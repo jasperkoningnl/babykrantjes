@@ -35,12 +35,7 @@ export default function Step3Fotos({ data, updateData, onNext, onBack }: Props) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validatie: minimaal 1 foto
-    if (!data.foto1 && !data.foto2 && !data.foto3 && !data.foto4) {
-      alert('Upload minimaal 1 foto')
-      return
-    }
-    
+    // Voor testfase: geen validatie, alles optioneel
     onNext()
   }
 
@@ -113,13 +108,13 @@ export default function Step3Fotos({ data, updateData, onNext, onBack }: Props) 
       <div>
         <h2 className="text-2xl font-bold mb-2">Foto's uploaden</h2>
         <p className="text-gray-600 mb-6">
-          Upload minimaal 1 en maximaal 4 foto's voor het openingsartikel.
+          Upload maximaal 4 foto's voor het openingsartikel (optioneel voor testfase).
           Deze foto's komen op de voorpagina van het babykrantje.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {renderFotoUpload('foto1', 'Foto 1', true)}
+        {renderFotoUpload('foto1', 'Foto 1')}
         {renderFotoUpload('foto2', 'Foto 2')}
         {renderFotoUpload('foto3', 'Foto 3')}
         {renderFotoUpload('foto4', 'Foto 4')}

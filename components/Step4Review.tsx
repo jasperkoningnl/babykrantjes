@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import type { BabykrantData } from '@/lib/types'
 
 interface Props {
@@ -8,10 +9,14 @@ interface Props {
 }
 
 export default function Step4Review({ data, onBack }: Props) {
+  const router = useRouter()
+  
   const handleGenerate = () => {
-    // Voor nu: toon de data als JSON
-    console.log('Babykrant data:', data)
-    alert('Data is verzameld! (Check console voor JSON)\n\nVolgende stap: AI artikelen genereren (komt in volgende fase)')
+    // Sla data op in localStorage voor testpagina
+    localStorage.setItem('babykrant_test_data', JSON.stringify(data))
+    
+    // Navigeer naar testpagina
+    router.push('/test-results')
   }
 
   const formatDate = (dateString: string) => {
