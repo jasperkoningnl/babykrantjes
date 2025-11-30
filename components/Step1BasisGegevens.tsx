@@ -12,10 +12,9 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validatie
-    if (!data.volledigeNaam || !data.geboorteDatum || !data.geboorteTijd || 
-        !data.gewicht || !data.lengte || !data.naamVader || !data.naamMoeder) {
-      alert('Vul alle verplichte velden in')
+    // Validatie - alleen essentiële velden verplicht voor testen
+    if (!data.volledigeNaam || !data.geboorteDatum) {
+      alert('Vul minimaal de naam en geboortedatum in')
       return
     }
     
@@ -61,14 +60,13 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
         
         <div>
           <label className="block text-sm font-medium mb-2">
-            Tijdstip *
+            Tijdstip
           </label>
           <input
             type="time"
             value={data.geboorteTijd}
             onChange={(e) => updateData({ geboorteTijd: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required
           />
         </div>
       </div>
@@ -77,7 +75,7 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium mb-2">
-            Gewicht (gram) *
+            Gewicht (gram)
           </label>
           <input
             type="number"
@@ -86,13 +84,12 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Bijv. 3450"
             min="0"
-            required
           />
         </div>
         
         <div>
           <label className="block text-sm font-medium mb-2">
-            Lengte (cm) *
+            Lengte (cm)
           </label>
           <input
             type="number"
@@ -101,7 +98,6 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Bijv. 51"
             min="0"
-            required
           />
         </div>
       </div>
@@ -184,7 +180,7 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium mb-2">
-            Naam vader *
+            Naam vader
           </label>
           <input
             type="text"
@@ -192,13 +188,12 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
             onChange={(e) => updateData({ naamVader: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Volledige naam"
-            required
           />
         </div>
         
         <div>
           <label className="block text-sm font-medium mb-2">
-            Naam moeder *
+            Naam moeder
           </label>
           <input
             type="text"
@@ -206,7 +201,6 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
             onChange={(e) => updateData({ naamMoeder: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Volledige naam"
-            required
           />
         </div>
       </div>
