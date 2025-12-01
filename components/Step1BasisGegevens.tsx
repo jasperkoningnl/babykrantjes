@@ -71,24 +71,6 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
         </div>
       </div>
 
-      {/* Geboorteplaats */}
-      <div>
-        <label className="block text-sm font-medium mb-2">
-          Geboorteplaats (stad) *
-        </label>
-        <input
-          type="text"
-          value={data.geboorteplaats}
-          onChange={(e) => updateData({ geboorteplaats: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Bijv. Zwolle, Amsterdam, Utrecht..."
-          required
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          We gebruiken dit voor het lokale weerbericht op de geboortedatum
-        </p>
-      </div>
-
       {/* Gewicht en lengte */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -118,6 +100,24 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
             min="0"
           />
         </div>
+      </div>
+
+      {/* Geboorteplaats */}
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          Geboorteplaats *
+        </label>
+        <input
+          type="text"
+          value={data.geboorteplaats}
+          onChange={(e) => updateData({ geboorteplaats: e.target.value })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Bijv. Zwolle, Amsterdam, Utrecht..."
+          required
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          We gebruiken dit voor het lokale weerbericht op de geboortedatum
+        </p>
       </div>
 
       {/* Geboortelocatie */}
