@@ -31,10 +31,18 @@ export default function Step4Review({ data, onBack }: Props) {
   }
 
   const geboorteLocatieText = () => {
-    const { geboorteLocatie, geboorteLocatieNaam } = data.basisGegevens
-    if (geboorteLocatie === 'thuis') return 'Thuis'
-    if (geboorteLocatieNaam) return geboorteLocatieNaam
-    return geboorteLocatie.charAt(0).toUpperCase() + geboorteLocatie.slice(1)
+    const { geboorteLocatie, geboorteLocatieNaam, geboorteplaats } = data.basisGegevens
+    
+    let locatie = ''
+    if (geboorteLocatie === 'thuis') {
+      locatie = 'Thuis'
+    } else if (geboorteLocatieNaam) {
+      locatie = geboorteLocatieNaam
+    } else {
+      locatie = geboorteLocatie.charAt(0).toUpperCase() + geboorteLocatie.slice(1)
+    }
+    
+    return `${locatie}, ${geboorteplaats}`
   }
 
   return (
@@ -76,25 +84,18 @@ export default function Step4Review({ data, onBack }: Props) {
           
           <div>
             <span className="font-medium text-gray-600">Gewicht:</span>
-            <p className="text-gray-900">{data.basisGegevens.gewicht} gram</p>
+            <p className="text-gray-900">{data.basisGegevens.gewicht ? `${data.basisGegevens.gewicht} gram` : '-'}</p>
           </div>
           
           <div>
             <span className="font-medium text-gray-600">Lengte:</span>
-            <p className="text-gray-900">{data.basisGegevens.lengte} cm</p>
+            <p className="text-gray-900">{data.basisGegevens.lengte ? `${data.basisGegevens.lengte} cm` : '-'}</p>
           </div>
-          
-          {data.basisGegevens.woonplaats && (
-            <div>
-              <span className="font-medium text-gray-600">Woonplaats:</span>
-              <p className="text-gray-900">{data.basisGegevens.woonplaats}</p>
-            </div>
-          )}
           
           <div>
             <span className="font-medium text-gray-600">Ouders:</span>
             <p className="text-gray-900">
-              {data.basisGegevens.naamVader} & {data.basisGegevens.naamMoeder}
+              {data.basisGegevens.naamVader || '-'} & {data.basisGegevens.naamMoeder || '-'}
             </p>
           </div>
         </div>

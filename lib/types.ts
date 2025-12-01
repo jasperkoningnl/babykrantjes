@@ -4,11 +4,11 @@ export interface BasisGegevens {
   volledigeNaam: string;
   geboorteDatum: string; // YYYY-MM-DD
   geboorteTijd: string; // HH:MM
+  geboorteplaats: string; // Stad/plaats - verplicht voor weerbericht
   geboorteLocatie: 'thuis' | 'ziekenhuis' | 'anders';
   geboorteLocatieNaam?: string; // Naam van ziekenhuis of andere locatie
   gewicht: number; // in grammen
   lengte: number; // in cm
-  woonplaats?: string; // optioneel, als afwijkend
   naamVader: string;
   naamMoeder: string;
 }

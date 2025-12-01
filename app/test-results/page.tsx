@@ -4,15 +4,31 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { BabykrantData } from '@/lib/types'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen, getKleur } from '@/lib/calculations'
+import { getHistoricalWeather, formatWeatherReport, type WeatherData } from '@/lib/weatherAPI'
 
 export default function TestResultsPage() {
   const [data, setData] = useState<BabykrantData | null>(null)
+  const [weather, setWeather] = useState<WeatherData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [weatherLoading, setWeatherLoading] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('babykrant_test_data')
     if (stored) {
-      setData(JSON.parse(stored))
+      const parsedData = JSON.parse(stored)
+      setData(parsedData)
+      
+      // Haal weerbericht op
+      if (parsedData.basisGegevens.geboorteDatum && parsedData.basisGegevens.geboorteplaats) {
+        setWeatherLoading(true)
+        getHistoricalWeather(
+          parsedData.basisGegevens.geboorteDatum,
+          parsedData.basisGegevens.geboorteplaats
+        ).then(weatherData => {
+          setWeather(weatherData)
+          setWeatherLoading(false)
+        })
+      }
     }
     setLoading(false)
   }, [])
@@ -90,13 +106,59 @@ export default function TestResultsPage() {
 
           {/* Placeholder voor API data */}
           <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">⏳ API Data (Fase 1C)</h2>
-            <div className="space-y-3 text-sm">
-              <div>
-                <span className="font-medium text-gray-600">Weerbericht op {data.basisGegevens.geboorteDatum}:</span>
-                <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
+            <h2 className="text-xl font-semibold mb-4">🌤️ Weerbericht</h2>
+            
+            {weatherLoading && (
+              <p className="text-gray-500 italic">Weerbericht wordt opgehaald...</p>
+            )}
+            
+            {!weatherLoading && weather && (
+              <div className="space-y-3">
+                <div>
+                  <span className="font-medium text-gray-600">
+                    Weer in {weather.city} op {new Date(weather.date).toLocaleDateString('nl-NL', { 
+                      weekday: 'long',
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}:
+                  </span>
+                  <p className="text-gray-900 mt-2">{formatWeatherReport(weather)}</p>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Max temperatuur</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.temperature_max}°C</div>
+                  </div>
+                  
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Min temperatuur</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.temperature_min}°C</div>
+                  </div>
+                  
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Neerslag</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.precipitation}mm</div>
+                  </div>
+                  
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Zonneschijn</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.sunshine_duration}u</div>
+                  </div>
+                </div>
               </div>
-              
+            )}
+            
+            {!weatherLoading && !weather && (
+              <p className="text-red-500">Weerbericht kon niet worden opgehaald</p>
+            )}
+          </div>
+
+          {/* Placeholder voor overige API data */}
+          <div className="bg-gray-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">⏳ Overige Data (Fase 1C)</h2>
+            <div className="space-y-3 text-sm">
               <div>
                 <span className="font-medium text-gray-600">Top films in {new Date(data.basisGegevens.geboorteDatum).getFullYear()}:</span>
                 <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>

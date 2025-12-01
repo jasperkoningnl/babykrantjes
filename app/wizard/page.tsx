@@ -14,6 +14,7 @@ export default function WizardPage() {
       volledigeNaam: '',
       geboorteDatum: '',
       geboorteTijd: '',
+      geboorteplaats: '',
       geboorteLocatie: 'ziekenhuis',
       gewicht: 0,
       lengte: 0,

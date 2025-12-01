@@ -12,9 +12,9 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validatie - alleen essentiële velden verplicht voor testen
-    if (!data.volledigeNaam || !data.geboorteDatum) {
-      alert('Vul minimaal de naam en geboortedatum in')
+    // Validatie - essentiële velden voor testen
+    if (!data.volledigeNaam || !data.geboorteDatum || !data.geboorteplaats) {
+      alert('Vul minimaal de naam, geboortedatum en geboorteplaats in')
       return
     }
     
@@ -71,6 +71,24 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
         </div>
       </div>
 
+      {/* Geboorteplaats */}
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          Geboorteplaats (stad) *
+        </label>
+        <input
+          type="text"
+          value={data.geboorteplaats}
+          onChange={(e) => updateData({ geboorteplaats: e.target.value })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Bijv. Zwolle, Amsterdam, Utrecht..."
+          required
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          We gebruiken dit voor het lokale weerbericht op de geboortedatum
+        </p>
+      </div>
+
       {/* Gewicht en lengte */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -105,7 +123,7 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
       {/* Geboortelocatie */}
       <div>
         <label className="block text-sm font-medium mb-2">
-          Geboorteplaats *
+          Type geboortelocatie
         </label>
         <div className="space-y-2">
           <div className="flex items-center space-x-4">
@@ -156,24 +174,10 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
               value={data.geboorteLocatieNaam || ''}
               onChange={(e) => updateData({ geboorteLocatieNaam: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder={data.geboorteLocatie === 'ziekenhuis' ? 'Naam ziekenhuis' : 'Bijv. geboortecentrum, onderweg...'}
+              placeholder={data.geboorteLocatie === 'ziekenhuis' ? 'Naam ziekenhuis (bijv. Isala Ziekenhuis)' : 'Bijv. geboortecentrum, onderweg...'}
             />
           )}
         </div>
-      </div>
-
-      {/* Woonplaats (optioneel) */}
-      <div>
-        <label className="block text-sm font-medium mb-2">
-          Woonplaats (optioneel, indien afwijkend van geboorteplaats)
-        </label>
-        <input
-          type="text"
-          value={data.woonplaats || ''}
-          onChange={(e) => updateData({ woonplaats: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Bijv. Amsterdam"
-        />
       </div>
 
       {/* Ouders */}
