@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { BabykrantData } from '@/lib/types'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen, getKleur } from '@/lib/calculations'
-import { getHistoricalWeather, formatWeatherReport, type WeatherData } from '@/lib/weatherAPI'
+import { getHistoricalWeather, formatWeatherReport, type WeatherData } from '@/lib/weatherApi'
+import { getBornOnThisDay, type BornPerson } from '@/lib/wikipediaAPI'
 
 export default function TestResultsPage() {
   const [data, setData] = useState<BabykrantData | null>(null)
   const [weather, setWeather] = useState<WeatherData | null>(null)
+  const [bornPersons, setBornPersons] = useState<BornPerson[]>([])
   const [loading, setLoading] = useState(true)
   const [weatherLoading, setWeatherLoading] = useState(false)
+  const [bornLoading, setBornLoading] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('babykrant_test_data')
@@ -27,6 +30,15 @@ export default function TestResultsPage() {
         ).then(weatherData => {
           setWeather(weatherData)
           setWeatherLoading(false)
+        })
+      }
+      
+      // Haal geboren personen op
+      if (parsedData.basisGegevens.geboorteDatum) {
+        setBornLoading(true)
+        getBornOnThisDay(parsedData.basisGegevens.geboorteDatum).then(persons => {
+          setBornPersons(persons)
+          setBornLoading(false)
         })
       }
     }
@@ -155,9 +167,53 @@ export default function TestResultsPage() {
             )}
           </div>
 
+          {/* Geboren personen */}
+          <div className="bg-gray-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">🎂 Ook geboren op deze dag</h2>
+            
+            {bornLoading && (
+              <p className="text-gray-500 italic">Bekende personen worden opgehaald...</p>
+            )}
+            
+            {!bornLoading && bornPersons.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 mb-3">
+                  Ook geboren op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { 
+                    day: 'numeric',
+                    month: 'long'
+                  })}:
+                </p>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  {bornPersons.slice(0, 8).map((person, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-semibold text-gray-900">{person.name}</span>
+                          <span className="text-gray-500 ml-2">({person.year})</span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{person.description}</p>
+                    </div>
+                  ))}
+                </div>
+                
+                {bornPersons.length > 8 && (
+                  <p className="text-xs text-gray-500 mt-3">
+                    En nog {bornPersons.length - 8} andere bekende personen...
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {!bornLoading && bornPersons.length === 0 && (
+              <p className="text-gray-500 italic">Geen bekende personen gevonden voor deze datum</p>
+            )}
+          </div>
+
           {/* Placeholder voor overige API data */}
           <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">⏳ Overige Data (Fase 1C)</h2>
+            <h2 className="text-xl font-semibold mb-4">⏳ Overige Data (Nog te implementeren)</h2>
             <div className="space-y-3 text-sm">
               <div>
                 <span className="font-medium text-gray-600">Top films in {new Date(data.basisGegevens.geboorteDatum).getFullYear()}:</span>
@@ -165,7 +221,18 @@ export default function TestResultsPage() {
               </div>
               
               <div>
-                <span className="font-medium text-gray-600">Belangrijke gebeurtenissen:</span>
+                <span className="font-medium text-gray-600">Belangrijke gebeurtenissen op deze dag:</span>
+                <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
+              </div>
+            </div>
+          </div>
+              <div>
+                <span className="font-medium text-gray-600">Top films in {new Date(data.basisGegevens.geboorteDatum).getFullYear()}:</span>
+                <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
+              </div>
+              
+              <div>
+                <span className="font-medium text-gray-600">Belangrijke gebeurtenissen op deze dag:</span>
                 <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
               </div>
               
