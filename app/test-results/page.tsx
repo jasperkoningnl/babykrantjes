@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { BabykrantData } from '@/lib/types'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen, getKleur } from '@/lib/calculations'
-import { getHistoricalWeather, formatWeatherReport, type WeatherData } from '@/lib/weatherApi'
+import { getHistoricalWeather, formatWeatherReport, type WeatherData } from '@/lib/weatherAPI'
 import { getBornOnThisDay, type BornPerson } from '@/lib/wikipediaAPI'
 
 export default function TestResultsPage() {
