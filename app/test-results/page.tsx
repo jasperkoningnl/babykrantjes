@@ -21,7 +21,6 @@ export default function TestResultsPage() {
       const parsedData = JSON.parse(stored)
       setData(parsedData)
       
-      // Haal weerbericht op
       if (parsedData.basisGegevens.geboorteDatum && parsedData.basisGegevens.geboorteplaats) {
         setWeatherLoading(true)
         getHistoricalWeather(
@@ -33,7 +32,6 @@ export default function TestResultsPage() {
         })
       }
       
-      // Haal geboren personen op
       if (parsedData.basisGegevens.geboorteDatum) {
         setBornLoading(true)
         getBornOnThisDay(parsedData.basisGegevens.geboorteDatum).then(persons => {
@@ -85,7 +83,6 @@ export default function TestResultsPage() {
             <p className="text-gray-600">Bekijk de berekende gegevens en opgehaalde informatie</p>
           </div>
 
-          {/* Berekende gegevens */}
           <div className="bg-blue-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">✅ Berekende Gegevens</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -116,7 +113,6 @@ export default function TestResultsPage() {
             </div>
           </div>
 
-          {/* Placeholder voor API data */}
           <div className="bg-gray-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">🌤️ Weerbericht</h2>
             
@@ -167,7 +163,6 @@ export default function TestResultsPage() {
             )}
           </div>
 
-          {/* Geboren personen */}
           <div className="bg-gray-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">🎂 Ook geboren op deze dag</h2>
             
@@ -211,7 +206,6 @@ export default function TestResultsPage() {
             )}
           </div>
 
-          {/* Placeholder voor overige API data */}
           <div className="bg-gray-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">⏳ Overige Data (Nog te implementeren)</h2>
             <div className="space-y-3 text-sm">
@@ -226,24 +220,7 @@ export default function TestResultsPage() {
               </div>
             </div>
           </div>
-              <div>
-                <span className="font-medium text-gray-600">Top films in {new Date(data.basisGegevens.geboorteDatum).getFullYear()}:</span>
-                <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
-              </div>
-              
-              <div>
-                <span className="font-medium text-gray-600">Belangrijke gebeurtenissen op deze dag:</span>
-                <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
-              </div>
-              
-              <div>
-                <span className="font-medium text-gray-600">Bekende personen geboren op deze dag:</span>
-                <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Ingevoerde data */}
           <div className="bg-gray-50 rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-4">📋 Ingevoerde Data</h2>
             <details className="cursor-pointer">
@@ -254,7 +231,6 @@ export default function TestResultsPage() {
             </details>
           </div>
 
-          {/* Acties */}
           <div className="mt-6 flex gap-4">
             <Link 
               href="/wizard"
