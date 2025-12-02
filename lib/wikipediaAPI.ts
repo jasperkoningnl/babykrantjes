@@ -71,7 +71,7 @@ function parseGeborenSection(html: string, pageUrl: string): BornPerson[] {
   console.log('Parsing HTML for births...')
   
   // Zoek list items in de HTML (geboren sectie is meestal de eerste ul)
-  const listItemRegex = /<li>(.*?)<\/li>/gs
+  const listItemRegex = /<li>([\s\S]*?)<\/li>/g
   let match
   let itemCount = 0
   
