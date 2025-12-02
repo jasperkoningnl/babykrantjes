@@ -93,8 +93,12 @@ function parseGeborenSection(html: string, pageUrl: string): BornPerson[] {
     const year = parseInt(yearMatch[1])
     if (year < 1800 || year > 2015) continue
     
-    // Extract naam uit de eerste link
-    const linkMatch = item.match(/<a\s+href="[^"]*"\s+title="([^"]*)">([^<]+)<\/a>/)
+    // Extract naam uit de EERSTE link NA het jaar
+    // Skip de jaar-link zelf als die er is
+    const afterYear = yearMatch[0].length
+    const remainingItem = item.substring(afterYear)
+    
+    const linkMatch = remainingItem.match(/<a\s+href="[^"]*"\s+title="([^"]*)">([^<]+)<\/a>/)
     if (!linkMatch) continue
     
     const title = linkMatch[1]
@@ -105,16 +109,15 @@ function parseGeborenSection(html: string, pageUrl: string): BornPerson[] {
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
     
-    // Extract beschrijving (alles na jaar en naam, voor eventuele referenties)
-    let description = item
+    // Extract beschrijving (alles na naam, voor eventuele referenties)
+    let description = remainingItem
       .replace(/<sup[^>]*>.*?<\/sup>/g, '') // Verwijder referenties
       .replace(/<[^>]+>/g, '') // Strip HTML
       .replace(/&amp;/g, '&')
       .replace(/&quot;/g, '"')
       .replace(/&#0?39;/g, "'")
-      .replace(/\d{4}\s*[-–—]\s*/, '') // Verwijder jaar
       .replace(name, '') // Verwijder naam
-      .replace(/^[,\s]+/, '') // Trim
+      .replace(/^[,\s-]+/, '') // Trim
       .replace(/\([†\d\s-]+\)/, '') // Verwijder doodjaar info
       .trim()
     
