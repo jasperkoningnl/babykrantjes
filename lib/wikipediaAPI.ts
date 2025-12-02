@@ -79,8 +79,15 @@ function parseGeborenSection(html: string, pageUrl: string): BornPerson[] {
     itemCount++
     const item = match[1]
     
-    // Parse het jaar aan het begin van de regel
-    const yearMatch = item.match(/^(\d{4})\s*[-–—]\s*/)
+    // Parse het jaar - kan met of zonder link zijn
+    // Format 1: "1986 - Name" 
+    // Format 2: "<a href...>1986</a> - Name"
+    let yearMatch = item.match(/^(\d{4})\s*[-–—]\s*/)
+    if (!yearMatch) {
+      // Probeer met link
+      yearMatch = item.match(/^<a[^>]*>(\d{4})<\/a>\s*[-–—]\s*/)
+    }
+    
     if (!yearMatch) continue
     
     const year = parseInt(yearMatch[1])
