@@ -1,4 +1,4 @@
-// Wikipedia scraper voor "Geboren op deze dag" (NL Wikipedia pagina's)
+// Wikipedia scraper voor "Geboren op deze dag" (NL Wikipedia)
 
 export interface BornPerson {
   name: string
@@ -14,36 +14,50 @@ const MONTH_NAMES = [
 
 /**
  * Haal personen op die geboren zijn op een specifieke datum
- * Scrapet de Nederlandse Wikipedia pagina
  */
 export async function getBornOnThisDay(date: string): Promise<BornPerson[]> {
   try {
     const dateObj = new Date(date)
     const day = dateObj.getDate()
-    const month = MONTH_NAMES[dateObj.getMonth()]
+    const monthIndex = dateObj.getMonth()
+    const month = MONTH_NAMES[monthIndex]
     
-    // NL Wikipedia pagina URL (bijv. "28_maart")
-    const pageUrl = `${day}_${month}`
+    console.log(`Fetching births for ${day} ${month}`)
     
-    // Gebruik Wikipedia API om de pagina HTML op te halen
-    const apiUrl = `https://nl.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(pageUrl)}&prop=text&format=json&origin=*`
+    // Probeer eerst de Wikipedia Parse API
+    const pageTitle = `${day}_${month}`
+    const apiUrl = `https://nl.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(pageTitle)}&prop=text&section=2&format=json&origin=*`
     
-    const response = await fetch(apiUrl)
+    console.log('API URL:', apiUrl)
+    
+    const response = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'BabykrantjesGenerator/1.0',
+      }
+    })
     
     if (!response.ok) {
-      throw new Error(`Wikipedia API error: ${response.status}`)
+      console.error('Wikipedia API response not OK:', response.status)
+      return []
     }
     
     const data = await response.json()
+    console.log('Wikipedia API response:', data)
     
-    if (!data.parse || !data.parse.text) {
-      throw new Error('No Wikipedia data found')
+    if (data.error) {
+      console.error('Wikipedia API error:', data.error)
+      return []
+    }
+    
+    if (!data.parse || !data.parse.text || !data.parse.text['*']) {
+      console.error('No parse text in response')
+      return []
     }
     
     const html = data.parse.text['*']
+    console.log('HTML length:', html.length)
     
-    // Parse de "Geboren" sectie
-    return parseGeborenSection(html, pageUrl)
+    return parseGeborenSection(html, pageTitle)
     
   } catch (error) {
     console.error('Error fetching births from Wikipedia:', error)
@@ -54,80 +68,85 @@ export async function getBornOnThisDay(date: string): Promise<BornPerson[]> {
 function parseGeborenSection(html: string, pageUrl: string): BornPerson[] {
   const persons: BornPerson[] = []
   
-  // Zoek de "Geboren" heading
-  const geborenMatch = html.match(/<span class="mw-headline"[^>]*>Geboren<\/span>([\s\S]*?)(?=<span class="mw-headline"|$)/i)
+  console.log('Parsing HTML for births...')
   
-  if (!geborenMatch) {
-    console.warn('Geen "Geboren" sectie gevonden')
-    return []
-  }
-  
-  const geborenSection = geborenMatch[1]
-  
-  // Parse alle list items in deze sectie
-  const listItemRegex = /<li>(.*?)<\/li>/g
+  // Zoek list items in de HTML (geboren sectie is meestal de eerste ul)
+  const listItemRegex = /<li>(.*?)<\/li>/gs
   let match
+  let itemCount = 0
   
-  while ((match = listItemRegex.exec(geborenSection)) !== null) {
+  while ((match = listItemRegex.exec(html)) !== null) {
+    itemCount++
     const item = match[1]
     
-    // Parse het jaar en de naam/beschrijving
-    // Format: "1986 - <a href...>Lady Gaga</a>, Amerikaanse zangeres"
-    const yearMatch = item.match(/(\d{4})\s*[-–]\s*/)
+    // Parse het jaar aan het begin van de regel
+    const yearMatch = item.match(/^(\d{4})\s*[-–—]\s*/)
     if (!yearMatch) continue
     
     const year = parseInt(yearMatch[1])
-    if (year < 1800 || year > 2010) continue // Filter te oude/jonge personen
+    if (year < 1800 || year > 2015) continue
     
-    // Extract naam (eerste link na het jaar)
-    const nameMatch = item.match(/<a[^>]*title="([^"]*)"[^>]*>([^<]+)<\/a>/)
-    if (!nameMatch) continue
+    // Extract naam uit de eerste link
+    const linkMatch = item.match(/<a\s+href="[^"]*"\s+title="([^"]*)">([^<]+)<\/a>/)
+    if (!linkMatch) continue
     
-    const name = nameMatch[2]
+    const title = linkMatch[1]
+    const name = linkMatch[2]
       .replace(/&amp;/g, '&')
       .replace(/&quot;/g, '"')
-      .replace(/&#039;/g, "'")
+      .replace(/&#0?39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
     
-    // Extract beschrijving (tekst na de naam)
+    // Extract beschrijving (alles na jaar en naam, voor eventuele referenties)
     let description = item
+      .replace(/<sup[^>]*>.*?<\/sup>/g, '') // Verwijder referenties
       .replace(/<[^>]+>/g, '') // Strip HTML
       .replace(/&amp;/g, '&')
       .replace(/&quot;/g, '"')
-      .replace(/&#039;/g, "'")
-      .replace(/\d{4}\s*[-–]\s*/, '') // Verwijder jaar
+      .replace(/&#0?39;/g, "'")
+      .replace(/\d{4}\s*[-–—]\s*/, '') // Verwijder jaar
       .replace(name, '') // Verwijder naam
-      .replace(/^[,\s]+/, '') // Verwijder leading comma/spaces
+      .replace(/^[,\s]+/, '') // Trim
+      .replace(/\([†\d\s-]+\)/, '') // Verwijder doodjaar info
       .trim()
     
-    // Als beschrijving te lang is, neem eerste deel
-    if (description.length > 100) {
-      description = description.substring(0, 100) + '...'
+    // Eerste zin pakken als beschrijving te lang is
+    if (description.length > 80) {
+      const firstSentence = description.split(/[.;]|,\s(?=[A-Z])/)[0]
+      description = firstSentence.trim()
     }
     
-    const wikipediaUrl = `https://nl.wikipedia.org/wiki/${encodeURIComponent(nameMatch[1].replace(/ /g, '_'))}`
+    if (!description || description.length < 3) {
+      description = 'Bekende persoon'
+    }
+    
+    const wikipediaUrl = `https://nl.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`
     
     persons.push({
       name,
       year,
-      description: description || 'Bekende persoon',
+      description,
       wikipediaUrl
     })
+    
+    console.log(`Found: ${name} (${year}) - ${description}`)
   }
   
-  // Sorteer: mix van bekende tijdperken
+  console.log(`Total items parsed: ${itemCount}, persons found: ${persons.length}`)
+  
+  // Sorteer op bekendheid (golden age eerst)
   persons.sort((a, b) => {
-    // Prioriteit voor "golden age" (1920-2000)
     const aGolden = a.year >= 1920 && a.year <= 2000
     const bGolden = b.year >= 1920 && b.year <= 2000
     
     if (aGolden && !bGolden) return -1
     if (!aGolden && bGolden) return 1
     
-    // Binnen groepen: afwisseling oud/nieuw
-    return Math.abs(1960 - a.year) - Math.abs(1960 - b.year)
+    return Math.abs(1965 - a.year) - Math.abs(1965 - b.year)
   })
   
-  return persons.slice(0, 20) // Max 20 personen
+  return persons.slice(0, 15)
 }
 
 /**
