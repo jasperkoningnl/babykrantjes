@@ -135,14 +135,33 @@ function parseGeborenSection(html: string, pageUrl: string): BornPerson[] {
   
   console.log(`Total items parsed: ${itemCount}, persons found: ${persons.length}`)
   
-  // Sorteer op bekendheid (golden age eerst)
+  // Handmatige prioriteit voor zeer bekende personen
+  const famousKeywords = [
+    'nobelprijswinnaar', 'oscar', 'acteur', 'actrice', 'zanger', 'zangeres',
+    'schrijver', 'koning', 'koningin', 'president', 'premier', 'wiskundige'
+  ]
+  
+  // Sorteer op bekendheid
   persons.sort((a, b) => {
-    const aGolden = a.year >= 1920 && a.year <= 2000
-    const bGolden = b.year >= 1920 && b.year <= 2000
+    // Check of beschrijving bekende keywords bevat
+    const aFamous = famousKeywords.some(kw => 
+      a.description.toLowerCase().includes(kw)
+    )
+    const bFamous = famousKeywords.some(kw => 
+      b.description.toLowerCase().includes(kw)
+    )
+    
+    if (aFamous && !bFamous) return -1
+    if (!aFamous && bFamous) return 1
+    
+    // Als beide famous of beide niet: sorteer op golden age (1940-1990)
+    const aGolden = a.year >= 1940 && a.year <= 1990
+    const bGolden = b.year >= 1940 && b.year <= 1990
     
     if (aGolden && !bGolden) return -1
     if (!aGolden && bGolden) return 1
     
+    // Binnen dezelfde categorie: meer naar midden van periode
     return Math.abs(1965 - a.year) - Math.abs(1965 - b.year)
   })
   
