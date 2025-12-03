@@ -36,11 +36,30 @@ export interface BabykrantData {
   fotos: GeuploadeFotos;
 }
 
-// Voor later: berekende gegevens
+// Berekende gegevens
 export interface BerekendGegevens {
   sterrenbeeld: string;
   chineesJaar: string;
   geboortebloem: string;
   geboortesteen: string;
   kleur: string;
+}
+
+// Naam betekenis en bekende naamdragers
+export interface FamousPerson {
+  name: string;
+  description: string;
+  wikipediaUrl?: string;
+  source: 'nl' | 'en';
+}
+
+export interface NameData {
+  firstName: string;
+  meaning: string | null;
+  origin: string | null;
+  famousPersons: FamousPerson[];
+  sources: {
+    nl: string | null;
+    en: string | null;
+  };
 }

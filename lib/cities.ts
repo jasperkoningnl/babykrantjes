@@ -27,7 +27,6 @@ export const DUTCH_CITIES: CityCoordinates[] = [
   { name: 'Haarlemmermeer', lat: 52.3030, lon: 4.6898 },
   { name: 'Zwolle', lat: 52.5168, lon: 6.0830 },
   { name: 'Zoetermeer', lat: 52.0575, lon: 4.4932 },
-  { name: 'Leiden', lat: 52.1601, lon: 4.4970 },
   { name: 'Maastricht', lat: 50.8514, lon: 5.6909 },
   { name: 'Dordrecht', lat: 51.8133, lon: 4.6901 },
   { name: 'Ede', lat: 52.0408, lon: 5.6588 },
