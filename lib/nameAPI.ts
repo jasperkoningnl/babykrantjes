@@ -1,5 +1,5 @@
 // Wikipedia API voor naambetekenis en bekende naamdragers
-// Parallelle lookup in NL en EN Wikipedia met fallback logica
+// Strikte fallback: NL eerst, dan EN, met slimme doorverwijzing
 
 export interface FamousPerson {
   name: string
@@ -24,6 +24,15 @@ interface WikipediaResult {
   origin: string | null
   famousPersons: FamousPerson[]
   pageUrl: string | null
+  success: boolean
+}
+
+const EMPTY_RESULT: WikipediaResult = {
+  meaning: null,
+  origin: null,
+  famousPersons: [],
+  pageUrl: null,
+  success: false
 }
 
 /**
@@ -34,19 +43,26 @@ export function extractFirstName(fullName: string): string {
   if (!fullName || fullName.trim() === '') return ''
   
   const trimmed = fullName.trim()
-  
-  // Split op spaties, maar behoud streepjesnamen
   const parts = trimmed.split(/\s+/)
   
   if (parts.length === 0) return ''
   
-  // Eerste deel is de voornaam (inclusief eventueel streepje)
   return parts[0]
 }
 
 /**
+ * Haalt het eerste deel van een streepjesnaam op
+ * "Jan-Peter" → "Jan"
+ */
+function getFirstPartOfHyphenatedName(name: string): string | null {
+  if (!name.includes('-')) return null
+  const firstPart = name.split('-')[0]
+  return firstPart.length >= 2 ? firstPart : null
+}
+
+/**
  * Hoofdfunctie: haalt naambetekenis en bekende personen op
- * Probeert parallel NL en EN Wikipedia
+ * Strikte fallback: NL → EN → streepjesnaam fallback
  */
 export async function getNameMeaning(fullName: string): Promise<NameData> {
   const firstName = extractFirstName(fullName)
@@ -61,67 +77,193 @@ export async function getNameMeaning(fullName: string): Promise<NameData> {
     }
   }
 
-  console.log(`Looking up name: "${firstName}"`)
+  console.log(`[nameAPI] Looking up name: "${firstName}"`)
 
-  // Parallel beide talen proberen
-  const [nlResult, enResult] = await Promise.all([
-    fetchNameFromWikipedia(firstName, 'nl'),
-    fetchNameFromWikipedia(firstName, 'en')
-  ])
+  // Stap 1: Probeer NL Wikipedia
+  let nlResult = await fetchNameFromWikipedia(firstName, 'nl')
+  
+  // Stap 2: Als NL niet genoeg opleverde, probeer EN
+  let enResult: WikipediaResult = EMPTY_RESULT
+  if (!nlResult.success || (!nlResult.meaning && nlResult.famousPersons.length === 0)) {
+    enResult = await fetchNameFromWikipedia(firstName, 'en')
+  }
 
-  console.log('NL result:', nlResult)
-  console.log('EN result:', enResult)
+  // Stap 3: Als beide niets opleverden en het is een streepjesnaam, probeer eerste deel
+  const hyphenatedFirstPart = getFirstPartOfHyphenatedName(firstName)
+  if (hyphenatedFirstPart && !nlResult.success && !enResult.success) {
+    console.log(`[nameAPI] Trying first part of hyphenated name: "${hyphenatedFirstPart}"`)
+    
+    nlResult = await fetchNameFromWikipedia(hyphenatedFirstPart, 'nl')
+    if (!nlResult.success) {
+      enResult = await fetchNameFromWikipedia(hyphenatedFirstPart, 'en')
+    }
+  }
 
   // Resultaten combineren
-  return mergeResults(firstName, nlResult, enResult)
+  return combineResults(firstName, nlResult, enResult)
 }
 
 /**
  * Probeert een naam op te zoeken in Wikipedia (NL of EN)
- * Met fallback logica voor verschillende paginastructuren
+ * Met strikte fallback volgorde
  */
 async function fetchNameFromWikipedia(
   name: string, 
   lang: 'nl' | 'en'
 ): Promise<WikipediaResult> {
-  const emptyResult: WikipediaResult = {
-    meaning: null,
-    origin: null,
-    famousPersons: [],
-    pageUrl: null
-  }
+  console.log(`[nameAPI] [${lang.toUpperCase()}] Starting lookup for "${name}"`)
 
   try {
     // Stap 1: Probeer directe voornaam-pagina
-    const suffixes = lang === 'nl' 
-      ? ['_(voornaam)', ''] 
-      : ['_(given_name)', '_(name)', '']
+    const primarySuffix = lang === 'nl' ? '_(voornaam)' : '_(given_name)'
+    const primaryTitle = `${name}${primarySuffix}`
     
-    for (const suffix of suffixes) {
-      const pageTitle = `${name}${suffix}`
-      console.log(`[${lang}] Trying: ${pageTitle}`)
+    console.log(`[nameAPI] [${lang.toUpperCase()}] Trying: ${primaryTitle}`)
+    let result = await tryFetchWikipediaPage(primaryTitle, lang, name)
+    
+    if (result.success) {
+      console.log(`[nameAPI] [${lang.toUpperCase()}] Success with ${primaryTitle}`)
+      return result
+    }
+
+    // Stap 2 (alleen EN): Probeer ook _(name) variant
+    if (lang === 'en') {
+      const altTitle = `${name}_(name)`
+      console.log(`[nameAPI] [${lang.toUpperCase()}] Trying: ${altTitle}`)
+      result = await tryFetchWikipediaPage(altTitle, lang, name)
       
-      const result = await tryFetchWikipediaPage(pageTitle, lang, name)
-      
-      if (result && (result.meaning || result.famousPersons.length > 0)) {
+      if (result.success) {
+        console.log(`[nameAPI] [${lang.toUpperCase()}] Success with ${altTitle}`)
         return result
-      }
-      
-      // Check of het een doorverwijspagina is
-      if (result && result.pageUrl === 'disambiguation') {
-        console.log(`[${lang}] Disambiguation page found, searching for given name link...`)
-        const disambigResult = await handleDisambiguationPage(name, lang)
-        if (disambigResult) {
-          return disambigResult
-        }
       }
     }
 
-    return emptyResult
+    // Stap 3: Probeer basis-pagina en check voor doorverwijzing
+    console.log(`[nameAPI] [${lang.toUpperCase()}] Trying base page: ${name}`)
+    const redirectResult = await tryFetchWithRedirectDetection(name, lang)
+    
+    if (redirectResult.success) {
+      console.log(`[nameAPI] [${lang.toUpperCase()}] Success via redirect`)
+      return redirectResult
+    }
+
+    console.log(`[nameAPI] [${lang.toUpperCase()}] No results found`)
+    return EMPTY_RESULT
+
   } catch (error) {
-    console.error(`[${lang}] Error fetching name data:`, error)
-    return emptyResult
+    console.error(`[nameAPI] [${lang.toUpperCase()}] Error:`, error)
+    return EMPTY_RESULT
   }
+}
+
+/**
+ * Probeert een pagina op te halen en checkt voor doorverwijzingen naar voornaam-pagina's
+ */
+async function tryFetchWithRedirectDetection(
+  name: string,
+  lang: 'nl' | 'en'
+): Promise<WikipediaResult> {
+  const baseUrl = lang === 'nl'
+    ? 'https://nl.wikipedia.org/w/api.php'
+    : 'https://en.wikipedia.org/w/api.php'
+
+  // Haal pagina op met links
+  const apiUrl = `${baseUrl}?action=parse&page=${encodeURIComponent(name)}&prop=text|links&format=json&origin=*`
+
+  try {
+    const response = await fetch(apiUrl, {
+      headers: { 'User-Agent': 'BabykrantjesGenerator/1.0' }
+    })
+
+    if (!response.ok) return EMPTY_RESULT
+
+    const data = await response.json()
+    
+    if (data.error) return EMPTY_RESULT
+    if (!data.parse?.text?.['*']) return EMPTY_RESULT
+
+    const html = data.parse.text['*']
+    const links = data.parse.links || []
+
+    // Check of het een doorverwijspagina is
+    if (isDisambiguationPage(html, lang)) {
+      console.log(`[nameAPI] [${lang.toUpperCase()}] Disambiguation page detected, scanning links...`)
+      
+      // Zoek naar voornaam-link in de links OF in de HTML tekst
+      const namePageLink = findNamePageLink(links, html, name, lang)
+      
+      if (namePageLink) {
+        console.log(`[nameAPI] [${lang.toUpperCase()}] Found name page link: ${namePageLink}`)
+        return await tryFetchWikipediaPage(namePageLink, lang, name)
+      }
+    }
+
+    // Geen doorverwijspagina of geen bruikbare link gevonden
+    return EMPTY_RESULT
+
+  } catch (error) {
+    console.error(`[nameAPI] [${lang.toUpperCase()}] Redirect detection error:`, error)
+    return EMPTY_RESULT
+  }
+}
+
+/**
+ * Zoekt naar een link naar een voornaam-pagina in de links en HTML
+ */
+function findNamePageLink(
+  links: Array<{ '*': string }>,
+  html: string,
+  originalName: string,
+  lang: 'nl' | 'en'
+): string | null {
+  // Patronen om te zoeken in link-titels
+  const urlPatterns = lang === 'nl'
+    ? ['(voornaam)', '(naam)']
+    : ['(given name)', '(given_name)', '(name)', '(first name)']
+
+  // Zoek eerst in de API links
+  for (const link of links) {
+    const title = link['*'] || ''
+    const lowerTitle = title.toLowerCase()
+    
+    if (urlPatterns.some(pattern => lowerTitle.includes(pattern.toLowerCase()))) {
+      return title
+    }
+  }
+
+  // Zoek in de HTML naar tekst die verwijst naar een voornaam
+  // Bijv: "Filip, verkorte vorm van de voornaam"
+  const textPatterns = lang === 'nl'
+    ? [/voornaam/i, /eigennaam/i, /roepnaam/i, /meisjesnaam/i, /jongensnaam/i]
+    : [/given name/i, /first name/i, /forename/i]
+
+  // Zoek links in de HTML die in de buurt staan van voornaam-tekst
+  const linkRegex = /<a[^>]+href="\/wiki\/([^"]+)"[^>]*title="([^"]*)"[^>]*>([^<]+)<\/a>/gi
+  let match
+
+  while ((match = linkRegex.exec(html)) !== null) {
+    const href = match[1]
+    const title = match[2]
+    const linkText = match[3]
+    
+    // Check de context rondom de link (50 karakters ervoor en erna)
+    const startIdx = Math.max(0, match.index - 50)
+    const endIdx = Math.min(html.length, match.index + match[0].length + 50)
+    const context = html.substring(startIdx, endIdx)
+    
+    // Als de context een voornaam-patroon bevat, en de link is niet een datum/jaar
+    if (textPatterns.some(pattern => pattern.test(context))) {
+      // Filter uit: jaren, datums, algemene woorden
+      if (!/^\d{4}$/.test(linkText) && !href.includes(':') && linkText.length > 2) {
+        // Decodeer de URL
+        const decodedTitle = decodeURIComponent(href.replace(/_/g, ' '))
+        console.log(`[nameAPI] Found potential name link via context: "${decodedTitle}"`)
+        return decodedTitle
+      }
+    }
+  }
+
+  return null
 }
 
 /**
@@ -131,7 +273,7 @@ async function tryFetchWikipediaPage(
   pageTitle: string,
   lang: 'nl' | 'en',
   originalName: string
-): Promise<WikipediaResult | null> {
+): Promise<WikipediaResult> {
   const baseUrl = lang === 'nl' 
     ? 'https://nl.wikipedia.org/w/api.php'
     : 'https://en.wikipedia.org/w/api.php'
@@ -144,32 +286,25 @@ async function tryFetchWikipediaPage(
     })
 
     if (!response.ok) {
-      console.log(`[${lang}] HTTP error for ${pageTitle}: ${response.status}`)
-      return null
+      return EMPTY_RESULT
     }
 
     const data = await response.json()
 
     if (data.error) {
-      console.log(`[${lang}] API error for ${pageTitle}:`, data.error.code)
-      return null
+      return EMPTY_RESULT
     }
 
     if (!data.parse?.text?.['*']) {
-      return null
+      return EMPTY_RESULT
     }
 
     const html = data.parse.text['*']
     const fullPageUrl = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(pageTitle.replace(/ /g, '_'))}`
 
-    // Check of het een doorverwijspagina is
+    // Check of het een doorverwijspagina is - zo ja, niet gebruiken
     if (isDisambiguationPage(html, lang)) {
-      return {
-        meaning: null,
-        origin: null,
-        famousPersons: [],
-        pageUrl: 'disambiguation'
-      }
+      return EMPTY_RESULT
     }
 
     // Parse de pagina
@@ -177,15 +312,19 @@ async function tryFetchWikipediaPage(
     const origin = parseNameOrigin(html, lang)
     const famousPersons = parseFamousPersons(html, lang, originalName)
 
+    // Bepaal of dit een succesvolle lookup was
+    const success = !!(meaning || famousPersons.length > 0)
+
     return {
       meaning,
       origin,
       famousPersons,
-      pageUrl: fullPageUrl
+      pageUrl: fullPageUrl,
+      success
     }
   } catch (error) {
-    console.error(`[${lang}] Fetch error for ${pageTitle}:`, error)
-    return null
+    console.error(`[nameAPI] Fetch error for ${pageTitle}:`, error)
+    return EMPTY_RESULT
   }
 }
 
@@ -194,58 +333,11 @@ async function tryFetchWikipediaPage(
  */
 function isDisambiguationPage(html: string, lang: 'nl' | 'en'): boolean {
   const markers = lang === 'nl'
-    ? ['doorverwijspagina', 'Dit is een doorverwijspagina']
-    : ['disambiguation', 'This disambiguation page', 'may refer to']
+    ? ['doorverwijspagina', 'Dit is een doorverwijspagina', 'kan verwijzen naar']
+    : ['disambiguation', 'This disambiguation page', 'may refer to', 'disambig']
   
   const lowerHtml = html.toLowerCase()
   return markers.some(marker => lowerHtml.includes(marker.toLowerCase()))
-}
-
-/**
- * Handelt een doorverwijspagina af door te zoeken naar voornaam-link
- */
-async function handleDisambiguationPage(
-  name: string,
-  lang: 'nl' | 'en'
-): Promise<WikipediaResult | null> {
-  const baseUrl = lang === 'nl'
-    ? 'https://nl.wikipedia.org/w/api.php'
-    : 'https://en.wikipedia.org/w/api.php'
-
-  // Haal de doorverwijspagina opnieuw op om links te scannen
-  const apiUrl = `${baseUrl}?action=parse&page=${encodeURIComponent(name)}&prop=links&format=json&origin=*`
-
-  try {
-    const response = await fetch(apiUrl, {
-      headers: { 'User-Agent': 'BabykrantjesGenerator/1.0' }
-    })
-
-    if (!response.ok) return null
-
-    const data = await response.json()
-    
-    if (!data.parse?.links) return null
-
-    // Zoek naar link met (voornaam), (given_name), of (name)
-    const targetSuffixes = lang === 'nl'
-      ? ['(voornaam)', '(naam)']
-      : ['(given name)', '(given_name)', '(name)', '(first name)']
-
-    for (const link of data.parse.links) {
-      const title = link['*'] || ''
-      const lowerTitle = title.toLowerCase()
-      
-      if (targetSuffixes.some(suffix => lowerTitle.includes(suffix.toLowerCase()))) {
-        console.log(`[${lang}] Found name page link: ${title}`)
-        return await tryFetchWikipediaPage(title, lang, name)
-      }
-    }
-
-    return null
-  } catch (error) {
-    console.error(`[${lang}] Error handling disambiguation:`, error)
-    return null
-  }
 }
 
 /**
@@ -253,10 +345,6 @@ async function handleDisambiguationPage(
  */
 function parseNameMeaning(html: string, lang: 'nl' | 'en'): string | null {
   try {
-    // Verwijder HTML tags voor makkelijker parsen, maar behoud structuur
-    // Zoek in de eerste paar paragrafen naar betekenis-informatie
-    
-    // Zoek de eerste <p> tag met substantiële inhoud
     const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi
     let match
     let meaningText = ''
@@ -264,15 +352,12 @@ function parseNameMeaning(html: string, lang: 'nl' | 'en'): string | null {
     
     while ((match = paragraphRegex.exec(html)) !== null && paragraphCount < 3) {
       const content = match[1]
-        .replace(/<sup[^>]*>.*?<\/sup>/g, '') // Verwijder referenties
-        .replace(/<[^>]+>/g, '') // Strip HTML
+        .replace(/<sup[^>]*>.*?<\/sup>/g, '')
+        .replace(/<[^>]+>/g, '')
         .replace(/\s+/g, ' ')
         .trim()
       
-      // Skip lege of te korte paragrafen
       if (content.length < 20) continue
-      
-      // Skip als het alleen een afbeeldingsbeschrijving is
       if (content.startsWith('thumb|') || content.includes('miniatur|')) continue
       
       paragraphCount++
@@ -283,20 +368,16 @@ function parseNameMeaning(html: string, lang: 'nl' | 'en'): string | null {
     
     if (!meaningText) return null
 
-    // Zoek naar typische betekenis-indicatoren
     const meaningIndicators = lang === 'nl'
-      ? ['betekent', 'betekenis', 'afgeleid van', 'komt van', 'afkomstig', 'Hebreeuwse', 'Griekse', 'Latijnse', 'Germaanse']
-      : ['means', 'meaning', 'derived from', 'comes from', 'origin', 'Hebrew', 'Greek', 'Latin', 'Germanic']
+      ? ['betekent', 'betekenis', 'afgeleid van', 'komt van', 'afkomstig', 'Hebreeuwse', 'Griekse', 'Latijnse', 'Germaanse', 'is een']
+      : ['means', 'meaning', 'derived from', 'comes from', 'origin', 'Hebrew', 'Greek', 'Latin', 'Germanic', 'is a']
 
-    // Check of de tekst betekenis-informatie bevat
     const hasMeaningInfo = meaningIndicators.some(indicator => 
       meaningText.toLowerCase().includes(indicator.toLowerCase())
     )
 
     if (hasMeaningInfo || meaningText.length > 50) {
-      // Beperk tot eerste ~500 karakters voor overzichtelijkheid
       if (meaningText.length > 500) {
-        // Probeer op een zin-grens af te kappen
         const truncated = meaningText.substring(0, 500)
         const lastSentence = truncated.lastIndexOf('. ')
         if (lastSentence > 200) {
@@ -318,9 +399,6 @@ function parseNameMeaning(html: string, lang: 'nl' | 'en'): string | null {
  * Parse naam-oorsprong uit de HTML
  */
 function parseNameOrigin(html: string, lang: 'nl' | 'en'): string | null {
-  // Voor nu extracten we oorsprong uit de betekenis-tekst
-  // Dit kan later verfijnd worden met specifieke parsing
-  
   const originPatterns = lang === 'nl'
     ? [
         /(?:is\s+)?(?:een\s+)?(\w+(?:se|sche))\s+(?:voor)?naam/i,
@@ -339,7 +417,6 @@ function parseNameOrigin(html: string, lang: 'nl' | 'en'): string | null {
     const match = text.match(pattern)
     if (match && match[1]) {
       const origin = match[1].trim()
-      // Filter onzinnige matches
       if (origin.length > 2 && origin.length < 30) {
         return origin
       }
@@ -351,6 +428,7 @@ function parseNameOrigin(html: string, lang: 'nl' | 'en'): string | null {
 
 /**
  * Parse bekende naamdragers uit de HTML
+ * Met filtering voor niet-personen (plaatsen, etc.)
  */
 function parseFamousPersons(
   html: string, 
@@ -360,16 +438,13 @@ function parseFamousPersons(
   const persons: FamousPerson[] = []
   
   try {
-    // Zoek de sectie met bekende naamdragers
     const sectionHeaders = lang === 'nl'
       ? ['Bekende naamdragers', 'Bekende personen', 'Naamdragers', 'Bekende mensen']
       : ['Notable people', 'People with the given name', 'People named', 'Famous people', 'Notable persons', 'People with this name']
 
     let sectionHtml = ''
     
-    // Zoek naar sectie headers
     for (const header of sectionHeaders) {
-      // Probeer verschillende header formaten
       const headerPatterns = [
         new RegExp(`<h[23][^>]*>\\s*(?:<[^>]+>)*\\s*${escapeRegex(header)}\\s*(?:<[^>]+>)*\\s*</h[23]>([\\s\\S]*?)(?=<h[23]|$)`, 'i'),
         new RegExp(`id="[^"]*${escapeRegex(header.replace(/ /g, '_'))}[^"]*"[^>]*>([\\s\\S]*?)(?=<h[23]|$)`, 'i')
@@ -379,7 +454,6 @@ function parseFamousPersons(
         const match = html.match(pattern)
         if (match) {
           sectionHtml = match[1] || match[0]
-          console.log(`[${lang}] Found section: ${header}`)
           break
         }
       }
@@ -387,20 +461,21 @@ function parseFamousPersons(
       if (sectionHtml) break
     }
 
-    // Als geen specifieke sectie gevonden, probeer bullet lists te vinden
     if (!sectionHtml) {
-      console.log(`[${lang}] No specific section found, scanning for lists...`)
       sectionHtml = html
     }
 
-    // Parse list items
     const listItemRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi
     let match
+
+    // Woorden die aangeven dat het GEEN persoon is
+    const nonPersonIndicators = lang === 'nl'
+      ? ['county', 'plaats', 'stad', 'dorp', 'gemeente', 'park', 'rivier', 'berg', 'eiland', 'gebied', 'streek', 'provincie', 'staat', 'district', 'regio']
+      : ['county', 'place', 'city', 'town', 'village', 'municipality', 'park', 'river', 'mountain', 'island', 'area', 'region', 'province', 'state', 'district', 'township', 'census-designated', 'unincorporated']
 
     while ((match = listItemRegex.exec(sectionHtml)) !== null) {
       const item = match[1]
       
-      // Zoek naar links naar personen
       const linkMatch = item.match(/<a\s+href="([^"]*)"[^>]*(?:\s+title="([^"]*)")?[^>]*>([^<]+)<\/a>/)
       
       if (!linkMatch) continue
@@ -409,23 +484,33 @@ function parseFamousPersons(
       const title = linkMatch[2] || linkMatch[3]
       const linkText = linkMatch[3]
       
-      // Filter: moet een persoonsnaam lijken
       // Skip categorieën, jaren, etc.
       if (href.includes(':') && !href.includes('/wiki/')) continue
-      if (/^\d{4}$/.test(linkText)) continue // Skip jaar-links
+      if (/^\d{4}$/.test(linkText)) continue
       if (linkText.length < 3) continue
       
-      // Haal beschrijving uit de rest van het list item
+      // Haal beschrijving
       let description = item
-        .replace(/<sup[^>]*>.*?<\/sup>/g, '') // Verwijder referenties
-        .replace(/<[^>]+>/g, ' ') // Strip HTML
+        .replace(/<sup[^>]*>.*?<\/sup>/g, '')
+        .replace(/<[^>]+>/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
       
-      // Verwijder de naam zelf uit de beschrijving
       description = description.replace(linkText, '').replace(/^[\s,\-–—:]+/, '').trim()
       
-      // Verkort beschrijving indien nodig
+      // Filter niet-personen op basis van beschrijving
+      const lowerDesc = description.toLowerCase()
+      const lowerTitle = title.toLowerCase()
+      const isNonPerson = nonPersonIndicators.some(indicator => 
+        lowerDesc.includes(indicator) || lowerTitle.includes(indicator)
+      )
+      
+      if (isNonPerson) {
+        console.log(`[nameAPI] Filtered out non-person: ${linkText} (${description})`)
+        continue
+      }
+      
+      // Verkort beschrijving
       if (description.length > 150) {
         const firstPart = description.substring(0, 150)
         const lastSpace = firstPart.lastIndexOf(' ')
@@ -436,7 +521,6 @@ function parseFamousPersons(
         description = ''
       }
 
-      // Bouw Wikipedia URL
       const baseWikiUrl = lang === 'nl' 
         ? 'https://nl.wikipedia.org'
         : 'https://en.wikipedia.org'
@@ -447,7 +531,6 @@ function parseFamousPersons(
           ? href 
           : `${baseWikiUrl}/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`
 
-      // Voeg toe als het niet dubbel is
       const isDuplicate = persons.some(p => 
         p.name.toLowerCase() === linkText.toLowerCase()
       )
@@ -462,9 +545,9 @@ function parseFamousPersons(
       }
     }
 
-    console.log(`[${lang}] Found ${persons.length} famous persons`)
+    console.log(`[nameAPI] [${lang.toUpperCase()}] Found ${persons.length} famous persons (after filtering)`)
   } catch (error) {
-    console.error(`[${lang}] Error parsing famous persons:`, error)
+    console.error(`[nameAPI] Error parsing famous persons:`, error)
   }
 
   return persons
@@ -473,20 +556,19 @@ function parseFamousPersons(
 /**
  * Combineert resultaten van NL en EN Wikipedia
  */
-function mergeResults(
+function combineResults(
   firstName: string,
   nlResult: WikipediaResult,
   enResult: WikipediaResult
 ): NameData {
   // Betekenis: prefereer NL, fallback naar EN
-  let meaning = nlResult.meaning || enResult.meaning
-  let origin = nlResult.origin || enResult.origin
+  const meaning = nlResult.meaning || enResult.meaning
+  const origin = nlResult.origin || enResult.origin
 
-  // Bekende personen: combineer beide lijsten, NL eerst
+  // Bekende personen: NL eerst, dan EN erbij (zonder duplicaten)
   const allPersons: FamousPerson[] = []
   const seenNames = new Set<string>()
 
-  // Voeg NL personen eerst toe
   for (const person of nlResult.famousPersons) {
     const lowerName = person.name.toLowerCase()
     if (!seenNames.has(lowerName)) {
@@ -495,7 +577,6 @@ function mergeResults(
     }
   }
 
-  // Voeg EN personen toe die nog niet in de lijst staan
   for (const person of enResult.famousPersons) {
     const lowerName = person.name.toLowerCase()
     if (!seenNames.has(lowerName)) {
@@ -510,8 +591,8 @@ function mergeResults(
     origin,
     famousPersons: allPersons,
     sources: {
-      nl: nlResult.pageUrl !== 'disambiguation' ? nlResult.pageUrl : null,
-      en: enResult.pageUrl !== 'disambiguation' ? enResult.pageUrl : null
+      nl: nlResult.pageUrl,
+      en: enResult.pageUrl
     }
   }
 }
@@ -535,3 +616,40 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&nbsp;/g, ' ')
 }
+```
+
+---
+
+### 📋 Samenvatting - Klaar om te deployen!
+
+**Aangepaste bestanden** (1):
+1. `lib/nameAPI.ts` - Volledig herschreven met verbeterde logica
+
+**Wat is veranderd:**
+
+1. **Strikte fallback i.p.v. parallel**
+   - NL wordt eerst volledig geprobeerd
+   - Alleen als NL niets oplevert → EN proberen
+   - Lost Martijn-probleem op
+
+2. **Streepjesnamen fallback**
+   - Als "Jan-Peter" niets oplevert → "Jan" proberen
+   - Lost Jan-Peter gedeeltelijk op
+
+3. **Slimmere doorverwijzing**
+   - Scant niet alleen URL's maar ook linktekst
+   - Zoekt naar "voornaam", "roepnaam", etc. in context
+   - Lost Flip → Filip op
+
+4. **Personen-filter**
+   - Filtert plaatsen, counties, parken, etc. uit bekende naamdragers
+   - Lost Jasper-probleem op
+
+**Git commit message:**
+```
+fix: improved name lookup with strict fallback and better filtering
+
+- Strict NL→EN fallback instead of parallel (fixes Martijn)
+- Hyphenated name fallback: Jan-Peter → Jan
+- Smarter redirect detection scanning link text for "voornaam"
+- Filter non-persons (places, counties) from famous namesakes
