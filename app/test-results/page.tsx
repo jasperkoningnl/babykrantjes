@@ -1,3 +1,5 @@
+// app/test-results/page.tsx
+// @version 1.3.0
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -5,18 +7,21 @@ import Link from 'next/link'
 import type { BabykrantData } from '@/lib/types'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen, getKleur } from '@/lib/calculations'
 import { getHistoricalWeather, formatWeatherReport, type WeatherData } from '@/lib/weatherAPI'
-import { getBornOnThisDay, type BornPerson } from '@/lib/wikipediaAPI'
-import { getNameMeaning, type NameData } from '@/lib/nameAPI'
+import { getBornOnThisDay, type BornPerson } from '@/lib/bornOnThisDayAPI'
+import { getNameMeaning, type NameMeaningData } from '@/lib/nameMeaningAPI'
+import { getFamousNamesakes, type FamousNamesakesData, type FamousPerson } from '@/lib/famousNamesakesAPI'
 
 export default function TestResultsPage() {
   const [data, setData] = useState<BabykrantData | null>(null)
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [bornPersons, setBornPersons] = useState<BornPerson[]>([])
-  const [nameData, setNameData] = useState<NameData | null>(null)
+  const [nameMeaning, setNameMeaning] = useState<NameMeaningData | null>(null)
+  const [famousNamesakes, setFamousNamesakes] = useState<FamousNamesakesData | null>(null)
   const [loading, setLoading] = useState(true)
   const [weatherLoading, setWeatherLoading] = useState(false)
   const [bornLoading, setBornLoading] = useState(false)
-  const [nameLoading, setNameLoading] = useState(false)
+  const [nameMeaningLoading, setNameMeaningLoading] = useState(false)
+  const [namesakesLoading, setNamesakesLoading] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('babykrant_test_data')
@@ -45,12 +50,19 @@ export default function TestResultsPage() {
         })
       }
       
-      // Naambetekenis ophalen
+      // Naambetekenis ophalen (nieuwe API)
       if (parsedData.basisGegevens.volledigeNaam) {
-        setNameLoading(true)
-        getNameMeaning(parsedData.basisGegevens.volledigeNaam).then(nameResult => {
-          setNameData(nameResult)
-          setNameLoading(false)
+        setNameMeaningLoading(true)
+        getNameMeaning(parsedData.basisGegevens.volledigeNaam).then(result => {
+          setNameMeaning(result)
+          setNameMeaningLoading(false)
+        })
+        
+        // Bekende naamdragers ophalen (aparte API)
+        setNamesakesLoading(true)
+        getFamousNamesakes(parsedData.basisGegevens.volledigeNaam).then(result => {
+          setFamousNamesakes(result)
+          setNamesakesLoading(false)
         })
       }
     }
@@ -83,6 +95,9 @@ export default function TestResultsPage() {
     geboortesteen: getGeboortesteen(data.basisGegevens.geboorteDatum),
     kleur: getKleur(data.basisGegevens.geboorteDatum),
   }
+
+  // Bepaal de voornaam voor de headers
+  const firstName = nameMeaning?.firstName || famousNamesakes?.firstName || '...'
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-pink-50 py-12 px-4">
@@ -130,67 +145,69 @@ export default function TestResultsPage() {
 
           {/* Naambetekenis */}
           <div className="bg-purple-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">📛 Betekenis naam {nameData?.firstName || '...'}</h2>
+            <h2 className="text-xl font-semibold mb-4">📛 Betekenis naam {firstName}</h2>
             
-            {nameLoading && (
+            {nameMeaningLoading && (
               <p className="text-gray-500 italic">Naambetekenis wordt opgehaald...</p>
             )}
             
-            {!nameLoading && nameData && (
+            {!nameMeaningLoading && nameMeaning && (
               <div className="space-y-4">
-                {nameData.meaning ? (
+                {nameMeaning.meaning ? (
                   <div>
                     <span className="font-medium text-gray-600">Betekenis:</span>
-                    <p className="text-gray-900 mt-1">{nameData.meaning}</p>
+                    <p className="text-gray-900 mt-1">{nameMeaning.meaning}</p>
                   </div>
                 ) : (
                   <p className="text-gray-500 italic">Geen betekenis gevonden</p>
                 )}
                 
-                {nameData.origin && (
+                {nameMeaning.origin && (
                   <div>
                     <span className="font-medium text-gray-600">Oorsprong:</span>
-                    <p className="text-gray-900 mt-1">{nameData.origin}</p>
+                    <p className="text-gray-900 mt-1">{nameMeaning.origin}</p>
                   </div>
                 )}
                 
-                {/* Bronnen */}
+                {nameMeaning.gender && (
+                  <div>
+                    <span className="font-medium text-gray-600">Geslacht:</span>
+                    <p className="text-gray-900 mt-1">{nameMeaning.gender}</p>
+                  </div>
+                )}
+                
+                {/* Bron */}
                 <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-purple-200">
-                  <span className="font-medium">Bronnen: </span>
-                  {nameData.sources.nl && (
-                    <a href={nameData.sources.nl} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline mr-3">
-                      Wikipedia NL
+                  <span className="font-medium">Bron: </span>
+                  {nameMeaning.source ? (
+                    <a href={nameMeaning.source} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
+                      {nameMeaning.source.includes('naamdokter') ? 'Naamdokter.nl' : 
+                       nameMeaning.source.includes('betekenisnamen') ? 'Betekenisnamen.nl' : 'Bron'}
                     </a>
-                  )}
-                  {nameData.sources.en && (
-                    <a href={nameData.sources.en} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
-                      Wikipedia EN
-                    </a>
-                  )}
-                  {!nameData.sources.nl && !nameData.sources.en && (
-                    <span>Geen bronnen gevonden</span>
+                  ) : (
+                    <span>Geen bron gevonden</span>
                   )}
                 </div>
               </div>
             )}
             
-            {!nameLoading && !nameData && (
+            {!nameMeaningLoading && !nameMeaning && (
               <p className="text-red-500">Naambetekenis kon niet worden opgehaald</p>
             )}
           </div>
 
           {/* Bekende naamdragers */}
           <div className="bg-pink-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">⭐ Bekende mensen die {nameData?.firstName || '...'} heten</h2>
+            <h2 className="text-xl font-semibold mb-4">⭐ Bekende mensen die {firstName} heten</h2>
             
-            {nameLoading && (
+            {namesakesLoading && (
               <p className="text-gray-500 italic">Bekende naamdragers worden opgehaald...</p>
             )}
             
-            {!nameLoading && nameData && nameData.famousPersons.length > 0 && (
+            {!namesakesLoading && famousNamesakes && famousNamesakes.persons.length > 0 && (
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-3">
-                  {nameData.famousPersons.map((person, idx) => (
+                  {famousNamesakes.persons.map((person, idx) => (
                     <div key={idx} className="bg-white p-3 rounded border border-pink-200">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
@@ -217,16 +234,31 @@ export default function TestResultsPage() {
                 </div>
                 
                 <p className="text-xs text-gray-500 mt-3">
-                  Totaal {nameData.famousPersons.length} bekende naamdragers gevonden
+                  Totaal {famousNamesakes.persons.length} bekende naamdragers gevonden
                 </p>
+                
+                {/* Bronnen */}
+                <div className="text-xs text-gray-500 pt-3 border-t border-pink-200">
+                  <span className="font-medium">Bronnen: </span>
+                  {famousNamesakes.sources.nl && (
+                    <a href={famousNamesakes.sources.nl} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline mr-3">
+                      Wikipedia NL
+                    </a>
+                  )}
+                  {famousNamesakes.sources.en && (
+                    <a href={famousNamesakes.sources.en} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline">
+                      Wikipedia EN
+                    </a>
+                  )}
+                </div>
               </div>
             )}
             
-            {!nameLoading && nameData && nameData.famousPersons.length === 0 && (
+            {!namesakesLoading && famousNamesakes && famousNamesakes.persons.length === 0 && (
               <p className="text-gray-500 italic">Geen bekende naamdragers gevonden</p>
             )}
             
-            {!nameLoading && !nameData && (
+            {!namesakesLoading && !famousNamesakes && (
               <p className="text-gray-500 italic">Kon geen gegevens ophalen</p>
             )}
           </div>
@@ -344,20 +376,18 @@ export default function TestResultsPage() {
           <div className="bg-gray-50 rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-4">📋 Ingevoerde Data</h2>
             <details className="cursor-pointer">
-              <summary className="font-medium text-blue-600 mb-2">Toon JSON data</summary>
+              <summary className="font-medium text-blue-600 mb-2">▶ Toon JSON data</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs">
                 {JSON.stringify(data, null, 2)}
               </pre>
             </details>
             
-            {nameData && (
-              <details className="cursor-pointer mt-4">
-                <summary className="font-medium text-purple-600 mb-2">Toon naam API response</summary>
-                <pre className="bg-white p-4 rounded border overflow-auto text-xs">
-                  {JSON.stringify(nameData, null, 2)}
-                </pre>
-              </details>
-            )}
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-purple-600 mb-2">▶ Toon naam API response</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs">
+                {JSON.stringify({ nameMeaning, famousNamesakes }, null, 2)}
+              </pre>
+            </details>
           </div>
 
           <div className="mt-6 flex gap-4">

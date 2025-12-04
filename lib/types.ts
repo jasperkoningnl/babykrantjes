@@ -1,4 +1,11 @@
+// lib/types.ts
+// @version 1.3.0
 // Types voor de babykrant applicatie
+// 
+// Let op: NameMeaningData, FamousNamesakesData en FamousPerson types
+// worden nu geëxporteerd vanuit hun eigen API bestanden:
+// - nameMeaningAPI.ts
+// - famousNamesakesAPI.ts
 
 export interface BasisGegevens {
   volledigeNaam: string;
@@ -43,23 +50,4 @@ export interface BerekendGegevens {
   geboortebloem: string;
   geboortesteen: string;
   kleur: string;
-}
-
-// Naam betekenis en bekende naamdragers
-export interface FamousPerson {
-  name: string;
-  description: string;
-  wikipediaUrl?: string;
-  source: 'nl' | 'en';
-}
-
-export interface NameData {
-  firstName: string;
-  meaning: string | null;
-  origin: string | null;
-  famousPersons: FamousPerson[];
-  sources: {
-    nl: string | null;
-    en: string | null;
-  };
 }
