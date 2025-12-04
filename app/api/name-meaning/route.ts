@@ -1,5 +1,5 @@
 // app/api/name-meaning/route.ts
-// @version 1.0.0
+// @version 1.0.1
 // Server-side API route voor naambetekenis
 // Lost CORS problemen op door requests vanaf server te doen
 
@@ -113,9 +113,9 @@ async function fetchFromNaamdokter(name: string): Promise<NameMeaningData> {
     const html = await response.text()
 
     // Check of de pagina echt bestaat (niet een 404 pagina of redirect)
-    if (html.includes('Pagina niet gevonden') || 
-        html.includes('404') ||
-        html.includes('niet gevonden')) {
+    // Let op: we checken specifiek op 404-pagina indicatoren, niet op "404" in scripts
+    if (html.includes('Naam niet gevonden') || 
+        html.includes('Sorry, we konden deze naam niet vinden')) {
       console.log(`[Naamdokter] Page not found for ${name}`)
       return emptyResult
     }
@@ -147,8 +147,9 @@ function parseNaamdokterHtml(html: string, name: string): NameMeaningData {
 
   try {
     // Zoek naar de prose sectie met de betekenis
-    // Naamdokter gebruikt prose-blue classes voor de hoofdtekst
-    const proseMatch = html.match(/<div[^>]*class="[^"]*prose[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i)
+    // De content staat in: <div class="prose prose-pink ..."><p>...</p></div>
+    // We zoeken de div met prose class binnen de bg-pink-50 sectie
+    const proseMatch = html.match(/<div[^>]*class="[^"]*prose\s+prose-pink[^"]*"[^>]*>([\s\S]*?)<\/div>/i)
     
     if (proseMatch) {
       let content = proseMatch[1]
@@ -157,29 +158,42 @@ function parseNaamdokterHtml(html: string, name: string): NameMeaningData {
       content = content
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<\/p>/gi, '\n\n')
+        .replace(/<p[^>]*>/gi, '')
+        .replace(/<strong>/gi, '')
+        .replace(/<\/strong>/gi, '')
         .replace(/<[^>]+>/g, '')
         .replace(/&nbsp;/g, ' ')
+        .replace(/&quot;/g, '"')
+        .replace(/\\"/g, '"')
+        .replace(/\n{3,}/g, '\n\n')
         .replace(/\s+/g, ' ')
         .trim()
 
       content = decodeHtmlEntities(content)
 
       if (content.length > 50) {
-        result.meaning = content.substring(0, 500).trim()
-        if (content.length > 500) {
-          result.meaning += '...'
+        // Neem max 800 karakters voor een rijke beschrijving
+        result.meaning = content.substring(0, 800).trim()
+        if (content.length > 800) {
+          // Knip af bij laatste zin
+          const lastPeriod = result.meaning.lastIndexOf('.')
+          if (lastPeriod > 400) {
+            result.meaning = result.meaning.substring(0, lastPeriod + 1)
+          } else {
+            result.meaning += '...'
+          }
         }
       }
     }
 
-    // Zoek naar geslacht
-    const genderMatch = html.match(/Geslacht:<\/strong>\s*([^<]+)/i)
+    // Zoek naar geslacht - format: <strong class="text-pink-600">Geslacht:</strong> Vrouw
+    const genderMatch = html.match(/>Geslacht:<\/strong>\s*(?:<!--[^>]*-->)?\s*([^<]+)/i)
     if (genderMatch) {
       result.gender = genderMatch[1].trim()
     }
 
-    // Zoek naar herkomst
-    const originMatch = html.match(/Herkomst:<\/strong>\s*([^<]+)/i)
+    // Zoek naar herkomst - format: <strong class="text-pink-600">Herkomst:</strong> Griekse oorsprong
+    const originMatch = html.match(/>Herkomst:<\/strong>\s*(?:<!--[^>]*-->)?\s*([^<]+)/i)
     if (originMatch) {
       result.origin = originMatch[1].trim()
     }
@@ -194,6 +208,8 @@ function parseNaamdokterHtml(html: string, name: string): NameMeaningData {
         }
       }
     }
+
+    console.log(`[Naamdokter] Parsed result - meaning: ${result.meaning ? 'found (' + result.meaning.length + ' chars)' : 'not found'}, gender: ${result.gender}, origin: ${result.origin}`)
 
   } catch (error) {
     console.error('[Naamdokter] Parse error:', error)
