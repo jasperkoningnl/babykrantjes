@@ -203,6 +203,7 @@ function isDisambiguationPage(html: string, lang: 'nl' | 'en'): boolean {
 
 /**
  * Handelt een doorverwijspagina af door te zoeken naar voornaam-link
+ * Zoekt zowel in URL's als in de linktekst/context
  */
 async function handleDisambiguationPage(
   name: string,
@@ -212,8 +213,8 @@ async function handleDisambiguationPage(
     ? 'https://nl.wikipedia.org/w/api.php'
     : 'https://en.wikipedia.org/w/api.php'
 
-  // Haal de doorverwijspagina opnieuw op om links te scannen
-  const apiUrl = `${baseUrl}?action=parse&page=${encodeURIComponent(name)}&prop=links&format=json&origin=*`
+  // Haal de doorverwijspagina opnieuw op met zowel links als HTML
+  const apiUrl = `${baseUrl}?action=parse&page=${encodeURIComponent(name)}&prop=text|links&format=json&origin=*`
 
   try {
     const response = await fetch(apiUrl, {
@@ -224,21 +225,32 @@ async function handleDisambiguationPage(
 
     const data = await response.json()
     
-    if (!data.parse?.links) return null
+    if (!data.parse) return null
+    
+    const links = data.parse.links || []
+    const html = data.parse.text?.['*'] || ''
 
-    // Zoek naar link met (voornaam), (given_name), of (name)
+    // Methode 1: Zoek naar link met (voornaam), (given_name), of (name) in de URL
     const targetSuffixes = lang === 'nl'
       ? ['(voornaam)', '(naam)']
       : ['(given name)', '(given_name)', '(name)', '(first name)']
 
-    for (const link of data.parse.links) {
+    for (const link of links) {
       const title = link['*'] || ''
       const lowerTitle = title.toLowerCase()
       
       if (targetSuffixes.some(suffix => lowerTitle.includes(suffix.toLowerCase()))) {
-        console.log(`[${lang}] Found name page link: ${title}`)
+        console.log(`[${lang}] Found name page link via URL pattern: ${title}`)
         return await tryFetchWikipediaPage(title, lang, name)
       }
+    }
+
+    // Methode 2: Zoek in de HTML naar links in de buurt van voornaam-gerelateerde tekst
+    // Bijv: "Filip, verkorte vorm van de voornaam"
+    const namePageLink = findNamePageLinkInHtml(html, links, lang)
+    if (namePageLink) {
+      console.log(`[${lang}] Found name page link via context: ${namePageLink}`)
+      return await tryFetchWikipediaPage(namePageLink, lang, name)
     }
 
     return null
@@ -246,6 +258,57 @@ async function handleDisambiguationPage(
     console.error(`[${lang}] Error handling disambiguation:`, error)
     return null
   }
+}
+
+/**
+ * Zoekt in de HTML naar links die in de context van voornaam-tekst staan
+ */
+function findNamePageLinkInHtml(
+  html: string,
+  links: Array<{ '*': string }>,
+  lang: 'nl' | 'en'
+): string | null {
+  // Tekstpatronen die aangeven dat een link naar een voornaam-pagina verwijst
+  const contextPatterns = lang === 'nl'
+    ? [/voornaam/i, /eigennaam/i, /roepnaam/i, /meisjesnaam/i, /jongensnaam/i, /verkorte vorm van/i, /koosnaam/i]
+    : [/given name/i, /first name/i, /forename/i, /short form of/i, /nickname/i, /diminutive of/i]
+
+  // Zoek links in de HTML die in de buurt staan van voornaam-tekst
+  const linkRegex = /<a[^>]+href="\/wiki\/([^"]+)"[^>]*>([^<]+)<\/a>/gi
+  let match
+
+  while ((match = linkRegex.exec(html)) !== null) {
+    const href = match[1]
+    const linkText = match[2]
+    
+    // Skip speciale pagina's
+    if (href.includes(':')) continue
+    // Skip jaar-links
+    if (/^\d{4}$/.test(linkText)) continue
+    // Skip te korte links
+    if (linkText.length < 2) continue
+    
+    // Check de context rondom de link (100 karakters ervoor)
+    const startIdx = Math.max(0, match.index - 100)
+    const contextBefore = html.substring(startIdx, match.index)
+    
+    // Als de context ervoor een voornaam-patroon bevat
+    if (contextPatterns.some(pattern => pattern.test(contextBefore))) {
+      // Decodeer de URL
+      const decodedTitle = decodeURIComponent(href.replace(/_/g, ' '))
+      
+      // Controleer of deze link ook in de API links zit (validatie)
+      const isValidLink = links.some(l => 
+        l['*']?.toLowerCase() === decodedTitle.toLowerCase()
+      )
+      
+      if (isValidLink) {
+        return decodedTitle
+      }
+    }
+  }
+
+  return null
 }
 
 /**
