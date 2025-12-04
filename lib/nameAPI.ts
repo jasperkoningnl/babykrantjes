@@ -1,3 +1,5 @@
+// lib/nameAPI.ts
+// @version 1.2.0
 // Wikipedia API voor naambetekenis en bekende naamdragers
 // Parallelle lookup in NL en EN Wikipedia met fallback logica
 
@@ -262,6 +264,7 @@ async function handleDisambiguationPage(
 
 /**
  * Zoekt in de HTML naar links die in de context van voornaam-tekst staan
+ * Scant zowel VOOR als NA de link
  */
 function findNamePageLinkInHtml(
   html: string,
@@ -270,10 +273,10 @@ function findNamePageLinkInHtml(
 ): string | null {
   // Tekstpatronen die aangeven dat een link naar een voornaam-pagina verwijst
   const contextPatterns = lang === 'nl'
-    ? [/voornaam/i, /eigennaam/i, /roepnaam/i, /meisjesnaam/i, /jongensnaam/i, /verkorte vorm van/i, /koosnaam/i]
-    : [/given name/i, /first name/i, /forename/i, /short form of/i, /nickname/i, /diminutive of/i]
+    ? [/voornaam/i, /eigennaam/i, /roepnaam/i, /meisjesnaam/i, /jongensnaam/i, /verkorte vorm/i, /koosnaam/i]
+    : [/given name/i, /first name/i, /forename/i, /short form/i, /nickname/i, /diminutive/i]
 
-  // Zoek links in de HTML die in de buurt staan van voornaam-tekst
+  // Zoek links in de HTML
   const linkRegex = /<a[^>]+href="\/wiki\/([^"]+)"[^>]*>([^<]+)<\/a>/gi
   let match
 
@@ -288,12 +291,18 @@ function findNamePageLinkInHtml(
     // Skip te korte links
     if (linkText.length < 2) continue
     
-    // Check de context rondom de link (100 karakters ervoor)
-    const startIdx = Math.max(0, match.index - 100)
-    const contextBefore = html.substring(startIdx, match.index)
+    // Check de context rondom de link:
+    // - 50 karakters VOOR de link
+    // - 100 karakters NA de link (hier staat vaak "verkorte vorm van de voornaam")
+    const startIdx = Math.max(0, match.index - 50)
+    const endIdx = Math.min(html.length, match.index + match[0].length + 100)
+    const contextAround = html.substring(startIdx, endIdx)
     
-    // Als de context ervoor een voornaam-patroon bevat
-    if (contextPatterns.some(pattern => pattern.test(contextBefore))) {
+    // Strip HTML uit de context voor betere matching
+    const contextText = contextAround.replace(/<[^>]+>/g, ' ')
+    
+    // Als de context een voornaam-patroon bevat
+    if (contextPatterns.some(pattern => pattern.test(contextText))) {
       // Decodeer de URL
       const decodedTitle = decodeURIComponent(href.replace(/_/g, ' '))
       
@@ -303,6 +312,7 @@ function findNamePageLinkInHtml(
       )
       
       if (isValidLink) {
+        console.log(`[${lang}] Found name link with context: "${contextText.substring(0, 80)}..."`)
         return decodedTitle
       }
     }
