@@ -1,5 +1,5 @@
 // lib/bornOnThisDayAPI.ts
-// @version 1.0.0
+// @version 1.0.1
 // API voor het ophalen van personen geboren op een specifieke datum
 // Bron: Wikipedia NL
 
@@ -10,26 +10,24 @@ export interface BornPerson {
   wikipediaUrl?: string
 }
 
-export interface BornOnThisDayData {
-  date: string
-  persons: BornPerson[]
-  source: string | null
-}
-
 /**
  * Haalt bekende personen op die geboren zijn op een specifieke datum
+ * @param dateStr - Datum in YYYY-MM-DD formaat
  */
 export async function getBornOnThisDay(
-  day: number,
-  month: number
-): Promise<BornOnThisDayData> {
+  dateStr: string
+): Promise<BornPerson[]> {
   const monthNames = [
     'januari', 'februari', 'maart', 'april', 'mei', 'juni',
     'juli', 'augustus', 'september', 'oktober', 'november', 'december'
   ]
 
-  const dateString = `${day} ${monthNames[month - 1]}`
-  const pageTitle = `${day}_${monthNames[month - 1]}`
+  // Parse de datum string
+  const date = new Date(dateStr)
+  const day = date.getDate()
+  const month = date.getMonth() // 0-indexed
+
+  const pageTitle = `${day}_${monthNames[month]}`
 
   try {
     const apiUrl = `https://nl.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(pageTitle)}&prop=text&format=json&origin=*`
@@ -40,28 +38,23 @@ export async function getBornOnThisDay(
 
     if (!response.ok) {
       console.error(`HTTP error fetching born on this day: ${response.status}`)
-      return { date: dateString, persons: [], source: null }
+      return []
     }
 
     const data = await response.json()
 
     if (data.error) {
       console.error('Wikipedia API error:', data.error)
-      return { date: dateString, persons: [], source: null }
+      return []
     }
 
     const html = data.parse?.text?.['*'] || ''
     const persons = parseBornPersons(html)
-    const source = `https://nl.wikipedia.org/wiki/${encodeURIComponent(pageTitle)}`
 
-    return {
-      date: dateString,
-      persons,
-      source
-    }
+    return persons
   } catch (error) {
     console.error('Error fetching born on this day:', error)
-    return { date: dateString, persons: [], source: null }
+    return []
   }
 }
 
