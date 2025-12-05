@@ -1,5 +1,5 @@
 // app/api/name-meaning/route.ts
-// @version 1.0.1
+// @version 1.0.2
 // Server-side API route voor naambetekenis
 // Lost CORS problemen op door requests vanaf server te doen
 
@@ -112,16 +112,15 @@ async function fetchFromNaamdokter(name: string): Promise<NameMeaningData> {
 
     const html = await response.text()
 
-    // Check of de pagina echt bestaat (niet een 404 pagina of redirect)
-    // Let op: we checken specifiek op 404-pagina indicatoren, niet op "404" in scripts
-    if (html.includes('Naam niet gevonden') || 
-        html.includes('Sorry, we konden deze naam niet vinden')) {
-      console.log(`[Naamdokter] Page not found for ${name}`)
+    // Parse de pagina eerst - als we content vinden, bestaat de pagina
+    const result = parseNaamdokterHtml(html, name)
+    
+    // Als we geen betekenis vonden EN de titel bevat niet de naam, dan is het 404
+    if (!result.meaning && !html.includes(`<h1`) ) {
+      console.log(`[Naamdokter] No content found for ${name}`)
       return emptyResult
     }
-
-    // Parse de pagina
-    const result = parseNaamdokterHtml(html, name)
+    
     if (result.meaning) {
       result.source = url
     }
