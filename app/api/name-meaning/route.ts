@@ -69,8 +69,8 @@ async function tryNaamdokter(name: string): Promise<NameMeaningData> {
   }
 
   try {
-    // Naamdokter gebruikt lowercase URLs
-    const url = `https://naamdokter.nl/naam/${name.toLowerCase()}/`
+    // Naamdokter gebruikt /name/ (Engels) met lowercase namen
+    const url = `https://naamdokter.nl/name/${name.toLowerCase()}/`
     console.log(`[Naamdokter] Fetching: ${url}`)
     
     const response = await fetch(url, {
