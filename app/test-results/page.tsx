@@ -1,11 +1,13 @@
 // app/test-results/page.tsx
-// @version 1.3.1
+// @version 1.4.0
+// Toegevoegd: horoscoop en Chinees jaar beschrijvingen
 'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { BabykrantData } from '@/lib/types'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen, getKleur } from '@/lib/calculations'
+import { getSterrenbeeldBeschrijving, getChineesTekenBeschrijving } from '@/lib/horoscoopData'
 import { getHistoricalWeather, formatWeatherReport, type WeatherData } from '@/lib/weatherAPI'
 import { getBornOnThisDay, type BornPerson } from '@/lib/bornOnThisDayAPI'
 import { getNameMeaning, type NameMeaningData } from '@/lib/nameMeaningAPI'
@@ -88,13 +90,21 @@ export default function TestResultsPage() {
     )
   }
 
+  // Berekende gegevens
+  const sterrenbeeld = getSterrenbeeld(data.basisGegevens.geboorteDatum)
+  const chineesJaar = getChineesJaar(data.basisGegevens.geboorteDatum)
+  
   const berekend = {
-    sterrenbeeld: getSterrenbeeld(data.basisGegevens.geboorteDatum),
-    chineesJaar: getChineesJaar(data.basisGegevens.geboorteDatum),
+    sterrenbeeld,
+    chineesJaar,
     geboortebloem: getGeboortebloem(data.basisGegevens.geboorteDatum),
     geboortesteen: getGeboortesteen(data.basisGegevens.geboorteDatum),
     kleur: getKleur(data.basisGegevens.geboorteDatum),
   }
+
+  // Beschrijvingen ophalen
+  const sterrenbeeldInfo = getSterrenbeeldBeschrijving(sterrenbeeld)
+  const chineesTekenInfo = getChineesTekenBeschrijving(chineesJaar)
 
   // Bepaal de voornaam voor de headers
   const firstName = nameMeaning?.firstName || famousNamesakes?.firstName || '...'
@@ -142,6 +152,45 @@ export default function TestResultsPage() {
               </div>
             </div>
           </div>
+
+          {/* Sterrenbeeld beschrijving */}
+          {sterrenbeeldInfo && (
+            <div className="bg-indigo-50 rounded-lg p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-4">
+                ♈ Sterrenbeeld {sterrenbeeldInfo.naam}
+              </h2>
+              <div className="mb-3 text-sm text-indigo-600">
+                <span className="font-medium">{sterrenbeeldInfo.datumStart} - {sterrenbeeldInfo.datumEind}</span>
+                <span className="mx-2">|</span>
+                <span>Element: {sterrenbeeldInfo.element}</span>
+                <span className="mx-2">|</span>
+                <span>Planeet: {sterrenbeeldInfo.planeet}</span>
+              </div>
+              <div className="text-gray-700 whitespace-pre-line leading-relaxed">
+                {sterrenbeeldInfo.beschrijving}
+              </div>
+            </div>
+          )}
+
+          {/* Chinees teken beschrijving */}
+          {chineesTekenInfo && (
+            <div className="bg-red-50 rounded-lg p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-4">
+                🐉 Chinees teken: {chineesTekenInfo.naam}
+              </h2>
+              <div className="mb-3 text-sm text-red-600">
+                <span className="font-medium">Jaren: </span>
+                {chineesTekenInfo.jaren.join(', ')}
+              </div>
+              <div className="text-gray-700 whitespace-pre-line leading-relaxed">
+                {chineesTekenInfo.beschrijving}
+              </div>
+              <p className="text-xs text-red-400 mt-3 italic">
+                Let op: Chinese Nieuwjaar valt tussen 21 jan - 20 feb. 
+                Mensen geboren in jan/feb moeten checken welk jaar ze precies zijn.
+              </p>
+            </div>
+          )}
 
           {/* Naambetekenis */}
           <div className="bg-purple-50 rounded-lg p-6 mb-6">
@@ -366,6 +415,11 @@ export default function TestResultsPage() {
               </div>
               
               <div>
+                <span className="font-medium text-gray-600">Muziek hits:</span>
+                <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
+              </div>
+              
+              <div>
                 <span className="font-medium text-gray-600">Belangrijke gebeurtenissen op deze dag:</span>
                 <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
               </div>
@@ -386,6 +440,13 @@ export default function TestResultsPage() {
               <summary className="font-medium text-purple-600 mb-2">▶ Toon naam API response</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs">
                 {JSON.stringify({ nameMeaning, famousNamesakes }, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-indigo-600 mb-2">▶ Toon horoscoop data</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs">
+                {JSON.stringify({ sterrenbeeldInfo, chineesTekenInfo }, null, 2)}
               </pre>
             </details>
           </div>
