@@ -1,6 +1,6 @@
 // app/test-results/page.tsx
-// @version 1.4.0
-// Toegevoegd: horoscoop en Chinees jaar beschrijvingen
+// @version 1.5.0
+// Toegevoegd: films, muziek (#1 hit), populaire artiesten, TV programma's
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -11,7 +11,11 @@ import { getSterrenbeeldBeschrijving, getChineesTekenBeschrijving } from '@/lib/
 import { getHistoricalWeather, formatWeatherReport, type WeatherData } from '@/lib/weatherAPI'
 import { getBornOnThisDay, type BornPerson } from '@/lib/bornOnThisDayAPI'
 import { getNameMeaning, type NameMeaningData } from '@/lib/nameMeaningAPI'
-import { getFamousNamesakes, type FamousNamesakesData, type FamousPerson } from '@/lib/famousNamesakesAPI'
+import { getFamousNamesakes, type FamousNamesakesData } from '@/lib/famousNamesakesAPI'
+import { getMoviesAroundDate, getTopMoviesOfYear, getPosterUrl, formatGenres, type TMDBMoviesResult } from '@/lib/tmdbAPI'
+import { getTop40ByDate, type Top40Result } from '@/lib/top40API'
+import { getYearOverview, type DutchChartsYearResult } from '@/lib/dutchChartsAPI'
+import { getTVProgramsAroundDate, type NPOResult } from '@/lib/npoBackstageAPI'
 
 export default function TestResultsPage() {
   const [data, setData] = useState<BabykrantData | null>(null)
@@ -19,11 +23,21 @@ export default function TestResultsPage() {
   const [bornPersons, setBornPersons] = useState<BornPerson[]>([])
   const [nameMeaning, setNameMeaning] = useState<NameMeaningData | null>(null)
   const [famousNamesakes, setFamousNamesakes] = useState<FamousNamesakesData | null>(null)
+  const [movies, setMovies] = useState<TMDBMoviesResult | null>(null)
+  const [topMovies, setTopMovies] = useState<TMDBMoviesResult | null>(null)
+  const [top40, setTop40] = useState<Top40Result | null>(null)
+  const [yearChart, setYearChart] = useState<DutchChartsYearResult | null>(null)
+  const [tvPrograms, setTvPrograms] = useState<NPOResult | null>(null)
+  
   const [loading, setLoading] = useState(true)
   const [weatherLoading, setWeatherLoading] = useState(false)
   const [bornLoading, setBornLoading] = useState(false)
   const [nameMeaningLoading, setNameMeaningLoading] = useState(false)
   const [namesakesLoading, setNamesakesLoading] = useState(false)
+  const [moviesLoading, setMoviesLoading] = useState(false)
+  const [top40Loading, setTop40Loading] = useState(false)
+  const [yearChartLoading, setYearChartLoading] = useState(false)
+  const [tvLoading, setTvLoading] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('babykrant_test_data')
@@ -31,28 +45,29 @@ export default function TestResultsPage() {
       const parsedData = JSON.parse(stored)
       setData(parsedData)
       
+      const birthDate = parsedData.basisGegevens.geboorteDatum
+      const birthYear = birthDate ? new Date(birthDate).getFullYear() : null
+      
       // Weerbericht ophalen
-      if (parsedData.basisGegevens.geboorteDatum && parsedData.basisGegevens.geboorteplaats) {
+      if (birthDate && parsedData.basisGegevens.geboorteplaats) {
         setWeatherLoading(true)
-        getHistoricalWeather(
-          parsedData.basisGegevens.geboorteDatum,
-          parsedData.basisGegevens.geboorteplaats
-        ).then(weatherData => {
-          setWeather(weatherData)
-          setWeatherLoading(false)
-        })
+        getHistoricalWeather(birthDate, parsedData.basisGegevens.geboorteplaats)
+          .then(weatherData => {
+            setWeather(weatherData)
+            setWeatherLoading(false)
+          })
       }
       
       // Geboren op deze dag ophalen
-      if (parsedData.basisGegevens.geboorteDatum) {
+      if (birthDate) {
         setBornLoading(true)
-        getBornOnThisDay(parsedData.basisGegevens.geboorteDatum).then(persons => {
+        getBornOnThisDay(birthDate).then(persons => {
           setBornPersons(persons)
           setBornLoading(false)
         })
       }
       
-      // Naambetekenis ophalen (nieuwe API)
+      // Naambetekenis ophalen
       if (parsedData.basisGegevens.volledigeNaam) {
         setNameMeaningLoading(true)
         getNameMeaning(parsedData.basisGegevens.volledigeNaam).then(result => {
@@ -60,11 +75,56 @@ export default function TestResultsPage() {
           setNameMeaningLoading(false)
         })
         
-        // Bekende naamdragers ophalen (aparte API)
+        // Bekende naamdragers ophalen
         setNamesakesLoading(true)
         getFamousNamesakes(parsedData.basisGegevens.volledigeNaam).then(result => {
           setFamousNamesakes(result)
           setNamesakesLoading(false)
+        })
+      }
+
+      // === NIEUWE CULTUUR DATA ===
+      
+      // Films rond geboortedatum
+      if (birthDate) {
+        setMoviesLoading(true)
+        getMoviesAroundDate(birthDate, 30).then(result => {
+          setMovies(result)
+          setMoviesLoading(false)
+        })
+      }
+
+      // Top films van het jaar
+      if (birthYear) {
+        getTopMoviesOfYear(birthYear, 5).then(result => {
+          setTopMovies(result)
+        })
+      }
+      
+      // #1 hit op geboortedatum
+      if (birthDate) {
+        setTop40Loading(true)
+        getTop40ByDate(birthDate).then(result => {
+          setTop40(result)
+          setTop40Loading(false)
+        })
+      }
+      
+      // Populaire artiesten van het jaar
+      if (birthYear) {
+        setYearChartLoading(true)
+        getYearOverview(birthYear, 10).then(result => {
+          setYearChart(result)
+          setYearChartLoading(false)
+        })
+      }
+      
+      // TV programma's rond geboortedatum
+      if (birthDate) {
+        setTvLoading(true)
+        getTVProgramsAroundDate(birthDate, 7).then(result => {
+          setTvPrograms(result)
+          setTvLoading(false)
         })
       }
     }
@@ -93,6 +153,7 @@ export default function TestResultsPage() {
   // Berekende gegevens
   const sterrenbeeld = getSterrenbeeld(data.basisGegevens.geboorteDatum)
   const chineesJaar = getChineesJaar(data.basisGegevens.geboorteDatum)
+  const birthYear = new Date(data.basisGegevens.geboorteDatum).getFullYear()
   
   const berekend = {
     sterrenbeeld,
@@ -130,22 +191,18 @@ export default function TestResultsPage() {
                 <span className="font-medium text-gray-600">Sterrenbeeld:</span>
                 <p className="text-lg text-blue-700 font-semibold">{berekend.sterrenbeeld}</p>
               </div>
-              
               <div>
                 <span className="font-medium text-gray-600">Chinees jaar:</span>
                 <p className="text-lg text-blue-700 font-semibold">{berekend.chineesJaar}</p>
               </div>
-              
               <div>
                 <span className="font-medium text-gray-600">Geboortebloem:</span>
                 <p className="text-lg text-blue-700 font-semibold">{berekend.geboortebloem}</p>
               </div>
-              
               <div>
                 <span className="font-medium text-gray-600">Geboortesteen:</span>
                 <p className="text-lg text-blue-700 font-semibold">{berekend.geboortesteen}</p>
               </div>
-              
               <div>
                 <span className="font-medium text-gray-600">Kleur:</span>
                 <p className="text-lg text-blue-700 font-semibold">{berekend.kleur}</p>
@@ -192,6 +249,173 @@ export default function TestResultsPage() {
             </div>
           )}
 
+          {/* #1 Hit op geboortedatum */}
+          <div className="bg-green-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">🎵 #1 Hit op geboortedatum</h2>
+            
+            {top40Loading && (
+              <p className="text-gray-500 italic">Hitlijst wordt opgehaald...</p>
+            )}
+            
+            {!top40Loading && top40?.numberOne && (
+              <div className="space-y-3">
+                <div className="bg-white p-4 rounded-lg border-2 border-green-300">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl font-bold text-green-600">#1</span>
+                    <div>
+                      <p className="text-xl font-semibold text-gray-900">{top40.numberOne.title}</p>
+                      <p className="text-lg text-gray-600">{top40.numberOne.artist}</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Top 40 week {top40.weekNumber}, {top40.year}
+                </p>
+                {top40.sourceUrl && (
+                  <a href={top40.sourceUrl} target="_blank" rel="noopener noreferrer" 
+                     className="text-xs text-green-600 hover:underline">
+                    Bron: Top40.nl →
+                  </a>
+                )}
+              </div>
+            )}
+            
+            {!top40Loading && !top40?.numberOne && (
+              <p className="text-gray-500 italic">Geen hitlijst gevonden voor deze datum</p>
+            )}
+          </div>
+
+          {/* Populaire artiesten van het jaar */}
+          <div className="bg-emerald-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">🎤 Populaire hits in {birthYear}</h2>
+            
+            {yearChartLoading && (
+              <p className="text-gray-500 italic">Jaaroverzicht wordt opgehaald...</p>
+            )}
+            
+            {!yearChartLoading && yearChart && yearChart.entries.length > 0 && (
+              <div className="space-y-2">
+                {yearChart.entries.slice(0, 5).map((entry, idx) => (
+                  <div key={idx} className="flex items-center gap-3 bg-white p-2 rounded border">
+                    <span className="text-lg font-bold text-emerald-600 w-8">{entry.position}.</span>
+                    <div className="flex-1">
+                      <span className="font-medium">{entry.artist}</span>
+                      <span className="text-gray-500"> - </span>
+                      <span className="text-gray-700">{entry.title}</span>
+                    </div>
+                  </div>
+                ))}
+                {yearChart.sourceUrl && (
+                  <a href={yearChart.sourceUrl} target="_blank" rel="noopener noreferrer" 
+                     className="text-xs text-emerald-600 hover:underline block mt-2">
+                    Bron: DutchCharts.nl →
+                  </a>
+                )}
+              </div>
+            )}
+            
+            {!yearChartLoading && (!yearChart || yearChart.entries.length === 0) && (
+              <p className="text-gray-500 italic">Geen jaaroverzicht gevonden</p>
+            )}
+          </div>
+
+          {/* Films rond geboortedatum */}
+          <div className="bg-amber-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">🎬 Films in de bioscoop</h2>
+            
+            {moviesLoading && (
+              <p className="text-gray-500 italic">Films worden opgehaald...</p>
+            )}
+            
+            {!moviesLoading && movies && movies.movies.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 mb-3">
+                  Films in Nederland rond {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL')}:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {movies.movies.slice(0, 6).map((movie) => (
+                    <div key={movie.id} className="bg-white p-3 rounded border flex gap-3">
+                      {movie.posterPath && (
+                        <img 
+                          src={getPosterUrl(movie.posterPath, 'w92') || ''} 
+                          alt={movie.title}
+                          className="w-12 h-18 object-cover rounded"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{movie.title}</p>
+                        <p className="text-xs text-gray-500">
+                          {formatGenres(movie.genreIds).slice(0, 2).join(', ')}
+                        </p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-yellow-500">★</span>
+                          <span className="text-sm text-gray-600">{movie.voteAverage.toFixed(1)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Bron: TMDB • Totaal {movies.totalResults} films gevonden
+                </p>
+              </div>
+            )}
+            
+            {!moviesLoading && (!movies || movies.movies.length === 0) && (
+              <p className="text-gray-500 italic">Geen films gevonden voor deze periode</p>
+            )}
+          </div>
+
+          {/* Top films van het jaar */}
+          {topMovies && topMovies.movies.length > 0 && (
+            <div className="bg-orange-50 rounded-lg p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-4">🏆 Populairste films van {birthYear}</h2>
+              <div className="space-y-2">
+                {topMovies.movies.map((movie, idx) => (
+                  <div key={movie.id} className="flex items-center gap-3 bg-white p-2 rounded border">
+                    <span className="text-lg font-bold text-orange-600 w-8">{idx + 1}.</span>
+                    <div className="flex-1">
+                      <span className="font-medium">{movie.title}</span>
+                      <span className="text-gray-500 text-sm ml-2">★ {movie.voteAverage.toFixed(1)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TV Programma's */}
+          <div className="bg-violet-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">📺 TV Programma's (NPO)</h2>
+            
+            {tvLoading && (
+              <p className="text-gray-500 italic">TV programma's worden opgehaald...</p>
+            )}
+            
+            {!tvLoading && tvPrograms && tvPrograms.programs.length > 0 && (
+              <div className="space-y-2">
+                {tvPrograms.programs.slice(0, 5).map((program, idx) => (
+                  <div key={idx} className="bg-white p-3 rounded border">
+                    <p className="font-semibold text-gray-900">{program.title}</p>
+                    {program.channel && (
+                      <p className="text-sm text-violet-600">{program.channel}</p>
+                    )}
+                    {program.description && (
+                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">{program.description}</p>
+                    )}
+                  </div>
+                ))}
+                <p className="text-xs text-gray-500 mt-2">
+                  Bron: NPO Backstage • {tvPrograms.totalResults} programma's gevonden
+                </p>
+              </div>
+            )}
+            
+            {!tvLoading && (!tvPrograms || tvPrograms.programs.length === 0) && (
+              <p className="text-gray-500 italic">Geen TV programma's gevonden (NPO data mogelijk niet beschikbaar voor deze periode)</p>
+            )}
+          </div>
+
           {/* Naambetekenis */}
           <div className="bg-purple-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">📛 Betekenis naam {firstName}</h2>
@@ -225,7 +449,6 @@ export default function TestResultsPage() {
                   </div>
                 )}
                 
-                {/* Bron */}
                 <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-purple-200">
                   <span className="font-medium">Bron: </span>
                   {nameMeaning.source ? (
@@ -261,12 +484,8 @@ export default function TestResultsPage() {
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           {person.wikipediaUrl ? (
-                            <a 
-                              href={person.wikipediaUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="font-semibold text-pink-700 hover:underline"
-                            >
+                            <a href={person.wikipediaUrl} target="_blank" rel="noopener noreferrer"
+                               className="font-semibold text-pink-700 hover:underline">
                               {person.name}
                             </a>
                           ) : (
@@ -286,7 +505,6 @@ export default function TestResultsPage() {
                   Totaal {famousNamesakes.persons.length} bekende naamdragers gevonden
                 </p>
                 
-                {/* Bronnen */}
                 <div className="text-xs text-gray-500 pt-3 border-t border-pink-200">
                   <span className="font-medium">Bronnen: </span>
                   {famousNamesakes.sources.nl && (
@@ -325,10 +543,7 @@ export default function TestResultsPage() {
                 <div>
                   <span className="font-medium text-gray-600">
                     Weer in {weather.city} op {new Date(weather.date).toLocaleDateString('nl-NL', { 
-                      weekday: 'long',
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
                     })}:
                   </span>
                   <p className="text-gray-900 mt-2">{formatWeatherReport(weather)}</p>
@@ -339,17 +554,14 @@ export default function TestResultsPage() {
                     <div className="text-gray-600 text-xs">Max temperatuur</div>
                     <div className="text-xl font-semibold text-blue-600">{weather.temperature_max}°C</div>
                   </div>
-                  
                   <div className="bg-white p-3 rounded border">
                     <div className="text-gray-600 text-xs">Min temperatuur</div>
                     <div className="text-xl font-semibold text-blue-600">{weather.temperature_min}°C</div>
                   </div>
-                  
                   <div className="bg-white p-3 rounded border">
                     <div className="text-gray-600 text-xs">Neerslag</div>
                     <div className="text-xl font-semibold text-blue-600">{weather.precipitation}mm</div>
                   </div>
-                  
                   <div className="bg-white p-3 rounded border">
                     <div className="text-gray-600 text-xs">Zonneschijn</div>
                     <div className="text-xl font-semibold text-blue-600">{weather.sunshine_duration}u</div>
@@ -375,8 +587,7 @@ export default function TestResultsPage() {
               <div className="space-y-3">
                 <p className="text-sm text-gray-600 mb-3">
                   Ook geboren op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { 
-                    day: 'numeric',
-                    month: 'long'
+                    day: 'numeric', month: 'long'
                   })}:
                 </p>
                 
@@ -405,57 +616,26 @@ export default function TestResultsPage() {
             )}
           </div>
 
-          {/* Overige data placeholder */}
-          <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">⏳ Overige Data (Nog te implementeren)</h2>
-            <div className="space-y-3 text-sm">
-              <div>
-                <span className="font-medium text-gray-600">Top films in {new Date(data.basisGegevens.geboorteDatum).getFullYear()}:</span>
-                <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
-              </div>
-              
-              <div>
-                <span className="font-medium text-gray-600">Muziek hits:</span>
-                <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
-              </div>
-              
-              <div>
-                <span className="font-medium text-gray-600">Belangrijke gebeurtenissen op deze dag:</span>
-                <p className="text-gray-500 italic">Nog niet geïmplementeerd</p>
-              </div>
-            </div>
-          </div>
-
           {/* Debug: ingevoerde data */}
           <div className="bg-gray-50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">📋 Ingevoerde Data</h2>
+            <h2 className="text-xl font-semibold mb-4">📋 Debug Data</h2>
             <details className="cursor-pointer">
-              <summary className="font-medium text-blue-600 mb-2">▶ Toon JSON data</summary>
+              <summary className="font-medium text-blue-600 mb-2">▶ Toon ingevoerde data</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs">
                 {JSON.stringify(data, null, 2)}
               </pre>
             </details>
             
             <details className="cursor-pointer mt-4">
-              <summary className="font-medium text-purple-600 mb-2">▶ Toon naam API response</summary>
+              <summary className="font-medium text-green-600 mb-2">▶ Toon cultuur data</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs">
-                {JSON.stringify({ nameMeaning, famousNamesakes }, null, 2)}
-              </pre>
-            </details>
-            
-            <details className="cursor-pointer mt-4">
-              <summary className="font-medium text-indigo-600 mb-2">▶ Toon horoscoop data</summary>
-              <pre className="bg-white p-4 rounded border overflow-auto text-xs">
-                {JSON.stringify({ sterrenbeeldInfo, chineesTekenInfo }, null, 2)}
+                {JSON.stringify({ top40, yearChart, movies: movies?.movies?.slice(0, 3), tvPrograms: tvPrograms?.programs?.slice(0, 3) }, null, 2)}
               </pre>
             </details>
           </div>
 
           <div className="mt-6 flex gap-4">
-            <Link 
-              href="/wizard"
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold"
-            >
+            <Link href="/wizard" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold">
               Nieuwe babykrant maken
             </Link>
           </div>
