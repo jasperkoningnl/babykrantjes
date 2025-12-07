@@ -1,9 +1,9 @@
 // app/test-results/page.tsx
-// @version 1.6.2
-// Vervangen: NPO Backstage + Wikipedia TV door uitzendinggemist.net
+// @version 1.7.0
+// Toegevoegd: TMDB series, Wikipedia TV context
 'use client'
 
-const PAGE_VERSION = '1.6.2'
+const PAGE_VERSION = '1.7.0'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -14,10 +14,11 @@ import { getHistoricalWeather, formatWeatherReport, type WeatherData } from '@/l
 import { getBornOnThisDay, type BornPerson } from '@/lib/bornOnThisDayAPI'
 import { getNameMeaning, type NameMeaningData } from '@/lib/nameMeaningAPI'
 import { getFamousNamesakes, type FamousNamesakesData } from '@/lib/famousNamesakesAPI'
-import { getMoviesAroundDate, getTopMoviesOfYear, getPosterUrl, formatGenres, type TMDBMoviesResult } from '@/lib/tmdbAPI'
+import { getMoviesAroundDate, getTopMoviesOfYear, getSeriesOfYear, getPosterUrl, formatGenres, type TMDBMoviesResult } from '@/lib/tmdbAPI'
 import { getTop40ByDate, type Top40Result } from '@/lib/top40API'
 import { getYearOverview, type DutchChartsYearResult } from '@/lib/dutchChartsAPI'
 import { getTVProgramsOnDate, filterInterestingPrograms, type TVOnDateResult } from '@/lib/tvOnDateAPI'
+import { getWikipediaTVByYear, type WikipediaTVResult } from '@/lib/wikipediaTVAPI'
 
 export default function TestResultsPage() {
   const [data, setData] = useState<BabykrantData | null>(null)
@@ -27,9 +28,11 @@ export default function TestResultsPage() {
   const [famousNamesakes, setFamousNamesakes] = useState<FamousNamesakesData | null>(null)
   const [movies, setMovies] = useState<TMDBMoviesResult | null>(null)
   const [topMovies, setTopMovies] = useState<TMDBMoviesResult | null>(null)
+  const [series, setSeries] = useState<TMDBMoviesResult | null>(null)
   const [top40, setTop40] = useState<Top40Result | null>(null)
   const [yearChart, setYearChart] = useState<DutchChartsYearResult | null>(null)
   const [tvPrograms, setTvPrograms] = useState<TVOnDateResult | null>(null)
+  const [wikipediaTV, setWikipediaTV] = useState<WikipediaTVResult | null>(null)
   
   const [loading, setLoading] = useState(true)
   const [weatherLoading, setWeatherLoading] = useState(false)
@@ -37,9 +40,11 @@ export default function TestResultsPage() {
   const [nameMeaningLoading, setNameMeaningLoading] = useState(false)
   const [namesakesLoading, setNamesakesLoading] = useState(false)
   const [moviesLoading, setMoviesLoading] = useState(false)
+  const [seriesLoading, setSeriesLoading] = useState(false)
   const [top40Loading, setTop40Loading] = useState(false)
   const [yearChartLoading, setYearChartLoading] = useState(false)
   const [tvLoading, setTvLoading] = useState(false)
+  const [wikipediaTVLoading, setWikipediaTVLoading] = useState(false)
 
   useEffect(() => {
     console.log(`[Babykrant] test-results page v${PAGE_VERSION}`)
@@ -130,6 +135,26 @@ export default function TestResultsPage() {
           console.log(`[Babykrant] TV API response:`, result?.totalFound, 'programs, apiVersion:', result?.apiVersion)
           setTvPrograms(result)
           setTvLoading(false)
+        })
+      }
+      
+      // Populaire series van het jaar
+      if (birthYear) {
+        setSeriesLoading(true)
+        getSeriesOfYear(birthYear, 10).then(result => {
+          console.log(`[Babykrant] Series API response:`, result?.movies?.length, 'series')
+          setSeries(result)
+          setSeriesLoading(false)
+        })
+      }
+      
+      // Wikipedia TV context (events, lopende shows)
+      if (birthYear) {
+        setWikipediaTVLoading(true)
+        getWikipediaTVByYear(birthYear).then(result => {
+          console.log(`[Babykrant] Wikipedia TV response:`, result?.events?.length, 'events, apiVersion:', result?.apiVersion)
+          setWikipediaTV(result)
+          setWikipediaTVLoading(false)
         })
       }
     }
@@ -436,6 +461,126 @@ export default function TestResultsPage() {
             )}
           </div>
 
+          {/* Populaire series van het jaar */}
+          <div className="bg-indigo-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">📺 Populaire series in {birthYear}</h2>
+            
+            {seriesLoading && (
+              <p className="text-gray-500 italic">Series worden opgehaald...</p>
+            )}
+            
+            {!seriesLoading && series && series.movies.length > 0 && (
+              <div className="space-y-2">
+                {series.movies.map((show, idx) => (
+                  <div key={show.id} className="flex items-center gap-3 bg-white p-2 rounded border">
+                    <span className="text-lg font-bold text-indigo-600 w-8">{idx + 1}.</span>
+                    {show.posterPath && (
+                      <img 
+                        src={getPosterUrl(show.posterPath, 'w92') || ''} 
+                        alt={show.title}
+                        className="w-10 h-14 object-cover rounded"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <span className="font-medium">{show.title}</span>
+                      <span className="text-gray-500 text-sm ml-2">★ {show.voteAverage.toFixed(1)}</span>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-gray-500 mt-2">
+                  Bron: TMDB
+                </p>
+              </div>
+            )}
+            
+            {!seriesLoading && (!series || series.movies.length === 0) && (
+              <p className="text-gray-500 italic">Geen series gevonden voor dit jaar</p>
+            )}
+          </div>
+
+          {/* Wikipedia TV Context */}
+          <div className="bg-slate-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">📖 TV Highlights {birthYear}</h2>
+            
+            {wikipediaTVLoading && (
+              <p className="text-gray-500 italic">Wikipedia data wordt opgehaald...</p>
+            )}
+            
+            {!wikipediaTVLoading && wikipediaTV && (
+              <div className="space-y-4">
+                {/* Events */}
+                {wikipediaTV.events.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Belangrijke TV-momenten</h3>
+                    <div className="space-y-2">
+                      {wikipediaTV.events.map((event, idx) => (
+                        <div key={idx} className="bg-white p-2 rounded border text-sm">
+                          {event.date && <span className="font-medium text-slate-600">{event.date}: </span>}
+                          <span className="text-gray-700">{event.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Lopende shows */}
+                {wikipediaTV.runningShows.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Populaire programma's in {birthYear}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {wikipediaTV.runningShows.slice(0, 15).map((show, idx) => (
+                        <span key={idx} className="bg-white px-2 py-1 rounded border text-sm">
+                          {show.title}
+                          {show.years && <span className="text-gray-400 text-xs ml-1">({show.years})</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Debuts */}
+                {wikipediaTV.debuts.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Nieuwe programma's in {birthYear}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {wikipediaTV.debuts.map((show, idx) => (
+                        <span key={idx} className="bg-green-100 px-2 py-1 rounded text-sm text-green-800">
+                          {show}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Endings */}
+                {wikipediaTV.endings.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Gestopte programma's in {birthYear}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {wikipediaTV.endings.map((show, idx) => (
+                        <span key={idx} className="bg-red-100 px-2 py-1 rounded text-sm text-red-800">
+                          {show}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {wikipediaTV.sourceUrl && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    <a href={wikipediaTV.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:underline">
+                      Bron: Wikipedia →
+                    </a>
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {!wikipediaTVLoading && (!wikipediaTV || (wikipediaTV.events.length === 0 && wikipediaTV.runningShows.length === 0)) && (
+              <p className="text-gray-500 italic">Geen Wikipedia TV data gevonden voor dit jaar</p>
+            )}
+          </div>
+
           {/* Naambetekenis */}
           <div className="bg-purple-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">📛 Betekenis naam {firstName}</h2>
@@ -668,9 +813,23 @@ export default function TestResultsPage() {
             </details>
             
             <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ Series ({series?.movies?.length || 0} series)</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(series, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
               <summary className="font-medium text-green-600 mb-2">▶ TV Programma's ({tvPrograms?.totalFound || 0} totaal, {filterInterestingPrograms(tvPrograms?.programs || []).length} na filter, apiVersion: {tvPrograms?.apiVersion || '?'})</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
                 {JSON.stringify(tvPrograms, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ Wikipedia TV ({wikipediaTV?.events?.length || 0} events, {wikipediaTV?.runningShows?.length || 0} shows, apiVersion: {wikipediaTV?.apiVersion || '?'})</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(wikipediaTV, null, 2)}
               </pre>
             </details>
           </div>

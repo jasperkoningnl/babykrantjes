@@ -37,7 +37,7 @@ export async function getTop40ByDate(date: string): Promise<Top40Result> {
   }
 
   try {
-    const response = await fetch(`/api/top40?date=${date}`)
+    const response = await fetch(`/api/culture/music/top40?date=${date}`)
 
     if (!response.ok) {
       console.error(`[Top40] API error: ${response.status}`)

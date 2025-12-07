@@ -41,7 +41,7 @@ export async function getTVProgramsOnDate(
   }
 
   try {
-    const response = await fetch(`/api/tv/on-date?date=${date}&limit=${limit}`)
+    const response = await fetch(`/api/culture/tv/uzg?date=${date}&limit=${limit}`)
     if (!response.ok) return emptyResult
     return await response.json()
   } catch (error) {

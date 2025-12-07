@@ -45,7 +45,7 @@ export async function getYearOverview(
   }
 
   try {
-    const response = await fetch(`/api/dutchcharts/year?year=${year}&limit=${limit}`)
+    const response = await fetch(`/api/culture/music/dutchcharts?year=${year}&limit=${limit}`)
 
     if (!response.ok) {
       console.error(`[DutchCharts] API error: ${response.status}`)

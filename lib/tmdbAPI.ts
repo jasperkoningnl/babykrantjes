@@ -81,7 +81,7 @@ export async function getMoviesAroundDate(
 
     // Roep onze API route aan
     const response = await fetch(
-      `/api/tmdb/movies?from=${from}&to=${to}`
+      `/api/culture/media/tmdb?type=movies&from=${from}&to=${to}`
     )
 
     if (!response.ok) {
@@ -124,7 +124,50 @@ export async function getTopMoviesOfYear(
 
   try {
     const response = await fetch(
-      `/api/tmdb/movies?year=${year}&limit=${limit}`
+      `/api/culture/media/tmdb?type=movies&year=${year}&limit=${limit}`
+    )
+
+    if (!response.ok) {
+      console.error(`[TMDB] API error: ${response.status}`)
+      return emptyResult
+    }
+
+    const data = await response.json()
+    
+    return {
+      movies: data.movies || [],
+      totalResults: data.totalResults || 0,
+      birthDate: `${year}-01-01`,
+      dateRange: { from: `${year}-01-01`, to: `${year}-12-31` },
+      source: 'TMDB'
+    }
+
+  } catch (error) {
+    console.error('[TMDB] Error:', error)
+    return emptyResult
+  }
+}
+
+/**
+ * Haalt populaire series op van een specifiek jaar
+ * @param year - Het jaar
+ * @param limit - Maximum aantal series (default: 10)
+ */
+export async function getSeriesOfYear(
+  year: number,
+  limit: number = 10
+): Promise<TMDBMoviesResult> {
+  const emptyResult: TMDBMoviesResult = {
+    movies: [],
+    totalResults: 0,
+    birthDate: `${year}-01-01`,
+    dateRange: { from: `${year}-01-01`, to: `${year}-12-31` },
+    source: 'TMDB'
+  }
+
+  try {
+    const response = await fetch(
+      `/api/culture/media/tmdb?type=series&year=${year}&limit=${limit}`
     )
 
     if (!response.ok) {
