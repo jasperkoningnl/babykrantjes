@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const dateParam = searchParams.get('date') // YYYY-MM-DD format
-  const limit = parseInt(searchParams.get('limit') || '10', 10)
+  const limit = parseInt(searchParams.get('limit') || '100', 10)
 
   if (!dateParam) {
     return NextResponse.json(
