@@ -30,7 +30,7 @@ export interface TVOnDateResult {
  */
 export async function getTVProgramsOnDate(
   date: string,
-  limit: number = 10
+  limit: number = 100
 ): Promise<TVOnDateResult> {
   const emptyResult: TVOnDateResult = {
     programs: [],
