@@ -109,10 +109,10 @@ function parseWikipediaTV(html: string, year: number): WikipediaTVData {
   try {
     // === EVENTS SECTION ===
     // Zoek naar de Events sectie en parse de lijst
-    const eventsMatch = html.match(/id="Events".*?<ul>(.*?)<\/ul>/s)
+    const eventsMatch = html.match(/id="Events"[\s\S]*?<ul>([\s\S]*?)<\/ul>/)
     if (eventsMatch) {
       const eventsList = eventsMatch[1]
-      const eventItems = eventsList.match(/<li>(.*?)<\/li>/gs) || []
+      const eventItems = eventsList.match(/<li>[\s\S]*?<\/li>/g) || []
       
       for (const item of eventItems) {
         // Verwijder HTML tags maar behoud de tekst
@@ -142,12 +142,12 @@ function parseWikipediaTV(html: string, year: number): WikipediaTVData {
     const decades = ['1950s', '1960s', '1970s', '1980s', '1990s', '2000s', '2010s', '2020s']
     
     for (const decade of decades) {
-      const decadePattern = new RegExp(`id="${decade}".*?<ul>(.*?)<\\/ul>`, 's')
+      const decadePattern = new RegExp(`id="${decade}"[\\s\\S]*?<ul>([\\s\\S]*?)<\\/ul>`)
       const decadeMatch = html.match(decadePattern)
       
       if (decadeMatch) {
         const showsList = decadeMatch[1]
-        const showItems = showsList.match(/<li>(.*?)<\/li>/gs) || []
+        const showItems = showsList.match(/<li>[\s\S]*?<\/li>/g) || []
         
         for (const item of showItems) {
           // Extract show title from link
@@ -170,9 +170,9 @@ function parseWikipediaTV(html: string, year: number): WikipediaTVData {
     }
 
     // === DEBUTS SECTION ===
-    const debutsMatch = html.match(/id="Debuts".*?<ul>(.*?)<\/ul>/s)
+    const debutsMatch = html.match(/id="Debuts"[\s\S]*?<ul>([\s\S]*?)<\/ul>/)
     if (debutsMatch) {
-      const debutItems = debutsMatch[1].match(/<li>(.*?)<\/li>/gs) || []
+      const debutItems = debutsMatch[1].match(/<li>[\s\S]*?<\/li>/g) || []
       for (const item of debutItems) {
         const titleMatch = item.match(/>([^<]+)<\/a>/)
         if (titleMatch) {
@@ -182,9 +182,9 @@ function parseWikipediaTV(html: string, year: number): WikipediaTVData {
     }
 
     // === ENDING THIS YEAR SECTION ===
-    const endingsMatch = html.match(/id="Ending_this_year".*?<ul>(.*?)<\/ul>/s)
+    const endingsMatch = html.match(/id="Ending_this_year"[\s\S]*?<ul>([\s\S]*?)<\/ul>/)
     if (endingsMatch) {
-      const endingItems = endingsMatch[1].match(/<li>(.*?)<\/li>/gs) || []
+      const endingItems = endingsMatch[1].match(/<li>[\s\S]*?<\/li>/g) || []
       for (const item of endingItems) {
         const titleMatch = item.match(/>([^<]+)<\/a>/)
         if (titleMatch) {
