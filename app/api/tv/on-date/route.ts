@@ -78,92 +78,92 @@ export async function GET(request: NextRequest) {
 }
 
 function parseUitzendingGemist(html: string, limit: number) {
-  const programs = []
-  const seen = new Set()
+  const programs: Array<{
+    title: string
+    episodeTitle: string | null
+    description: string | null
+    broadcaster: string | null
+    channel: string | null
+    imageUrl: string | null
+    sourceUrl: string | null
+  }> = []
+  const seen = new Set<string>()
 
   try {
-    // De HTML bevat programma's in dit patroon (markdown-converted):
-    // ### [Programma Naam](url "title")
-    // [![alt](image-url)](link)
-    // Aflevering Titel
-    // Beschrijving...
-    // DD-MM-YYYY
-    // OMROEP
-    // [Alle afleveringen bekijken](url)
-    // [![Zender](zender-image)](zender-link)
+    // De HTML structuur per programma:
+    // <div class="kr_blok_main">
+    //   <h3 class="kr_blok_title"><a href="URL" title="TITLE">TITLE</a></h3>
+    //   <div class="kr_blok_thumb"><a href="..."><img src="IMAGE" .../></a></div>
+    //   <p class="kr_blok_subtitle">EPISODE</p>
+    //   <p class="kr_blok_desc">DESCRIPTION</p>
+    //   <p class="kr_blok_date">DD-MM-YYYY</p>
+    //   <p class="kr_blok_host">BROADCASTER</p>
+    //   <p class="icon"><a href="..."><img ... alt="CHANNEL" /></a></p>
+    // </div>
 
-    // Split op "### [" om programma blokken te vinden
-    const blocks = html.split('### [')
+    // Split op kr_blok_main om individuele programma's te krijgen
+    const blocks = html.split('kr_blok_main')
     
     for (let i = 1; i < blocks.length && programs.length < limit; i++) {
       const block = blocks[i]
       
-      // Haal programmanaam uit eerste regel
-      const titleMatch = block.match(/^([^\]]+)\]\(([^)]+)/)
+      // Titel: <h3 class="kr_blok_title"><a href="URL" title="TITLE">TITLE</a></h3>
+      const titleMatch = block.match(/kr_blok_title[^>]*><a\s+href="([^"]+)"[^>]*>([^<]+)<\/a>/)
       if (!titleMatch) continue
       
-      const title = titleMatch[1].trim()
-      const programUrl = titleMatch[2].split('"')[0].trim()
+      const sourceUrl = titleMatch[1]
+      const title = titleMatch[2].trim()
       
-      // Skip navigatie/datum links
-      if (title.match(/^\d+\s+(January|February|March|April|May|June|July|August|September|October|November|December)/i) ||
-          title.match(/^\d+\s+(Januari|Februari|Maart|April|Mei|Juni|Juli|Augustus|September|Oktober|November|December)/i) ||
-          title.length < 3) {
-        continue
-      }
+      // Skip als al gezien
+      if (seen.has(title)) continue
+      seen.add(title)
       
-      // Haal aflevering titel (regel na de afbeelding link)
-      const episodeMatch = block.match(/\)\]\([^)]+\)\n\n([^\n]+)/)
+      // Aflevering: <p class="kr_blok_subtitle">EPISODE</p>
+      const episodeMatch = block.match(/kr_blok_subtitle[^>]*>([^<]+)<\/p>/)
       let episodeTitle = episodeMatch ? episodeMatch[1].trim() : null
-      
-      // Soms is episodeTitle hetzelfde als title
+      // Skip als episode gelijk is aan titel
       if (episodeTitle === title) episodeTitle = null
       
-      // Haal beschrijving (langere tekst na episodetitel)
-      const lines = block.split('\n').filter(l => l.trim())
-      let description = null
-      for (const line of lines) {
-        const trimmed = line.trim()
-        // Beschrijving is meestal 50+ karakters en begint met hoofdletter
-        if (trimmed.length > 50 && 
-            trimmed.match(/^[A-Z]/) && 
-            !trimmed.startsWith('[![') &&
-            !trimmed.startsWith('[Alle') &&
-            !trimmed.match(/^\d{2}-\d{2}-\d{4}/)) {
-          description = trimmed
-          break
+      // Beschrijving: <p class="kr_blok_desc">DESCRIPTION</p>
+      const descMatch = block.match(/kr_blok_desc[^>]*>([^<]+)<\/p>/)
+      let description = descMatch ? descMatch[1].trim() : null
+      // Clean HTML entities
+      if (description) {
+        description = description
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&aacute;/g, 'á')
+          .replace(/&eacute;/g, 'é')
+          .replace(/&quot;/g, '"')
+          .replace(/\s+/g, ' ')
+          .trim()
+        // Skip beschrijvingen die HTML tags bevatten
+        if (description.includes('<') || description.length < 10) {
+          description = null
         }
       }
       
-      // Haal omroep (staat vaak alleen op een regel, uppercase start)
-      const broadcasterMatch = block.match(/\n([A-Z][A-Z0-9a-z]{1,15})\n/)
-      const broadcaster = broadcasterMatch ? broadcasterMatch[1] : null
+      // Omroep: <p class="kr_blok_host">BROADCASTER</p>
+      const broadcasterMatch = block.match(/kr_blok_host[^>]*>([^<]+)<\/p>/)
+      const broadcaster = broadcasterMatch ? broadcasterMatch[1].trim() : null
       
-      // Haal zender uit de zender afbeelding alt text
-      const channelMatch = block.match(/!\[(Nederland \d|RTL \d|SBS \d|NET \d|Veronica)\]/)
-      const channel = channelMatch ? channelMatch[1] : null
+      // Zender: <img ... alt="CHANNEL" /> in icon sectie
+      const channelMatch = block.match(/class="icon"[^>]*>.*?alt="([^"]+)"/)
+      const channel = channelMatch ? channelMatch[1].trim() : null
       
-      // Haal afbeelding URL
-      const imageMatch = block.match(/\[!\[[^\]]*\]\(([^)]+)\)/)
-      let imageUrl = imageMatch ? imageMatch[1] : null
-      if (imageUrl && !imageUrl.startsWith('http')) {
-        imageUrl = null
-      }
-      
-      // Maak unieke key om duplicaten te voorkomen
-      const key = `${title}|${episodeTitle || ''}`
-      if (seen.has(key)) continue
-      seen.add(key)
+      // Afbeelding: <img src="IMAGE" in kr_blok_thumb
+      const imageMatch = block.match(/kr_blok_thumb[^>]*>.*?<img\s+src="([^"]+)"/)
+      const imageUrl = imageMatch ? imageMatch[1] : null
       
       programs.push({
         title,
         episodeTitle,
-        description: description ? description.substring(0, 200) : null,
+        description,
         broadcaster,
         channel,
         imageUrl,
-        sourceUrl: programUrl.startsWith('http') ? programUrl : 
-                   `https://www.uitzendinggemist.net${programUrl}`
+        sourceUrl: sourceUrl.startsWith('http') ? sourceUrl : `https://www.uitzendinggemist.net${sourceUrl}`
       })
     }
 
