@@ -1,9 +1,9 @@
 // app/test-results/page.tsx
-// @version 1.7.0
-// Toegevoegd: TMDB series, Wikipedia TV context
+// @version 1.7.1
+// Cultuurdata compleet: muziek, films, series, TV
 'use client'
 
-const PAGE_VERSION = '1.7.0'
+const PAGE_VERSION = '1.7.1'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -414,6 +414,43 @@ export default function TestResultsPage() {
             </div>
           )}
 
+          {/* Populaire series van het jaar */}
+          <div className="bg-indigo-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">📺 Populaire series in {birthYear}</h2>
+            
+            {seriesLoading && (
+              <p className="text-gray-500 italic">Series worden opgehaald...</p>
+            )}
+            
+            {!seriesLoading && series && series.movies.length > 0 && (
+              <div className="space-y-2">
+                {series.movies.map((show, idx) => (
+                  <div key={show.id} className="flex items-center gap-3 bg-white p-2 rounded border">
+                    <span className="text-lg font-bold text-indigo-600 w-8">{idx + 1}.</span>
+                    {show.posterPath && (
+                      <img 
+                        src={getPosterUrl(show.posterPath, 'w92') || ''} 
+                        alt={show.title}
+                        className="w-10 h-14 object-cover rounded"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <span className="font-medium">{show.title}</span>
+                      <span className="text-gray-500 text-sm ml-2">★ {show.voteAverage.toFixed(1)}</span>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-gray-500 mt-2">
+                  Bron: TMDB
+                </p>
+              </div>
+            )}
+            
+            {!seriesLoading && (!series || series.movies.length === 0) && (
+              <p className="text-gray-500 italic">Geen series gevonden voor dit jaar</p>
+            )}
+          </div>
+
           {/* TV Programma's op geboortedatum */}
           <div className="bg-violet-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">📺 Op TV op de geboortedag</h2>
@@ -461,43 +498,6 @@ export default function TestResultsPage() {
             )}
           </div>
 
-          {/* Populaire series van het jaar */}
-          <div className="bg-indigo-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">📺 Populaire series in {birthYear}</h2>
-            
-            {seriesLoading && (
-              <p className="text-gray-500 italic">Series worden opgehaald...</p>
-            )}
-            
-            {!seriesLoading && series && series.movies.length > 0 && (
-              <div className="space-y-2">
-                {series.movies.map((show, idx) => (
-                  <div key={show.id} className="flex items-center gap-3 bg-white p-2 rounded border">
-                    <span className="text-lg font-bold text-indigo-600 w-8">{idx + 1}.</span>
-                    {show.posterPath && (
-                      <img 
-                        src={getPosterUrl(show.posterPath, 'w92') || ''} 
-                        alt={show.title}
-                        className="w-10 h-14 object-cover rounded"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <span className="font-medium">{show.title}</span>
-                      <span className="text-gray-500 text-sm ml-2">★ {show.voteAverage.toFixed(1)}</span>
-                    </div>
-                  </div>
-                ))}
-                <p className="text-xs text-gray-500 mt-2">
-                  Bron: TMDB
-                </p>
-              </div>
-            )}
-            
-            {!seriesLoading && (!series || series.movies.length === 0) && (
-              <p className="text-gray-500 italic">Geen series gevonden voor dit jaar</p>
-            )}
-          </div>
-
           {/* Wikipedia TV Context */}
           <div className="bg-slate-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">📖 TV Highlights {birthYear}</h2>
@@ -538,7 +538,7 @@ export default function TestResultsPage() {
                   </div>
                 )}
                 
-                {/* Debuts */}
+                {/* Debuts - alleen tonen als er echte content is */}
                 {wikipediaTV.debuts.length > 0 && (
                   <div>
                     <h3 className="font-medium text-gray-700 mb-2">Nieuwe programma's in {birthYear}</h3>
@@ -552,7 +552,7 @@ export default function TestResultsPage() {
                   </div>
                 )}
                 
-                {/* Endings */}
+                {/* Endings - alleen tonen als er echte content is */}
                 {wikipediaTV.endings.length > 0 && (
                   <div>
                     <h3 className="font-medium text-gray-700 mb-2">Gestopte programma's in {birthYear}</h3>

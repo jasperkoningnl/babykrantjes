@@ -170,25 +170,33 @@ function parseWikipediaTV(html: string, year: number): WikipediaTVData {
     }
 
     // === DEBUTS SECTION ===
-    const debutsMatch = html.match(/id="Debuts"[\s\S]*?<ul>([\s\S]*?)<\/ul>/)
-    if (debutsMatch) {
-      const debutItems = debutsMatch[1].match(/<li>[\s\S]*?<\/li>/g) || []
-      for (const item of debutItems) {
-        const titleMatch = item.match(/>([^<]+)<\/a>/)
-        if (titleMatch) {
-          debuts.push(titleMatch[1].trim())
+    // Skip als sectie "empty" bevat
+    const debutsSection = html.match(/id="Debuts"[\s\S]*?(?=<div class="mw-heading|$)/)
+    if (debutsSection && !debutsSection[0].includes('empty')) {
+      const debutsMatch = debutsSection[0].match(/<ul>([\s\S]*?)<\/ul>/)
+      if (debutsMatch) {
+        const debutItems = debutsMatch[1].match(/<li>[\s\S]*?<\/li>/g) || []
+        for (const item of debutItems) {
+          const titleMatch = item.match(/>([^<]+)<\/a>/)
+          if (titleMatch) {
+            debuts.push(titleMatch[1].trim())
+          }
         }
       }
     }
 
     // === ENDING THIS YEAR SECTION ===
-    const endingsMatch = html.match(/id="Ending_this_year"[\s\S]*?<ul>([\s\S]*?)<\/ul>/)
-    if (endingsMatch) {
-      const endingItems = endingsMatch[1].match(/<li>[\s\S]*?<\/li>/g) || []
-      for (const item of endingItems) {
-        const titleMatch = item.match(/>([^<]+)<\/a>/)
-        if (titleMatch) {
-          endings.push(titleMatch[1].trim())
+    // Skip als sectie "empty" bevat
+    const endingsSection = html.match(/id="Ending_this_year"[\s\S]*?(?=<div class="mw-heading|$)/)
+    if (endingsSection && !endingsSection[0].includes('empty')) {
+      const endingsMatch = endingsSection[0].match(/<ul>([\s\S]*?)<\/ul>/)
+      if (endingsMatch) {
+        const endingItems = endingsMatch[1].match(/<li>[\s\S]*?<\/li>/g) || []
+        for (const item of endingItems) {
+          const titleMatch = item.match(/>([^<]+)<\/a>/)
+          if (titleMatch) {
+            endings.push(titleMatch[1].trim())
+          }
         }
       }
     }
