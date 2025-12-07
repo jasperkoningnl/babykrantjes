@@ -1,5 +1,5 @@
 // lib/tvOnDateAPI.ts
-// @version 1.0.0
+// @version 1.1.0
 // Client voor TV programma's op een specifieke datum
 // Vervangt npoBackstageAPI en wikipediaTVAPI
 
@@ -19,6 +19,7 @@ export interface TVOnDateResult {
   totalFound: number
   source: string
   sourceUrl: string
+  apiVersion?: string
   error?: string
 }
 
