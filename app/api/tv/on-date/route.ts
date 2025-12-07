@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function parseUitzendingGemist(html, limit) {
+function parseUitzendingGemist(html: string, limit: number) {
   const programs = []
   const seen = new Set()
 
