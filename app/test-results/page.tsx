@@ -1,9 +1,9 @@
 // app/test-results/page.tsx
-// @version 1.6.1
+// @version 1.6.2
 // Vervangen: NPO Backstage + Wikipedia TV door uitzendinggemist.net
 'use client'
 
-const PAGE_VERSION = '1.6.1'
+const PAGE_VERSION = '1.6.2'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -405,7 +405,7 @@ export default function TestResultsPage() {
                   })}:
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {filterInterestingPrograms(tvPrograms.programs).slice(0, 8).map((program, idx) => (
+                  {filterInterestingPrograms(tvPrograms.programs).map((program, idx) => (
                     <div key={idx} className="bg-white p-3 rounded border border-violet-200">
                       <p className="font-semibold text-gray-900">{program.title}</p>
                       {program.episodeTitle && (
@@ -426,7 +426,7 @@ export default function TestResultsPage() {
                   <a href={tvPrograms.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">
                     Bron: {tvPrograms.source} →
                   </a>
-                  {' '}• {tvPrograms.totalFound} programma's gevonden
+                  {' '}• {filterInterestingPrograms(tvPrograms.programs).length} van {tvPrograms.totalFound} programma's getoond (gefilterd op interessante content)
                 </p>
               </div>
             )}
@@ -647,9 +647,30 @@ export default function TestResultsPage() {
             </details>
             
             <details className="cursor-pointer mt-4">
-              <summary className="font-medium text-green-600 mb-2">▶ Toon cultuur data</summary>
-              <pre className="bg-white p-4 rounded border overflow-auto text-xs">
-                {JSON.stringify({ top40, yearChart, movies: movies?.movies?.slice(0, 3), tvPrograms: tvPrograms?.programs?.slice(0, 5) }, null, 2)}
+              <summary className="font-medium text-green-600 mb-2">▶ Top 40 ({top40?.entries?.length || 0} entries)</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(top40, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ Jaaroverzicht ({yearChart?.entries?.length || 0} entries)</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(yearChart, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ Films ({movies?.movies?.length || 0} films)</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(movies, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ TV Programma's ({tvPrograms?.totalFound || 0} totaal, {filterInterestingPrograms(tvPrograms?.programs || []).length} na filter, apiVersion: {tvPrograms?.apiVersion || '?'})</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(tvPrograms, null, 2)}
               </pre>
             </details>
           </div>
