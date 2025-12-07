@@ -1,7 +1,7 @@
 // app/api/dutchcharts/year/route.ts
-// @version 1.0.0
+// @version 1.1.0
 // Server-side scraper voor DutchCharts.nl jaaroverzichten
-// Bron: https://dutchcharts.nl/jaaroverzichten.asp
+// FIXED: Correcte kolom parsing - kolommen zijn: #, W, P, Artiest, Titel, Label, %
 
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -9,8 +9,9 @@ interface YearChartEntry {
   position: number
   title: string
   artist: string
-  peakPosition?: number
   weeksInChart?: number
+  peakPosition?: number
+  label?: string
 }
 
 interface DutchChartsYearResult {
@@ -21,10 +22,6 @@ interface DutchChartsYearResult {
   sourceUrl: string
 }
 
-/**
- * GET /api/dutchcharts/year?year=YYYY&limit=N
- * Haalt het jaaroverzicht singles op
- */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const yearParam = searchParams.get('year')
@@ -39,7 +36,6 @@ export async function GET(request: NextRequest) {
 
   const year = parseInt(yearParam, 10)
   
-  // Valideer jaar (DutchCharts gaat terug tot 1956)
   if (year < 1956 || year > new Date().getFullYear()) {
     return NextResponse.json(
       { error: 'Year must be between 1956 and current year' },
@@ -48,17 +44,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // DutchCharts URL patroon voor jaaroverzichten
     const url = `https://dutchcharts.nl/jaaroverzichten.asp?year=${year}&cat=s`
     console.log(`[DutchCharts] Fetching: ${url}`)
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; BabykrantBot/1.0)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'nl-NL,nl;q=0.9'
       },
-      next: { revalidate: 86400 } // Cache 24 uur
+      next: { revalidate: 86400 }
     })
 
     if (!response.ok) {
@@ -73,6 +68,9 @@ export async function GET(request: NextRequest) {
     const result = parseDutchChartsYearHtml(html, year, limit, url)
 
     console.log(`[DutchCharts] Found ${result.totalEntries} entries for ${year}`)
+    if (result.entries.length > 0) {
+      console.log(`[DutchCharts] #1: ${result.entries[0].artist} - ${result.entries[0].title}`)
+    }
 
     return NextResponse.json(result)
 
@@ -85,9 +83,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * Parse DutchCharts jaaroverzicht HTML
- */
 function parseDutchChartsYearHtml(
   html: string,
   year: number,
@@ -105,54 +100,99 @@ function parseDutchChartsYearHtml(
   try {
     const entries: YearChartEntry[] = []
 
-    // DutchCharts gebruikt een tabel structuur
-    // Zoek naar table rows met chart data
+    // DutchCharts tabel structuur:
+    // | # | W | P | [lege] | Artiest | Titel | Label | % |
+    // Waarbij:
+    // # = jaarlijkse positie
+    // W = weken in lijst
+    // P = piek positie
+    // Artiest en Titel zijn links
     
-    // Patroon 1: Tabel rows met positie, titel, artiest
-    // <tr><td>1</td><td><a href="...">Titel</a></td><td>Artiest</td>...</tr>
-    const tableRowPattern = /<tr[^>]*>[\s\S]*?<td[^>]*>(\d+)<\/td>[\s\S]*?<td[^>]*>(?:<a[^>]*>)?([^<]+)(?:<\/a>)?<\/td>[\s\S]*?<td[^>]*>(?:<a[^>]*>)?([^<]+)(?:<\/a>)?<\/td>/gi
+    // De HTML is een tabel, we zoeken naar rijen met links naar showitem.asp
+    // Format: <a href="showitem.asp?interpret=...&titel=...">Artiest/Titel</a>
+    
+    // Patroon: zoek naar rijen die beginnen met een positienummer
+    // gevolgd door artiest en titel links
+    
+    // Methode 1: Zoek naar tabel rijen met het juiste patroon
+    // De eerste cel bevat de positie (bold), dan W, P, en dan artiest/titel links
+    const rowPattern = /<tr[^>]*>[\s\S]*?<td[^>]*><b>(\d+)<\/b><\/td>[\s\S]*?<td[^>]*>(\d+)<\/td>[\s\S]*?<td[^>]*>(\d+)<\/td>[\s\S]*?<a[^>]*interpret=([^&"]+)[^>]*>([^<]+)<\/a>[\s\S]*?<a[^>]*titel=([^&"]+)[^>]*>([^<]+)<\/a>/gi
 
     let match
-    while ((match = tableRowPattern.exec(html)) !== null && entries.length < limit) {
+    while ((match = rowPattern.exec(html)) !== null && entries.length < limit) {
       const position = parseInt(match[1], 10)
-      const title = decodeHtmlEntities(match[2].trim())
-      const artist = decodeHtmlEntities(match[3].trim())
+      const weeksInChart = parseInt(match[2], 10)
+      const peakPosition = parseInt(match[3], 10)
+      const artist = decodeHtmlEntities(decodeURIComponent(match[5].replace(/\+/g, ' ').trim()))
+      const title = decodeHtmlEntities(decodeURIComponent(match[7].replace(/\+/g, ' ').trim()))
       
-      // Filter lege entries
-      if (title && artist && position > 0) {
+      if (position > 0 && title && artist) {
         entries.push({
           position,
           title,
-          artist
+          artist,
+          weeksInChart,
+          peakPosition
         })
       }
     }
 
-    // Alternatief patroon als de tabel anders is opgebouwd
+    // Methode 2: Alternatief patroon als eerste niet werkt
     if (entries.length === 0) {
-      // Zoek naar links met /song/ of /nummer/ in href
-      const altPattern = /<a[^>]*href="[^"]*(?:\/song\/|\/nummer\/)[^"]*"[^>]*>([^<]+)<\/a>[\s\S]*?<a[^>]*href="[^"]*(?:\/artist\/|\/artiest\/)[^"]*"[^>]*>([^<]+)<\/a>/gi
+      // Zoek naar alle showitem links en reconstrueer de data
+      const linkPattern = /<a[^>]*href="showitem\.asp\?interpret=([^&"]+)&(?:amp;)?titel=([^&"]+)&(?:amp;)?cat=s"[^>]*>([^<]+)<\/a>/gi
+      const artistTitlePairs: Array<{artist: string, title: string, displayArtist: string, displayTitle: string}> = []
       
-      let pos = 1
-      while ((match = altPattern.exec(html)) !== null && entries.length < limit) {
-        entries.push({
-          position: pos++,
-          title: decodeHtmlEntities(match[1].trim()),
-          artist: decodeHtmlEntities(match[2].trim())
+      while ((match = linkPattern.exec(html)) !== null) {
+        const interpretEncoded = match[1]
+        const titelEncoded = match[2]
+        const displayText = match[3].trim()
+        
+        // Decode URL parameters
+        const artist = decodeURIComponent(interpretEncoded.replace(/\+/g, ' '))
+        const title = decodeURIComponent(titelEncoded.replace(/\+/g, ' '))
+        
+        artistTitlePairs.push({
+          artist,
+          title,
+          displayArtist: displayText,
+          displayTitle: displayText
         })
+      }
+
+      // Group pairs - elke entry heeft 2 links (artiest en titel)
+      for (let i = 0; i < artistTitlePairs.length - 1; i += 2) {
+        const artistLink = artistTitlePairs[i]
+        const titleLink = artistTitlePairs[i + 1]
+        
+        if (artistLink && titleLink && entries.length < limit) {
+          entries.push({
+            position: entries.length + 1,
+            artist: decodeHtmlEntities(artistLink.displayArtist),
+            title: decodeHtmlEntities(titleLink.displayTitle)
+          })
+        }
       }
     }
 
-    // Nog een fallback: zoek naar specifieke class names
+    // Methode 3: Parse als markdown tabel (voor web_fetch converted content)
     if (entries.length === 0) {
-      const classPattern = /class="[^"]*chart[^"]*"[\s\S]*?(\d+)[\s\S]*?<[^>]*>([^<]+)<[\s\S]*?<[^>]*>([^<]+)</gi
+      // Markdown tabel format:
+      // | **1** | 52 | 2 |  | [Kris Kross...](showitem.asp?...) | [Vluchtstrook](showitem.asp?...) | LABEL | 100 |
+      const mdRowPattern = /\|\s*\*?\*?(\d+)\*?\*?\s*\|[^|]*\|[^|]*\|[^|]*\|\s*\[([^\]]+)\]\([^)]+\)\s*\|\s*\[([^\]]+)\]\([^)]+\)/g
       
-      while ((match = classPattern.exec(html)) !== null && entries.length < limit) {
-        entries.push({
-          position: parseInt(match[1], 10),
-          title: decodeHtmlEntities(match[2].trim()),
-          artist: decodeHtmlEntities(match[3].trim())
-        })
+      while ((match = mdRowPattern.exec(html)) !== null && entries.length < limit) {
+        const position = parseInt(match[1], 10)
+        const artist = decodeHtmlEntities(match[2].trim())
+        const title = decodeHtmlEntities(match[3].trim())
+        
+        if (position > 0 && title && artist) {
+          entries.push({
+            position,
+            title,
+            artist
+          })
+        }
       }
     }
 
@@ -166,9 +206,6 @@ function parseDutchChartsYearHtml(
   return result
 }
 
-/**
- * Decode HTML entities
- */
 function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&amp;/g, '&')
