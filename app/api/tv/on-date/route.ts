@@ -3,9 +3,9 @@
 // TV programma's op een specifieke datum
 // Bron: uitzendinggemist.net
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(request) {
+export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const dateParam = searchParams.get('date') // YYYY-MM-DD format
   const limit = parseInt(searchParams.get('limit') || '10', 10)
