@@ -647,7 +647,7 @@ export default function TestResultsPage() {
             </details>
             
             <details className="cursor-pointer mt-4">
-              <summary className="font-medium text-green-600 mb-2">▶ Top 40 ({top40?.entries?.length || 0} entries)</summary>
+              <summary className="font-medium text-green-600 mb-2">▶ Top 40 ({top40?.topTen?.length || 0} entries)</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
                 {JSON.stringify(top40, null, 2)}
               </pre>
