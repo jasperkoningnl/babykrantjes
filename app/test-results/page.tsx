@@ -1,6 +1,6 @@
 // app/test-results/page.tsx
 // @version 1.6.0
-// Toegevoegd: Wikipedia TV events (Wie is de Mol winnaar, Eurovision, etc.)
+// Vervangen: NPO Backstage + Wikipedia TV door uitzendinggemist.net
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -15,8 +15,7 @@ import { getFamousNamesakes, type FamousNamesakesData } from '@/lib/famousNamesa
 import { getMoviesAroundDate, getTopMoviesOfYear, getPosterUrl, formatGenres, type TMDBMoviesResult } from '@/lib/tmdbAPI'
 import { getTop40ByDate, type Top40Result } from '@/lib/top40API'
 import { getYearOverview, type DutchChartsYearResult } from '@/lib/dutchChartsAPI'
-import { getTVProgramsAroundDate, type NPOResult } from '@/lib/npoBackstageAPI'
-import { getTVEventsForYear, type WikipediaTVResult } from '@/lib/wikipediaTVAPI'
+import { getTVProgramsOnDate, filterInterestingPrograms, type TVOnDateResult } from '@/lib/tvOnDateAPI'
 
 export default function TestResultsPage() {
   const [data, setData] = useState<BabykrantData | null>(null)
@@ -28,8 +27,7 @@ export default function TestResultsPage() {
   const [topMovies, setTopMovies] = useState<TMDBMoviesResult | null>(null)
   const [top40, setTop40] = useState<Top40Result | null>(null)
   const [yearChart, setYearChart] = useState<DutchChartsYearResult | null>(null)
-  const [tvPrograms, setTvPrograms] = useState<NPOResult | null>(null)
-  const [wikiTVEvents, setWikiTVEvents] = useState<WikipediaTVResult | null>(null)
+  const [tvPrograms, setTvPrograms] = useState<TVOnDateResult | null>(null)
   
   const [loading, setLoading] = useState(true)
   const [weatherLoading, setWeatherLoading] = useState(false)
@@ -40,7 +38,6 @@ export default function TestResultsPage() {
   const [top40Loading, setTop40Loading] = useState(false)
   const [yearChartLoading, setYearChartLoading] = useState(false)
   const [tvLoading, setTvLoading] = useState(false)
-  const [wikiTVLoading, setWikiTVLoading] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('babykrant_test_data')
@@ -122,21 +119,12 @@ export default function TestResultsPage() {
         })
       }
       
-      // TV programma's rond geboortedatum
+      // TV programma's op geboortedatum
       if (birthDate) {
         setTvLoading(true)
-        getTVProgramsAroundDate(birthDate, 7).then(result => {
+        getTVProgramsOnDate(birthDate, 15).then(result => {
           setTvPrograms(result)
           setTvLoading(false)
-        })
-      }
-      
-      // Wikipedia TV events van het jaar
-      if (birthYear) {
-        setWikiTVLoading(true)
-        getTVEventsForYear(birthYear).then(result => {
-          setWikiTVEvents(result)
-          setWikiTVLoading(false)
         })
       }
     }
@@ -396,9 +384,9 @@ export default function TestResultsPage() {
             </div>
           )}
 
-          {/* TV Programma's */}
+          {/* TV Programma's op geboortedatum */}
           <div className="bg-violet-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">📺 TV Programma's (NPO)</h2>
+            <h2 className="text-xl font-semibold mb-4">📺 Op TV op de geboortedag</h2>
             
             {tvLoading && (
               <p className="text-gray-500 italic">TV programma's worden opgehaald...</p>
@@ -406,63 +394,40 @@ export default function TestResultsPage() {
             
             {!tvLoading && tvPrograms && tvPrograms.programs.length > 0 && (
               <div className="space-y-2">
-                {tvPrograms.programs.slice(0, 5).map((program, idx) => (
-                  <div key={idx} className="bg-white p-3 rounded border">
-                    <p className="font-semibold text-gray-900">{program.title}</p>
-                    {program.channel && (
-                      <p className="text-sm text-violet-600">{program.channel}</p>
-                    )}
-                    {program.description && (
-                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">{program.description}</p>
-                    )}
-                  </div>
-                ))}
-                <p className="text-xs text-gray-500 mt-2">
-                  Bron: NPO Backstage • {tvPrograms.totalResults} programma's gevonden
+                <p className="text-sm text-gray-600 mb-3">
+                  Dit was er op TV op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { 
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+                  })}:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {filterInterestingPrograms(tvPrograms.programs).slice(0, 8).map((program, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border border-violet-200">
+                      <p className="font-semibold text-gray-900">{program.title}</p>
+                      {program.episodeTitle && (
+                        <p className="text-sm text-violet-700">{program.episodeTitle}</p>
+                      )}
+                      {(program.channel || program.broadcaster) && (
+                        <p className="text-xs text-violet-500 mt-1">
+                          {program.channel || program.broadcaster}
+                        </p>
+                      )}
+                      {program.description && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{program.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  <a href={tvPrograms.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">
+                    Bron: {tvPrograms.source} →
+                  </a>
+                  {' '}• {tvPrograms.totalFound} programma's gevonden
                 </p>
               </div>
             )}
             
             {!tvLoading && (!tvPrograms || tvPrograms.programs.length === 0) && (
-              <p className="text-gray-500 italic">Geen TV programma's gevonden (NPO data mogelijk niet beschikbaar voor deze periode)</p>
-            )}
-          </div>
-
-          {/* Wikipedia TV Events */}
-          <div className="bg-indigo-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">📺 TV Hoogtepunten {birthYear}</h2>
-            
-            {wikiTVLoading && (
-              <p className="text-gray-500 italic">TV events worden opgehaald...</p>
-            )}
-            
-            {!wikiTVLoading && wikiTVEvents && wikiTVEvents.events.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600 mb-3">
-                  Belangrijke TV-momenten in {birthYear}:
-                </p>
-                <div className="grid grid-cols-1 gap-3">
-                  {wikiTVEvents.events.slice(0, 10).map((event, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border border-indigo-200">
-                      <div className="flex justify-between items-start">
-                        <span className="text-xs font-medium text-indigo-600 bg-indigo-100 px-2 py-1 rounded">
-                          {event.date}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-800 mt-2">{event.description}</p>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  <a href={wikiTVEvents.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                    Bron: Wikipedia →
-                  </a>
-                </p>
-              </div>
-            )}
-            
-            {!wikiTVLoading && (!wikiTVEvents || wikiTVEvents.events.length === 0) && (
-              <p className="text-gray-500 italic">Geen TV events gevonden voor {birthYear}</p>
+              <p className="text-gray-500 italic">Geen TV programma's gevonden voor deze datum</p>
             )}
           </div>
 
@@ -679,7 +644,7 @@ export default function TestResultsPage() {
             <details className="cursor-pointer mt-4">
               <summary className="font-medium text-green-600 mb-2">▶ Toon cultuur data</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs">
-                {JSON.stringify({ top40, yearChart, movies: movies?.movies?.slice(0, 3), tvPrograms: tvPrograms?.programs?.slice(0, 3), wikiTVEvents: wikiTVEvents?.events?.slice(0, 5) }, null, 2)}
+                {JSON.stringify({ top40, yearChart, movies: movies?.movies?.slice(0, 3), tvPrograms: tvPrograms?.programs?.slice(0, 5) }, null, 2)}
               </pre>
             </details>
           </div>
