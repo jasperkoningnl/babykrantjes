@@ -1,5 +1,7 @@
 // app/api/tv/on-date/route.ts
-// @version 1.0.0
+// @version 1.1.0
+
+const API_VERSION = '1.1.0'
 // TV programma's op een specifieke datum
 // Bron: uitzendinggemist.net
 
@@ -62,7 +64,8 @@ export async function GET(request: NextRequest) {
       date: dateParam,
       totalFound: programs.length,
       source: 'uitzendinggemist.net',
-      sourceUrl: url
+      sourceUrl: url,
+      apiVersion: API_VERSION
     })
 
   } catch (error) {

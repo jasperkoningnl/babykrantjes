@@ -1,7 +1,9 @@
 // app/test-results/page.tsx
-// @version 1.6.0
+// @version 1.6.1
 // Vervangen: NPO Backstage + Wikipedia TV door uitzendinggemist.net
 'use client'
+
+const PAGE_VERSION = '1.6.1'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -40,6 +42,8 @@ export default function TestResultsPage() {
   const [tvLoading, setTvLoading] = useState(false)
 
   useEffect(() => {
+    console.log(`[Babykrant] test-results page v${PAGE_VERSION}`)
+    
     const stored = localStorage.getItem('babykrant_test_data')
     if (stored) {
       const parsedData = JSON.parse(stored)
@@ -122,7 +126,8 @@ export default function TestResultsPage() {
       // TV programma's op geboortedatum
       if (birthDate) {
         setTvLoading(true)
-        getTVProgramsOnDate(birthDate, 15).then(result => {
+        getTVProgramsOnDate(birthDate).then(result => {
+          console.log(`[Babykrant] TV API response:`, result?.totalFound, 'programs, apiVersion:', result?.apiVersion)
           setTvPrograms(result)
           setTvLoading(false)
         })
@@ -653,6 +658,11 @@ export default function TestResultsPage() {
             <Link href="/wizard" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold">
               Nieuwe babykrant maken
             </Link>
+          </div>
+          
+          {/* Versie footer */}
+          <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 text-right">
+            test-results v{PAGE_VERSION}
           </div>
         </div>
       </div>
