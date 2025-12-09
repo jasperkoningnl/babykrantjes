@@ -1,11 +1,12 @@
 // app/api/news/daily/route.ts
-// @version 1.0.0
+// @version 1.1.0
 // Wikipedia Current Events scraper voor internationaal nieuws op een specifieke dag
 // Bron: https://en.wikipedia.org/wiki/Portal:Current_events/{jaar}_{maand}_{dag}
+// FIX: Betere cleaning van Wikipedia markup
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_VERSION = '1.0.0'
+const API_VERSION = '1.1.0'
 
 const MONTHS_EN = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -29,7 +30,7 @@ interface DailyNewsResult {
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const dateParam = searchParams.get('date') // YYYY-MM-DD format
+  const dateParam = searchParams.get('date')
 
   if (!dateParam) {
     return NextResponse.json(
@@ -38,7 +39,6 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Parse datum
   const dateParts = dateParam.split('-')
   if (dateParts.length !== 3) {
     return NextResponse.json(
@@ -61,10 +61,6 @@ export async function GET(request: NextRequest) {
 
   const monthName = MONTHS_EN[month - 1]
   const pageTitle = `Portal:Current_events/${year}_${monthName}_${day}`
-  const encodedTitle = encodeURIComponent(pageTitle)
-  
-  // Wikipedia REST API voor schone HTML
-  const apiUrl = `https://en.wikipedia.org/api/rest_v1/page/html/${encodedTitle}`
   const webUrl = `https://en.wikipedia.org/wiki/${pageTitle.replace(/ /g, '_')}`
 
   const emptyResult: DailyNewsResult = {
@@ -77,14 +73,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`[NewsDaily] Fetching: ${apiUrl}`)
+    // Gebruik normale Wikipedia URL (niet REST API) voor betere HTML structuur
+    console.log(`[NewsDaily] Fetching: ${webUrl}`)
 
-    const response = await fetch(apiUrl, {
+    const response = await fetch(webUrl, {
       headers: {
         'User-Agent': 'BabykrantBot/1.0 (educational project)',
-        'Accept': 'text/html'
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9'
       },
-      next: { revalidate: 86400 * 30 } // Cache 30 dagen (historische data)
+      next: { revalidate: 86400 * 30 }
     })
 
     if (response.status === 404) {
@@ -126,88 +124,74 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * Parset de Wikipedia Current Events HTML
- * Structuur: secties met headers (h2/h3) gevolgd door ul/li lijsten
- */
 function parseCurrentEventsHtml(html: string): NewsEvent[] {
   const events: NewsEvent[] = []
-  const categoryCount: Record<string, number> = {}
-  const MAX_PER_CATEGORY = 5
+  const seenTexts = new Set<string>()
 
   try {
-    // Bepaal of de pagina veel categorieën heeft
-    const headerMatches = html.match(/<h[23][^>]*>/gi) || []
-    const hasManyCats = headerMatches.length >= 3
-    const maxPerCat = hasManyCats ? MAX_PER_CATEGORY : 25
+    // Zoek de content sectie
+    const contentMatch = html.match(/<div[^>]*class="[^"]*current-events[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?:<div class="(printfooter|catlinks)"|<\/td>)/i)
+      || html.match(/<div[^>]*id="mw-content-text"[^>]*>([\s\S]*?)<\/div>\s*<div class="printfooter"/i)
+    
+    let contentHtml = contentMatch ? contentMatch[1] : html
 
-    let currentCategory = 'General'
-
-    // Splits op secties en headers
-    // We zoeken naar h2, h3 headers en ul lijsten
-
-    // Methode 1: Zoek headers en pak de tekst
-    const headerPattern = /<h[23][^>]*>([^<]*(?:<[^>]+>[^<]*)*)<\/h[23]>/gi
-    const listItemPattern = /<li[^>]*>([\s\S]*?)<\/li>/gi
-
-    // Eerst alle headers vinden met hun positie
-    const headers: Array<{ pos: number; text: string }> = []
-    let headerMatch
-    while ((headerMatch = headerPattern.exec(html)) !== null) {
-      const headerText = cleanText(headerMatch[1])
-      if (headerText && headerText.length > 1 && headerText.length < 100) {
-        headers.push({ pos: headerMatch.index, text: headerText })
+    // Zoek naar categorieën (bold/strong headers of dt elementen)
+    let currentCategory = 'Nieuws'
+    
+    // Parse de HTML structuur
+    // Wikipedia Current Events gebruikt vaak: <p><b>Category</b></p> gevolgd door <ul><li>items</li></ul>
+    
+    // Methode 1: Zoek naar description lists (dl/dt/dd)
+    const dlPattern = /<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi
+    let dlMatch
+    while ((dlMatch = dlPattern.exec(contentHtml)) !== null) {
+      const category = cleanWikiText(dlMatch[1])
+      const content = dlMatch[2]
+      
+      if (category && category.length > 2 && category.length < 50) {
+        currentCategory = category
       }
-    }
-
-    // Dan alle list items vinden
-    let listMatch
-    while ((listMatch = listItemPattern.exec(html)) !== null) {
-      const itemPos = listMatch.index
-      const itemHtml = listMatch[1]
-
-      // Bepaal huidige categorie op basis van positie
-      for (const h of headers) {
-        if (h.pos < itemPos) {
-          currentCategory = h.text
-        }
-      }
-
-      // Check of we max voor deze categorie hebben bereikt
-      if (!categoryCount[currentCategory]) {
-        categoryCount[currentCategory] = 0
-      }
-      if (categoryCount[currentCategory] >= maxPerCat) {
-        continue
-      }
-
-      // Parse de tekst uit het list item
-      const text = cleanNewsText(itemHtml)
-
-      // Filter: moet substantieel zijn en geen nested list header
-      if (text.length > 20 && !text.endsWith(':')) {
-        // Check voor duplicaten
-        const isDuplicate = events.some(e => e.text === text || text.includes(e.text) || e.text.includes(text))
-        
-        if (!isDuplicate) {
-          events.push({
-            category: currentCategory,
-            text
-          })
-          categoryCount[currentCategory]++
+      
+      // Parse list items in de dd
+      const items = parseListItems(content, currentCategory)
+      for (const item of items) {
+        if (!seenTexts.has(item.text.toLowerCase())) {
+          seenTexts.add(item.text.toLowerCase())
+          events.push(item)
         }
       }
     }
 
-    // Fallback: als geen events gevonden, probeer paragraphs
+    // Methode 2: Zoek naar bold headers gevolgd door lijsten
+    const sectionPattern = /<(?:p|div)[^>]*>\s*<b>([\s\S]*?)<\/b>\s*<\/(?:p|div)>\s*<ul[^>]*>([\s\S]*?)<\/ul>/gi
+    let sectionMatch
+    while ((sectionMatch = sectionPattern.exec(contentHtml)) !== null) {
+      const category = cleanWikiText(sectionMatch[1])
+      const listHtml = sectionMatch[2]
+      
+      if (category && category.length > 2 && category.length < 50) {
+        currentCategory = category
+      }
+      
+      const items = parseListItems(listHtml, currentCategory)
+      for (const item of items) {
+        if (!seenTexts.has(item.text.toLowerCase())) {
+          seenTexts.add(item.text.toLowerCase())
+          events.push(item)
+        }
+      }
+    }
+
+    // Methode 3: Directe ul/li parsing als fallback
     if (events.length === 0) {
-      const pPattern = /<p[^>]*>([\s\S]*?)<\/p>/gi
-      let pMatch
-      while ((pMatch = pPattern.exec(html)) !== null && events.length < 15) {
-        const text = cleanNewsText(pMatch[1])
-        if (text.length > 30) {
+      const listPattern = /<li[^>]*>([\s\S]*?)<\/li>/gi
+      let listMatch
+      while ((listMatch = listPattern.exec(contentHtml)) !== null && events.length < 30) {
+        const text = cleanWikiText(listMatch[1])
+        if (text.length > 30 && text.length < 500 && !seenTexts.has(text.toLowerCase())) {
+          seenTexts.add(text.toLowerCase())
           events.push({
-            category: 'News',
+            category: 'Nieuws',
             text
           })
         }
@@ -218,35 +202,57 @@ function parseCurrentEventsHtml(html: string): NewsEvent[] {
     console.error('[NewsDaily] Parse error:', error)
   }
 
-  return events
+  return events.slice(0, 25) // Max 25 items
 }
 
-/**
- * Verwijdert HTML tags en behoudt alleen tekst
- */
-function cleanText(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+function parseListItems(html: string, category: string): NewsEvent[] {
+  const items: NewsEvent[] = []
+  const liPattern = /<li[^>]*>([\s\S]*?)<\/li>/gi
+  let match
+  
+  while ((match = liPattern.exec(html)) !== null && items.length < 10) {
+    // Skip nested lists
+    const content = match[1].replace(/<ul[\s\S]*?<\/ul>/gi, '')
+    const text = cleanWikiText(content)
+    
+    if (text.length > 30 && text.length < 500) {
+      items.push({ category, text })
+    }
+  }
+  
+  return items
 }
 
-/**
- * Reinigt nieuws tekst: verwijdert referenties, extra whitespace, etc.
- */
-function cleanNewsText(html: string): string {
+function cleanWikiText(html: string): string {
   let text = html
-    // Verwijder HTML tags
+    // Verwijder HTML comments
+    .replace(/<!--[\s\S]*?-->/g, '')
+    // Verwijder script/style tags
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    // Verwijder sup tags (referenties)
+    .replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, '')
+    // Converteer links: <a href="..." title="...">text</a> -> text
+    .replace(/<a[^>]*>([^<]*)<\/a>/gi, '$1')
+    // Verwijder overige HTML tags
     .replace(/<[^>]+>/g, ' ')
-    // Verwijder Wikipedia referenties [1], [2], etc.
+    // Verwijder Wikipedia [[link|display]] markup -> display
+    .replace(/\[\[(?:[^\]|]*\|)?([^\]]+)\]\]/g, '$1')
+    // Verwijder Wikipedia [[link]] markup -> link
+    .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    // Verwijder [ref] referenties
     .replace(/\[\d+\]/g, '')
-    // Verwijder haakjes met alleen een bron erin
-    .replace(/\s*\([^)]*(?:Reuters|AP|BBC|AFP|source)[^)]*\)\s*$/i, '')
+    // Verwijder URLs
+    .replace(/https?:\/\/[^\s\])]*/g, '')
+    // Verwijder (bron) referenties aan het eind
+    .replace(/\s*\([^)]*(?:Reuters|AP|BBC|AFP|News|Source|Times)[^)]*\)\s*$/i, '')
+    // Verwijder lege haakjes
+    .replace(/\(\s*\)/g, '')
     // Normaliseer whitespace
     .replace(/\s+/g, ' ')
-    // Verwijder leading/trailing dubbele punt
-    .replace(/^[:\s]+/, '')
-    .replace(/[:\s]+$/, '')
+    // Verwijder leading bullets/dashes
+    .replace(/^[\s*•\-–—]+/, '')
+    // Trim
     .trim()
 
   // Decode HTML entities
@@ -255,14 +261,12 @@ function cleanNewsText(html: string): string {
   return text
 }
 
-/**
- * Decodeert HTML entities
- */
 function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#0?39;/g, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&nbsp;/g, ' ')
