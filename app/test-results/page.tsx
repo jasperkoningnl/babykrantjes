@@ -1,9 +1,9 @@
 // app/test-results/page.tsx
-// @version 1.8.0
-// Nieuws toegevoegd: dagelijks internationaal + maandoverzicht NL
+// @version 1.9.0
+// FIX: Aangepast aan nieuws API v1.2.0 met NewsItem { day, text } structuur
 'use client'
 
-const PAGE_VERSION = '1.8.0'
+const PAGE_VERSION = '1.9.0'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -19,7 +19,7 @@ import { getTop40ByDate, type Top40Result } from '@/lib/top40API'
 import { getYearOverview, type DutchChartsYearResult } from '@/lib/dutchChartsAPI'
 import { getTVProgramsOnDate, filterInterestingPrograms, type TVOnDateResult } from '@/lib/tvOnDateAPI'
 import { getWikipediaTVByYear, type WikipediaTVResult } from '@/lib/wikipediaTVAPI'
-import { getDailyNews, getMonthlyNews, groupNewsByCategory, type DailyNewsResult, type MonthNewsResult } from '@/lib/newsAPI'
+import { getDailyNews, getMonthlyNews, groupNewsByCategory, type DailyNewsResult, type MonthNewsResult, type NewsEvent } from '@/lib/newsAPI'
 
 export default function TestResultsPage() {
   const [data, setData] = useState<BabykrantData | null>(null)
@@ -227,8 +227,9 @@ export default function TestResultsPage() {
   // Bepaal de voornaam voor de headers
   const firstName = nameMeaning?.firstName || famousNamesakes?.firstName || '...'
 
-  // Groepeer nieuws per categorie voor weergave
-  const groupedNews = dailyNews?.events ? groupNewsByCategory(dailyNews.events) : {}
+  // Groepeer nieuws per categorie voor weergave (Map -> Object conversie)
+  const groupedNewsMap = dailyNews?.events ? groupNewsByCategory(dailyNews.events) : new Map()
+  const groupedNews: Record<string, NewsEvent[]> = Object.fromEntries(groupedNewsMap)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-pink-50 py-12 px-4">
@@ -310,7 +311,7 @@ export default function TestResultsPage() {
           )}
 
           {/* ============================================== */}
-          {/* NIEUWS SECTIE - NIEUW */}
+          {/* NIEUWS SECTIE */}
           {/* ============================================== */}
 
           {/* Internationaal nieuws op geboortedag */}
@@ -330,13 +331,13 @@ export default function TestResultsPage() {
                 </p>
                 
                 {/* Gegroepeerd per categorie */}
-                {Object.entries(groupedNews).slice(0, 6).map(([category, texts]) => (
+                {Object.entries(groupedNews).slice(0, 6).map(([category, events]) => (
                   <div key={category} className="bg-white p-3 rounded border border-sky-200">
                     <h4 className="font-medium text-sky-800 mb-2">{category}</h4>
                     <ul className="space-y-1">
-                      {texts.slice(0, 3).map((text, idx) => (
+                      {events.slice(0, 3).map((event, idx) => (
                         <li key={idx} className="text-sm text-gray-700 pl-3 border-l-2 border-sky-200">
-                          {text}
+                          {event.text}
                         </li>
                       ))}
                     </ul>
@@ -378,7 +379,8 @@ export default function TestResultsPage() {
                 <div className="space-y-2">
                   {monthlyNews.items.slice(0, 10).map((item, idx) => (
                     <div key={idx} className="bg-white p-3 rounded border border-orange-200">
-                      <p className="text-sm text-gray-700">{item}</p>
+                      <span className="text-xs font-medium text-orange-600 mr-2">{item.day} {monthlyNews.monthName}:</span>
+                      <span className="text-sm text-gray-700">{item.text}</span>
                     </div>
                   ))}
                 </div>
