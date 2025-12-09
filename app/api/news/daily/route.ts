@@ -1,13 +1,14 @@
 // app/api/news/daily/route.ts
-// @version 1.4.0
+// @version 2.0.0
 // Wikipedia Current Events scraper voor internationaal nieuws op een specifieke dag
-// Bron: https://en.wikipedia.org/wiki/Portal:Current_events/{jaar}_{maand}_{dag}
-// FIX v1.3.0: Robuustere content extractie met meerdere fallbacks
-// FIX v1.4.0: Ondersteuning voor oudere Wikipedia structuur (current-events-content-heading divs)
+// Ondersteunt alle structuren van 2002 tot heden:
+// - Jan-Feb 2002: maand-pagina met anker
+// - Mrt 2002+: dag-specifieke pagina's
+// - Categorieën: <div class="current-events-content-heading">, <p><b>, of geen
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_VERSION = '1.4.0'
+const API_VERSION = '2.0.0'
 
 const MONTHS_EN = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -28,8 +29,8 @@ interface DailyNewsResult {
   apiVersion: string
   debug?: {
     categoriesFound: string[]
-    rawCategoryCount: number
-    contentMethod: string
+    urlType: 'day-page' | 'month-page'
+    parseMethod: string
   }
   error?: string
 }
@@ -65,9 +66,38 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  // Check minimum datum (eerste Current Events pagina is januari 2002)
+  if (year < 2002 || (year === 2002 && month < 1)) {
+    return NextResponse.json({
+      date: dateParam,
+      events: [],
+      totalEvents: 0,
+      source: 'Wikipedia Portal:Current_events',
+      sourceUrl: '',
+      apiVersion: API_VERSION,
+      error: 'No news data available before January 2002'
+    })
+  }
+
   const monthName = MONTHS_EN[month - 1]
-  const pageTitle = `Portal:Current_events/${year}_${monthName}_${day}`
-  const webUrl = `https://en.wikipedia.org/wiki/${pageTitle.replace(/ /g, '_')}`
+  
+  // Bepaal URL strategie:
+  // - Jan-Feb 2002: gebruik maand-pagina met anker
+  // - Vanaf 1 maart 2002: gebruik dag-specifieke pagina
+  const useMonthPage = year === 2002 && month <= 2
+  
+  let webUrl: string
+  let urlType: 'day-page' | 'month-page'
+  
+  if (useMonthPage) {
+    // Maand-pagina URL met anker
+    webUrl = `https://en.wikipedia.org/wiki/Portal:Current_events/${monthName}_${year}`
+    urlType = 'month-page'
+  } else {
+    // Dag-specifieke URL
+    webUrl = `https://en.wikipedia.org/wiki/Portal:Current_events/${year}_${monthName}_${day}`
+    urlType = 'day-page'
+  }
 
   const emptyResult: DailyNewsResult = {
     date: dateParam,
@@ -79,11 +109,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`[NewsDaily v${API_VERSION}] Fetching: ${webUrl}`)
+    console.log(`[NewsDaily v${API_VERSION}] Fetching: ${webUrl} (${urlType})`)
 
     const response = await fetch(webUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; BabykrantBot/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; BabykrantBot/2.0)',
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-US,en;q=0.9'
       },
@@ -107,21 +137,33 @@ export async function GET(request: NextRequest) {
     }
 
     const html = await response.text()
-    const { events, categoriesFound, contentMethod } = parseCurrentEventsHtml(html)
+    
+    // Parse content afhankelijk van URL type
+    let parseResult: { events: NewsEvent[], categoriesFound: string[], parseMethod: string }
+    
+    if (useMonthPage) {
+      // Extract content voor specifieke dag uit maand-pagina
+      parseResult = parseMonthPageForDay(html, year, month, day, monthName)
+    } else {
+      // Parse dag-specifieke pagina
+      parseResult = parseDayPage(html)
+    }
 
-    console.log(`[NewsDaily v${API_VERSION}] Found ${events.length} events in ${categoriesFound.length} categories for ${dateParam} (method: ${contentMethod})`)
+    const { events, categoriesFound, parseMethod } = parseResult
+
+    console.log(`[NewsDaily v${API_VERSION}] Found ${events.length} events in ${categoriesFound.length} categories for ${dateParam} (method: ${parseMethod})`)
 
     return NextResponse.json({
       date: dateParam,
       events,
       totalEvents: events.length,
       source: 'Wikipedia Portal:Current_events',
-      sourceUrl: webUrl,
+      sourceUrl: useMonthPage ? `${webUrl}#${year}_${monthName}_${day}` : webUrl,
       apiVersion: API_VERSION,
       debug: {
         categoriesFound,
-        rawCategoryCount: categoriesFound.length,
-        contentMethod
+        urlType,
+        parseMethod
       }
     })
 
@@ -134,103 +176,156 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function parseCurrentEventsHtml(html: string): { events: NewsEvent[], categoriesFound: string[], contentMethod: string } {
+/**
+ * Parse een dag-specifieke pagina (maart 2002 en later)
+ */
+function parseDayPage(html: string): { events: NewsEvent[], categoriesFound: string[], parseMethod: string } {
   const events: NewsEvent[] = []
   const categoriesFound: string[] = []
-  let contentMethod = 'none'
+  let parseMethod = 'none'
 
-  try {
-    // Probeer verschillende methodes om de content te vinden
-    let contentHtml = ''
-    
-    // Methode 1: Zoek specifiek naar current-events-content description div
-    const method1 = html.match(/<div\s+class="current-events-content\s+description">([\s\S]*?)<\/div>\s*<\/div>/i)
-    if (method1) {
-      contentHtml = method1[1]
-      contentMethod = 'current-events-content'
-      console.log('[NewsDaily] Found content via method 1 (current-events-content)')
-    }
-    
-    // Methode 2: Zoek naar current-events-content (zonder description)
-    if (!contentHtml) {
-      const method2 = html.match(/<div\s+class="current-events-content[^"]*">([\s\S]*?)<\/div>\s*<div\s+class="current-events-nav/i)
-      if (method2) {
-        contentHtml = method2[1]
-        contentMethod = 'current-events-content-nav'
-        console.log('[NewsDaily] Found content via method 2 (current-events-content-nav)')
-      }
-    }
-    
-    // Methode 3: Zoek in mw-parser-output, stop bij printfooter of catlinks
-    if (!contentHtml) {
-      const method3 = html.match(/<div class="mw-content-ltr mw-parser-output"[^>]*>([\s\S]*?)(?:<div class="printfooter"|<div id="catlinks")/i)
-      if (method3) {
-        contentHtml = method3[1]
-        contentMethod = 'mw-parser-output'
-        console.log('[NewsDaily] Found content via method 3 (mw-parser-output)')
-      }
-    }
-    
-    // Methode 4: Zoek in bodyContent
-    if (!contentHtml) {
-      const method4 = html.match(/<div id="bodyContent"[^>]*>([\s\S]*?)<div class="printfooter"/i)
-      if (method4) {
-        contentHtml = method4[1]
-        contentMethod = 'bodyContent'
-        console.log('[NewsDaily] Found content via method 4 (bodyContent)')
-      }
-    }
-
-    if (!contentHtml) {
-      console.log('[NewsDaily] Could not find content section with any method')
-      return { events, categoriesFound, contentMethod: 'none' }
-    }
-
-    console.log(`[NewsDaily] Content length: ${contentHtml.length} chars`)
-
-    // Wikipedia structuur:
-    // <p><b>Armed conflicts and attacks</b></p>
-    // <ul><li>Item 1</li></ul>
-    // OF:
-    // <p><b>Armed conflicts and attacks</b>
-    // </p>
-    // <ul><li>Item 1</li></ul>
-
-    // Probeer eerst de oudere Wikipedia structuur (2012 en eerder)
-    // Deze gebruikt: <div class="current-events-content-heading">Category</div><ul>...</ul>
-    parseWithContentHeadingDivs(contentHtml, events, categoriesFound)
-
-    // Als dat niet werkt, probeer de nieuwere structuur (2022+)
-    // Deze gebruikt: <p><b>Category</b></p><ul>...</ul>
-    if (events.length === 0) {
-      console.log('[NewsDaily] Content-heading method failed, trying p/b pattern')
-      parseWithCategoryPattern(contentHtml, events, categoriesFound)
-    }
-
-    // Als dat niet werkt, probeer split methode
-    if (events.length === 0) {
-      console.log('[NewsDaily] Primary pattern failed, trying split method')
-      parseWithSplitMethod(contentHtml, events, categoriesFound)
-    }
-
-    // Als dat ook niet werkt, probeer bold-headers te vinden
-    if (events.length === 0) {
-      console.log('[NewsDaily] Split method failed, trying bold header method')
-      parseWithBoldHeaders(contentHtml, events, categoriesFound)
-    }
-
-  } catch (error) {
-    console.error('[NewsDaily] Parse error:', error)
+  // Zoek de content div
+  const contentHtml = extractContentDiv(html)
+  if (!contentHtml) {
+    console.log('[NewsDaily] Could not find content div')
+    return { events, categoriesFound, parseMethod: 'no-content-div' }
   }
 
-  return { events, categoriesFound, contentMethod }
+  // Probeer verschillende parse methodes in volgorde van waarschijnlijkheid
+  
+  // Methode 1: <div class="current-events-content-heading"> (2010-2015)
+  if (events.length === 0) {
+    parseWithContentHeadingDivs(contentHtml, events, categoriesFound)
+    if (events.length > 0) parseMethod = 'content-heading-divs'
+  }
+
+  // Methode 2: <p><b>Category</b></p> of <p><b>Category</b>\n (2010+, 2020+)
+  if (events.length === 0) {
+    parseWithParagraphBold(contentHtml, events, categoriesFound)
+    if (events.length > 0) parseMethod = 'paragraph-bold'
+  }
+
+  // Methode 3: Directe <ul><li> zonder categorieën (2002-2009)
+  if (events.length === 0) {
+    parseWithoutCategories(contentHtml, events, categoriesFound)
+    if (events.length > 0) parseMethod = 'no-categories'
+  }
+
+  return { events, categoriesFound, parseMethod }
 }
 
-function parseWithContentHeadingDivs(contentHtml: string, events: NewsEvent[], categoriesFound: string[]): void {
-  // Oudere Wikipedia structuur (pre-2020):
-  // <div class="current-events-content-heading" role="heading">Category Name</div>
-  // <ul><li>Item 1</li><li>Item 2</li></ul>
+/**
+ * Parse een maand-pagina en extract content voor specifieke dag (jan-feb 2002)
+ */
+function parseMonthPageForDay(
+  html: string, 
+  year: number, 
+  month: number, 
+  day: number,
+  monthName: string
+): { events: NewsEvent[], categoriesFound: string[], parseMethod: string } {
+  const events: NewsEvent[] = []
+  const categoriesFound: string[] = []
   
+  // Zoek het anker voor deze dag: id="2002_January_1" of id="2002&#95;January&#95;1"
+  const anchorPatterns = [
+    `id="${year}_${monthName}_${day}"`,
+    `id="${year}&#95;${monthName}&#95;${day}"`,
+    `id="${year}_${monthName}_${String(day).padStart(2, '0')}"`,
+    `id="${year}&#95;${monthName}&#95;${String(day).padStart(2, '0')}"`
+  ]
+  
+  let startIndex = -1
+  for (const pattern of anchorPatterns) {
+    const idx = html.indexOf(pattern)
+    if (idx !== -1) {
+      startIndex = idx
+      break
+    }
+  }
+  
+  if (startIndex === -1) {
+    console.log(`[NewsDaily] Could not find anchor for ${year}_${monthName}_${day}`)
+    return { events, categoriesFound, parseMethod: 'anchor-not-found' }
+  }
+
+  // Zoek de content div na het anker
+  const afterAnchor = html.substring(startIndex)
+  const contentStart = afterAnchor.indexOf('<div class="current-events-content description">')
+  
+  if (contentStart === -1) {
+    console.log('[NewsDaily] Could not find content div after anchor')
+    return { events, categoriesFound, parseMethod: 'no-content-after-anchor' }
+  }
+
+  // Zoek het einde van deze dag (volgende current-events-main of einde van sectie)
+  const contentAfterStart = afterAnchor.substring(contentStart)
+  const endMarkers = [
+    '<div class="current-events-main',
+    '<div class="current-events-nav',
+    '<div class="current-events-calendar'
+  ]
+  
+  let endIndex = contentAfterStart.length
+  for (const marker of endMarkers) {
+    const idx = contentAfterStart.indexOf(marker, 50) // Skip eerste deel
+    if (idx !== -1 && idx < endIndex) {
+      endIndex = idx
+    }
+  }
+
+  const dayContent = contentAfterStart.substring(0, endIndex)
+  
+  // Parse de content (vroege pagina's hebben geen categorieën)
+  parseWithoutCategories(dayContent, events, categoriesFound)
+  
+  return { 
+    events, 
+    categoriesFound, 
+    parseMethod: events.length > 0 ? 'month-page-extracted' : 'month-page-empty' 
+  }
+}
+
+/**
+ * Extract de content div uit de pagina
+ */
+function extractContentDiv(html: string): string | null {
+  // Probeer verschillende content div patronen
+  const patterns = [
+    // Specifieke current-events-content description div
+    /<div class="current-events-content description">([\s\S]*?)<\/div>\s*<\/div>\s*(?:<\/div>)?\s*(?:<div class="current-events-nav|<link|$)/i,
+    // Ruimere match
+    /<div class="current-events-content description">([\s\S]*?)<\/div>\s*<\/div>/i,
+    // Fallback: zoek in mw-parser-output
+    /<div class="mw-content-ltr mw-parser-output"[^>]*>([\s\S]*?)<div class="printfooter"/i
+  ]
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern)
+    if (match && match[1] && match[1].length > 50) {
+      return match[1]
+    }
+  }
+
+  // Laatste poging: zoek content div en neem alles tot nav
+  const startIdx = html.indexOf('<div class="current-events-content description">')
+  if (startIdx !== -1) {
+    const afterStart = html.substring(startIdx + 48)
+    const endIdx = afterStart.search(/<div class="current-events-nav|<\/div>\s*<\/div>\s*<div class="current-events-nav/)
+    if (endIdx !== -1) {
+      return afterStart.substring(0, endIdx)
+    }
+    // Neem eerste 10000 karakters als fallback
+    return afterStart.substring(0, 10000)
+  }
+
+  return null
+}
+
+/**
+ * Parse met <div class="current-events-content-heading"> structuur (2010-2015 stijl)
+ */
+function parseWithContentHeadingDivs(contentHtml: string, events: NewsEvent[], categoriesFound: string[]): void {
   const headingPattern = /<div\s+class="current-events-content-heading"[^>]*>([^<]+)<\/div>\s*<ul>([\s\S]*?)<\/ul>/gi
   
   let match
@@ -240,12 +335,14 @@ function parseWithContentHeadingDivs(contentHtml: string, events: NewsEvent[], c
     
     if (!categoryName || categoryName.length < 2 || categoryName.length > 80) continue
     
-    categoriesFound.push(categoryName)
+    if (!categoriesFound.includes(categoryName)) {
+      categoriesFound.push(categoryName)
+    }
     
     const items = parseListItems(ulContent)
     
     for (const itemText of items) {
-      if (itemText.length > 10) {
+      if (itemText.length > 15) {
         events.push({
           category: categoryName,
           text: itemText
@@ -253,28 +350,38 @@ function parseWithContentHeadingDivs(contentHtml: string, events: NewsEvent[], c
       }
     }
   }
-  
-  console.log(`[NewsDaily] Content-heading divs found ${events.length} events in ${categoriesFound.length} categories`)
 }
 
-function parseWithCategoryPattern(contentHtml: string, events: NewsEvent[], categoriesFound: string[]): void {
-  // Pattern: <p><b>Category</b></p> gevolgd door <ul>...</ul>
-  // Met mogelijke whitespace/newlines
-  const categoryPattern = /<p>\s*<b>([^<]+)<\/b>\s*<\/p>\s*<ul>([\s\S]*?)<\/ul>/gi
+/**
+ * Parse met <p><b>Category</b></p> of <p><b>Category</b>\n structuur (2010+, 2020+ stijl)
+ */
+function parseWithParagraphBold(contentHtml: string, events: NewsEvent[], categoriesFound: string[]): void {
+  // Pattern voor <p><b>Category</b></p> gevolgd door <ul> OF
+  // <p><b>Category</b>\n gevolgd door <ul>
+  const pattern = /<p>\s*<b>([^<]+)<\/b>\s*(?:<\/p>)?\s*<ul>([\s\S]*?)<\/ul>/gi
   
   let match
-  while ((match = categoryPattern.exec(contentHtml)) !== null) {
+  while ((match = pattern.exec(contentHtml)) !== null) {
     const categoryName = cleanText(match[1])
     const ulContent = match[2]
     
     if (!categoryName || categoryName.length < 2 || categoryName.length > 80) continue
     
-    categoriesFound.push(categoryName)
+    // Filter niet-categorie headers
+    const lowerCat = categoryName.toLowerCase()
+    if (lowerCat.includes('see also') || lowerCat.includes('references') || 
+        lowerCat.includes('external links') || lowerCat.includes('further reading')) {
+      continue
+    }
+    
+    if (!categoriesFound.includes(categoryName)) {
+      categoriesFound.push(categoryName)
+    }
     
     const items = parseListItems(ulContent)
     
     for (const itemText of items) {
-      if (itemText.length > 10) {
+      if (itemText.length > 15) {
         events.push({
           category: categoryName,
           text: itemText
@@ -284,115 +391,46 @@ function parseWithCategoryPattern(contentHtml: string, events: NewsEvent[], cate
   }
 }
 
-function parseWithSplitMethod(contentHtml: string, events: NewsEvent[], categoriesFound: string[]): void {
-  // Split op <p><b> of <p> <b>
-  const sections = contentHtml.split(/<p>\s*<b>/i)
+/**
+ * Parse zonder categorieën - alle items onder "General News" (2002-2009 stijl)
+ */
+function parseWithoutCategories(contentHtml: string, events: NewsEvent[], categoriesFound: string[]): void {
+  const defaultCategory = 'General News'
   
-  for (let i = 1; i < sections.length; i++) {
-    const section = sections[i]
-    
-    // Extract category name (tot </b>)
-    const categoryEndIndex = section.indexOf('</b>')
-    if (categoryEndIndex === -1) continue
-    
-    const categoryName = cleanText(section.substring(0, categoryEndIndex))
-    if (!categoryName || categoryName.length < 2 || categoryName.length > 80) continue
-    
-    // Check dat het een echte categorie is (geen sub-heading)
-    const lowerCat = categoryName.toLowerCase()
-    if (lowerCat.includes('see also') || lowerCat.includes('references')) continue
-    
-    categoriesFound.push(categoryName)
-    
-    // Zoek de <ul> na de category header
-    const ulMatch = section.match(/<\/p>\s*<ul>([\s\S]*?)<\/ul>/i)
-    if (!ulMatch) {
-      // Probeer ook zonder </p>
-      const ulMatch2 = section.match(/<ul>([\s\S]*?)<\/ul>/i)
-      if (!ulMatch2) continue
-      
-      const items = parseListItems(ulMatch2[1])
-      for (const itemText of items) {
-        if (itemText.length > 10) {
-          events.push({ category: categoryName, text: itemText })
-        }
-      }
-      continue
-    }
-    
-    const items = parseListItems(ulMatch[1])
-    
-    for (const itemText of items) {
-      if (itemText.length > 10) {
-        events.push({
-          category: categoryName,
-          text: itemText
-        })
-      }
-    }
-  }
-}
-
-function parseWithBoldHeaders(contentHtml: string, events: NewsEvent[], categoriesFound: string[]): void {
-  // Zoek alle <b>Category</b> gevolgd door content
-  const boldPattern = /<b>([^<]{3,60})<\/b>/gi
-  const knownCategories = [
-    'armed conflicts', 'attacks', 'business', 'economy', 'disasters', 'accidents',
-    'health', 'environment', 'international relations', 'law', 'crime',
-    'politics', 'elections', 'science', 'technology', 'sport', 'arts', 'culture'
-  ]
+  // Zoek alle <ul>...</ul> blokken
+  const ulPattern = /<ul>([\s\S]*?)<\/ul>/gi
   
   let match
-  let lastCategoryEnd = 0
-  let currentCategory = ''
+  let foundItems = false
   
-  while ((match = boldPattern.exec(contentHtml)) !== null) {
-    const potentialCategory = cleanText(match[1]).toLowerCase()
+  while ((match = ulPattern.exec(contentHtml)) !== null) {
+    const ulContent = match[1]
+    const items = parseListItems(ulContent)
     
-    // Check of dit een bekende categorie lijkt
-    const isCategory = knownCategories.some(kc => potentialCategory.includes(kc))
-    
-    if (isCategory) {
-      // Als we al een categorie hadden, parse de content ertussen
-      if (currentCategory && lastCategoryEnd > 0) {
-        const betweenContent = contentHtml.substring(lastCategoryEnd, match.index)
-        const ulMatch = betweenContent.match(/<ul>([\s\S]*?)<\/ul>/i)
-        if (ulMatch) {
-          const items = parseListItems(ulMatch[1])
-          for (const itemText of items) {
-            if (itemText.length > 10) {
-              events.push({ category: currentCategory, text: itemText })
-            }
-          }
-        }
+    for (const itemText of items) {
+      if (itemText.length > 15) {
+        foundItems = true
+        events.push({
+          category: defaultCategory,
+          text: itemText
+        })
       }
-      
-      currentCategory = cleanText(match[1])
-      categoriesFound.push(currentCategory)
-      lastCategoryEnd = match.index + match[0].length
     }
   }
   
-  // Parse content na de laatste categorie
-  if (currentCategory && lastCategoryEnd > 0) {
-    const remainingContent = contentHtml.substring(lastCategoryEnd)
-    const ulMatch = remainingContent.match(/<ul>([\s\S]*?)<\/ul>/i)
-    if (ulMatch) {
-      const items = parseListItems(ulMatch[1])
-      for (const itemText of items) {
-        if (itemText.length > 10) {
-          events.push({ category: currentCategory, text: itemText })
-        }
-      }
-    }
+  if (foundItems && !categoriesFound.includes(defaultCategory)) {
+    categoriesFound.push(defaultCategory)
   }
 }
 
+/**
+ * Parse list items uit een <ul> content block
+ */
 function parseListItems(ulContent: string): string[] {
   const items: string[] = []
   const seen = new Set<string>()
   
-  // Simpele aanpak: splits op </li> en parse elke sectie
+  // Split op </li> en parse elke sectie
   const liParts = ulContent.split(/<\/li>/i)
   
   for (const part of liParts) {
@@ -406,12 +444,24 @@ function parseListItems(ulContent: string): string[] {
     // Verwijder de <li> tag zelf
     liContent = liContent.replace(/<li[^>]*>/i, '')
     
+    // Verwijder geneste <ul>...</ul> blokken (sub-items)
+    // maar behoud de tekst van het hoofditem
+    const nestedUlStart = liContent.indexOf('<ul')
+    if (nestedUlStart !== -1) {
+      liContent = liContent.substring(0, nestedUlStart)
+    }
+    
     // Clean de tekst
     const cleanedText = cleanText(liContent)
     
-    // Filter duplicaten en te korte items
-    if (cleanedText.length > 10 && !seen.has(cleanedText.toLowerCase())) {
-      seen.add(cleanedText.toLowerCase())
+    // Filter duplicaten, te korte items, en navigatie-tekst
+    const lowerText = cleanedText.toLowerCase()
+    if (cleanedText.length > 15 && 
+        !seen.has(lowerText) &&
+        !lowerText.startsWith('edit') &&
+        !lowerText.startsWith('history') &&
+        !lowerText.startsWith('watch')) {
+      seen.add(lowerText)
       items.push(cleanedText)
     }
   }
@@ -419,6 +469,9 @@ function parseListItems(ulContent: string): string[] {
   return items
 }
 
+/**
+ * Clean HTML en tekst
+ */
 function cleanText(html: string): string {
   let text = html
   
@@ -429,21 +482,26 @@ function cleanText(html: string): string {
   text = text.replace(/<script[\s\S]*?<\/script>/gi, '')
   text = text.replace(/<style[\s\S]*?<\/style>/gi, '')
   
-  // Verwijder geneste <ul>...</ul> blokken maar behoud tekst
+  // Verwijder geneste <ul>...</ul> en <li> tags maar behoud tekst
   text = text.replace(/<\/?ul[^>]*>/gi, ' ')
   text = text.replace(/<\/?li[^>]*>/gi, ' ')
   
-  // Converteer <a> tags naar hun tekst (behoud de link tekst)
+  // Converteer <a> tags naar hun tekst
   text = text.replace(/<a[^>]*>([^<]*)<\/a>/gi, '$1')
+  
+  // Verwijder <sup> referentie tags
+  text = text.replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, '')
   
   // Verwijder overige HTML tags
   text = text.replace(/<[^>]+>/g, ' ')
   
   // Verwijder Wikipedia referentie nummers [1], [2], etc.
   text = text.replace(/\[\d+\]/g, '')
+  text = text.replace(/\[citation needed\]/gi, '')
+  text = text.replace(/\[permanent dead link\]/gi, '')
   
-  // Verwijder source citations aan het eind (bv. "(BBC News)", "(Reuters)")
-  text = text.replace(/\s*\([^)]*(?:News|Times|Post|Guardian|Reuters|AFP|AP|BBC|CNN|Forbes|Journal|Economist|Yahoo|Sky|RTÉ|Setanta)[^)]*\)\s*/gi, ' ')
+  // Verwijder source citations (bv. "(BBC News)", "(Reuters)")
+  text = text.replace(/\s*\([^)]*(?:News|Times|Post|Guardian|Reuters|AFP|AP|BBC|CNN|Forbes|Journal|Economist|Yahoo|Sky|RTÉ|Setanta|Al Jazeera|NPR|UPI|Xinhua|VOA|CBC|NYT|Globe)[^)]*\)\s*/gi, ' ')
   
   // Verwijder URLs
   text = text.replace(/https?:\/\/[^\s<>"]+/gi, '')
@@ -454,11 +512,15 @@ function cleanText(html: string): string {
   text = text.replace(/&lt;/g, '<')
   text = text.replace(/&gt;/g, '>')
   text = text.replace(/&quot;/g, '"')
-  text = text.replace(/&#39;/g, "'")
+  text = text.replace(/&#0?39;/g, "'")
   text = text.replace(/&#x27;/g, "'")
   text = text.replace(/&#91;/g, '[')
   text = text.replace(/&#93;/g, ']')
   text = text.replace(/&#160;/g, ' ')
+  text = text.replace(/&#95;/g, '_')
+  
+  // Verwijder → en andere speciale karakters aan het begin
+  text = text.replace(/^[\s→•·\-–—]+/, '')
   
   // Verwijder dubbele spaties en trim
   text = text.replace(/\s+/g, ' ').trim()
