@@ -1,9 +1,9 @@
 // app/test-results/page.tsx
-// @version 1.7.1
-// Cultuurdata compleet: muziek, films, series, TV
+// @version 1.8.0
+// Nieuws toegevoegd: dagelijks internationaal + maandoverzicht NL
 'use client'
 
-const PAGE_VERSION = '1.7.1'
+const PAGE_VERSION = '1.8.0'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -19,6 +19,7 @@ import { getTop40ByDate, type Top40Result } from '@/lib/top40API'
 import { getYearOverview, type DutchChartsYearResult } from '@/lib/dutchChartsAPI'
 import { getTVProgramsOnDate, filterInterestingPrograms, type TVOnDateResult } from '@/lib/tvOnDateAPI'
 import { getWikipediaTVByYear, type WikipediaTVResult } from '@/lib/wikipediaTVAPI'
+import { getDailyNews, getMonthlyNews, groupNewsByCategory, type DailyNewsResult, type MonthNewsResult } from '@/lib/newsAPI'
 
 export default function TestResultsPage() {
   const [data, setData] = useState<BabykrantData | null>(null)
@@ -33,6 +34,8 @@ export default function TestResultsPage() {
   const [yearChart, setYearChart] = useState<DutchChartsYearResult | null>(null)
   const [tvPrograms, setTvPrograms] = useState<TVOnDateResult | null>(null)
   const [wikipediaTV, setWikipediaTV] = useState<WikipediaTVResult | null>(null)
+  const [dailyNews, setDailyNews] = useState<DailyNewsResult | null>(null)
+  const [monthlyNews, setMonthlyNews] = useState<MonthNewsResult | null>(null)
   
   const [loading, setLoading] = useState(true)
   const [weatherLoading, setWeatherLoading] = useState(false)
@@ -45,6 +48,8 @@ export default function TestResultsPage() {
   const [yearChartLoading, setYearChartLoading] = useState(false)
   const [tvLoading, setTvLoading] = useState(false)
   const [wikipediaTVLoading, setWikipediaTVLoading] = useState(false)
+  const [dailyNewsLoading, setDailyNewsLoading] = useState(false)
+  const [monthlyNewsLoading, setMonthlyNewsLoading] = useState(false)
 
   useEffect(() => {
     console.log(`[Babykrant] test-results page v${PAGE_VERSION}`)
@@ -92,7 +97,7 @@ export default function TestResultsPage() {
         })
       }
 
-      // === NIEUWE CULTUUR DATA ===
+      // === CULTUUR DATA ===
       
       // Films rond geboortedatum
       if (birthDate) {
@@ -157,6 +162,28 @@ export default function TestResultsPage() {
           setWikipediaTVLoading(false)
         })
       }
+
+      // === NIEUWS DATA ===
+      
+      // Dagelijks internationaal nieuws
+      if (birthDate) {
+        setDailyNewsLoading(true)
+        getDailyNews(birthDate).then(result => {
+          console.log(`[Babykrant] Daily news response:`, result?.totalEvents, 'events, apiVersion:', result?.apiVersion)
+          setDailyNews(result)
+          setDailyNewsLoading(false)
+        })
+      }
+
+      // Maandoverzicht NL
+      if (birthDate) {
+        setMonthlyNewsLoading(true)
+        getMonthlyNews(birthDate).then(result => {
+          console.log(`[Babykrant] Monthly news response:`, result?.totalItems, 'items, apiVersion:', result?.apiVersion)
+          setMonthlyNews(result)
+          setMonthlyNewsLoading(false)
+        })
+      }
     }
     setLoading(false)
   }, [])
@@ -199,6 +226,9 @@ export default function TestResultsPage() {
 
   // Bepaal de voornaam voor de headers
   const firstName = nameMeaning?.firstName || famousNamesakes?.firstName || '...'
+
+  // Groepeer nieuws per categorie voor weergave
+  const groupedNews = dailyNews?.events ? groupNewsByCategory(dailyNews.events) : {}
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-pink-50 py-12 px-4">
@@ -278,6 +308,108 @@ export default function TestResultsPage() {
               </p>
             </div>
           )}
+
+          {/* ============================================== */}
+          {/* NIEUWS SECTIE - NIEUW */}
+          {/* ============================================== */}
+
+          {/* Internationaal nieuws op geboortedag */}
+          <div className="bg-sky-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">📰 Nieuws op de geboortedag (Internationaal)</h2>
+            
+            {dailyNewsLoading && (
+              <p className="text-gray-500 italic">Internationaal nieuws wordt opgehaald...</p>
+            )}
+            
+            {!dailyNewsLoading && dailyNews && dailyNews.events.length > 0 && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600 mb-3">
+                  Wat er gebeurde op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { 
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+                  })}:
+                </p>
+                
+                {/* Gegroepeerd per categorie */}
+                {Object.entries(groupedNews).slice(0, 6).map(([category, texts]) => (
+                  <div key={category} className="bg-white p-3 rounded border border-sky-200">
+                    <h4 className="font-medium text-sky-800 mb-2">{category}</h4>
+                    <ul className="space-y-1">
+                      {texts.slice(0, 3).map((text, idx) => (
+                        <li key={idx} className="text-sm text-gray-700 pl-3 border-l-2 border-sky-200">
+                          {text}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                
+                <p className="text-xs text-gray-500 mt-3">
+                  <a href={dailyNews.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sky-600 hover:underline">
+                    Bron: {dailyNews.source} →
+                  </a>
+                  {' '}• {dailyNews.totalEvents} nieuwsberichten gevonden
+                </p>
+              </div>
+            )}
+            
+            {!dailyNewsLoading && dailyNews?.error && (
+              <p className="text-amber-600 italic">{dailyNews.error}</p>
+            )}
+            
+            {!dailyNewsLoading && !dailyNews?.error && dailyNews?.events.length === 0 && (
+              <p className="text-gray-500 italic">Geen internationaal nieuws gevonden voor deze datum</p>
+            )}
+          </div>
+
+          {/* Nederlands maandoverzicht */}
+          <div className="bg-orange-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">🇳🇱 Nieuws & Context ({monthlyNews?.monthName} {monthlyNews?.year})</h2>
+            
+            {monthlyNewsLoading && (
+              <p className="text-gray-500 italic">Maandoverzicht wordt opgehaald...</p>
+            )}
+            
+            {!monthlyNewsLoading && monthlyNews && monthlyNews.items.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 mb-3">
+                  Wat er die maand gebeurde in Nederland en de wereld:
+                </p>
+                
+                <div className="space-y-2">
+                  {monthlyNews.items.slice(0, 10).map((item, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border border-orange-200">
+                      <p className="text-sm text-gray-700">{item}</p>
+                    </div>
+                  ))}
+                </div>
+                
+                {monthlyNews.items.length > 10 && (
+                  <p className="text-xs text-orange-600">
+                    + {monthlyNews.items.length - 10} meer items...
+                  </p>
+                )}
+                
+                <p className="text-xs text-gray-500 mt-3">
+                  <a href={monthlyNews.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-orange-600 hover:underline">
+                    Bron: {monthlyNews.source} →
+                  </a>
+                  {' '}• {monthlyNews.totalItems} items gevonden
+                </p>
+              </div>
+            )}
+            
+            {!monthlyNewsLoading && monthlyNews?.error && (
+              <p className="text-amber-600 italic">{monthlyNews.error}</p>
+            )}
+            
+            {!monthlyNewsLoading && !monthlyNews?.error && monthlyNews?.items.length === 0 && (
+              <p className="text-gray-500 italic">Geen maandoverzicht gevonden</p>
+            )}
+          </div>
+
+          {/* ============================================== */}
+          {/* BESTAANDE SECTIES */}
+          {/* ============================================== */}
 
           {/* #1 Hit op geboortedatum */}
           <div className="bg-green-50 rounded-lg p-6 mb-6">
@@ -538,7 +670,7 @@ export default function TestResultsPage() {
                   </div>
                 )}
                 
-                {/* Debuts - alleen tonen als er echte content is */}
+                {/* Debuts */}
                 {wikipediaTV.debuts.length > 0 && (
                   <div>
                     <h3 className="font-medium text-gray-700 mb-2">Nieuwe programma's in {birthYear}</h3>
@@ -552,7 +684,7 @@ export default function TestResultsPage() {
                   </div>
                 )}
                 
-                {/* Endings - alleen tonen als er echte content is */}
+                {/* Endings */}
                 {wikipediaTV.endings.length > 0 && (
                   <div>
                     <h3 className="font-medium text-gray-700 mb-2">Gestopte programma's in {birthYear}</h3>
@@ -788,6 +920,20 @@ export default function TestResultsPage() {
               <summary className="font-medium text-blue-600 mb-2">▶ Toon ingevoerde data</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs">
                 {JSON.stringify(data, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-sky-600 mb-2">▶ Daily News ({dailyNews?.totalEvents || 0} events, apiVersion: {dailyNews?.apiVersion || '?'})</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(dailyNews, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-orange-600 mb-2">▶ Monthly News ({monthlyNews?.totalItems || 0} items, apiVersion: {monthlyNews?.apiVersion || '?'})</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(monthlyNews, null, 2)}
               </pre>
             </details>
             
