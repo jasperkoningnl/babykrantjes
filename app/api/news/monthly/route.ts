@@ -1,27 +1,42 @@
 // app/api/news/monthly/route.ts
-// @version 1.1.0
-// Wikipedia NL maandoverzicht scraper
+// @version 1.2.0
+// Wikipedia NL maandoverzicht scraper voor Nederlands nieuws
 // Bron: https://nl.wikipedia.org/wiki/{Maand}_{jaar}
-// FIX: Betere filtering van intro tekst, zoek naar echte nieuwsitems
+// FIX v1.2.0: Correcte parsing van <h3> datum headers + <ul><li> items
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_VERSION = '1.1.0'
+const API_VERSION = '1.2.0'
 
-const MAANDEN_NL = [
+const MONTHS_NL = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
   'juli', 'augustus', 'september', 'oktober', 'november', 'december'
 ]
+
+// Maandnamen met hoofdletter voor de URL
+const MONTHS_NL_CAPITALIZED = [
+  'Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni',
+  'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'
+]
+
+interface NewsItem {
+  day: number
+  text: string
+}
 
 interface MonthNewsResult {
   year: number
   month: number
   monthName: string
-  items: string[]
+  items: NewsItem[]
   totalItems: number
   source: string
   sourceUrl: string
   apiVersion: string
+  debug?: {
+    datesFound: string[]
+    rawItemCount: number
+  }
   error?: string
 }
 
@@ -31,38 +46,38 @@ export async function GET(request: NextRequest) {
 
   if (!dateParam) {
     return NextResponse.json(
-      { error: 'Missing required parameter: date (YYYY-MM-DD or YYYY-MM)' },
+      { error: 'Missing required parameter: date (YYYY-MM-DD)' },
       { status: 400 }
     )
   }
 
   const dateParts = dateParam.split('-')
-  if (dateParts.length < 2) {
+  if (dateParts.length !== 3) {
     return NextResponse.json(
-      { error: 'Invalid date format. Use YYYY-MM-DD or YYYY-MM' },
+      { error: 'Invalid date format. Use YYYY-MM-DD' },
       { status: 400 }
     )
   }
 
-  const year = parseInt(dateParts[0], 10)
-  const month = parseInt(dateParts[1], 10)
+  const [yearStr, monthStr] = dateParts
+  const year = parseInt(yearStr, 10)
+  const month = parseInt(monthStr, 10)
 
   if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
     return NextResponse.json(
-      { error: 'Invalid year or month values' },
+      { error: 'Invalid date values' },
       { status: 400 }
     )
   }
 
-  const monthName = MAANDEN_NL[month - 1]
-  const monthNameCapitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1)
-  const pageTitle = `${monthNameCapitalized}_${year}`
+  const monthName = MONTHS_NL_CAPITALIZED[month - 1]
+  const pageTitle = `${monthName}_${year}`
   const webUrl = `https://nl.wikipedia.org/wiki/${pageTitle}`
 
   const emptyResult: MonthNewsResult = {
     year,
     month,
-    monthName: monthNameCapitalized,
+    monthName: MONTHS_NL[month - 1],
     items: [],
     totalItems: 0,
     source: 'Wikipedia NL Maandoverzicht',
@@ -71,184 +86,253 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`[NewsMonthly] Fetching: ${webUrl}`)
+    console.log(`[NewsMonthly v${API_VERSION}] Fetching: ${webUrl}`)
 
     const response = await fetch(webUrl, {
       headers: {
-        'User-Agent': 'BabykrantBot/1.0 (educational project)',
+        'User-Agent': 'Mozilla/5.0 (compatible; BabykrantBot/1.0)',
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'nl-NL,nl;q=0.9'
       },
       next: { revalidate: 86400 * 30 }
     })
 
+    if (response.status === 404) {
+      console.log(`[NewsMonthly] Page not found for ${monthName} ${year}`)
+      return NextResponse.json({
+        ...emptyResult,
+        error: `No news page found for ${monthName} ${year}`
+      })
+    }
+
     if (!response.ok) {
       console.error(`[NewsMonthly] HTTP ${response.status}`)
       return NextResponse.json({
         ...emptyResult,
-        error: `Page not found for ${monthNameCapitalized} ${year}`
+        error: `Wikipedia returned ${response.status}`
       })
     }
 
     const html = await response.text()
-    const items = parseMonthPageHtml(html, year)
+    const { items, datesFound } = parseMonthOverviewHtml(html, month)
 
-    console.log(`[NewsMonthly] Found ${items.length} items for ${monthNameCapitalized} ${year}`)
+    console.log(`[NewsMonthly v${API_VERSION}] Found ${items.length} items for ${datesFound.length} dates in ${monthName} ${year}`)
 
     return NextResponse.json({
       year,
       month,
-      monthName: monthNameCapitalized,
+      monthName: MONTHS_NL[month - 1],
       items,
       totalItems: items.length,
       source: 'Wikipedia NL Maandoverzicht',
       sourceUrl: webUrl,
-      apiVersion: API_VERSION
+      apiVersion: API_VERSION,
+      debug: {
+        datesFound,
+        rawItemCount: items.length
+      }
     })
 
   } catch (error) {
     console.error('[NewsMonthly] Error:', error)
     return NextResponse.json({
       ...emptyResult,
-      error: 'Failed to fetch month data'
+      error: 'Failed to fetch news data'
     })
   }
 }
 
-function parseMonthPageHtml(html: string, year: number): string[] {
-  const items: string[] = []
-  const seenTexts = new Set<string>()
-  const MAX_ITEMS = 20
+function parseMonthOverviewHtml(html: string, month: number): { items: NewsItem[], datesFound: string[] } {
+  const items: NewsItem[] = []
+  const datesFound: string[] = []
 
   try {
     // Zoek de content sectie
-    const contentMatch = html.match(/<div[^>]*id="mw-content-text"[^>]*>([\s\S]*?)(?:<div[^>]*class="printfooter"|<div[^>]*id="catlinks")/i)
-    const contentHtml = contentMatch ? contentMatch[1] : html
-
-    // Patronen voor intro tekst die we moeten skippen
-    const skipPatterns = [
-      /dit artikel geeft een/i,
-      /chronologisch overzicht/i,
-      /belangrijkste gebeurtenissen/i,
-      /zie ook/i,
-      /externe link/i,
-      /referenties/i,
-      /navigatiemenu/i,
-      /^[\s]*$/,
-    ]
-
-    // Zoek naar list items die beginnen met een dag nummer
-    // Format: "1 - Gebeurtenis" of "1 januari - Gebeurtenis" of gewoon een nieuwsfeit
-    const listItemPattern = /<li[^>]*>([\s\S]*?)<\/li>/gi
-    let match
-
-    while ((match = listItemPattern.exec(contentHtml)) !== null && items.length < MAX_ITEMS) {
-      const rawText = match[1]
-      const text = cleanWikiText(rawText)
-
-      // Skip te korte of te lange teksten
-      if (text.length < 20 || text.length > 500) continue
-
-      // Skip intro/navigatie teksten
-      const shouldSkip = skipPatterns.some(pattern => pattern.test(text))
-      if (shouldSkip) continue
-
-      // Skip duplicaten
-      const textLower = text.toLowerCase()
-      if (seenTexts.has(textLower)) continue
-
-      // Skip als het alleen een maandnaam of jaar is
-      if (/^(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december|\d{4})$/i.test(text.trim())) {
-        continue
-      }
-
-      // Skip navigatie links
-      if (/^[←→]/.test(text) || /^\d{4}$/.test(text.trim())) continue
-
-      seenTexts.add(textLower)
-      items.push(text)
+    const contentMatch = html.match(/<div id="mw-content-text"[^>]*>([\s\S]*?)<div class="printfooter"/i)
+    
+    if (!contentMatch) {
+      console.log('[NewsMonthly] Could not find mw-content-text div')
+      return { items, datesFound }
     }
 
-    // Als geen list items gevonden, zoek in paragraphs
-    if (items.length === 0) {
-      const pPattern = /<p[^>]*>([\s\S]*?)<\/p>/gi
-      while ((match = pPattern.exec(contentHtml)) !== null && items.length < MAX_ITEMS) {
-        const text = cleanWikiText(match[1])
-        
-        if (text.length < 30 || text.length > 500) continue
-        
-        const shouldSkip = skipPatterns.some(pattern => pattern.test(text))
-        if (shouldSkip) continue
+    let contentHtml = contentMatch[1]
 
-        const textLower = text.toLowerCase()
-        if (seenTexts.has(textLower)) continue
+    // Stop bij "Overleden" sectie
+    const overledenIndex = contentHtml.indexOf('id="Overleden"')
+    if (overledenIndex !== -1) {
+      contentHtml = contentHtml.substring(0, overledenIndex)
+    }
 
-        seenTexts.add(textLower)
-        items.push(text)
+    // Ook stoppen bij bronnen/referenties sectie
+    const bronnenIndex = contentHtml.indexOf('class="references"')
+    if (bronnenIndex !== -1) {
+      contentHtml = contentHtml.substring(0, bronnenIndex)
+    }
+
+    // Nederlandse Wikipedia structuur:
+    // <div class="mw-heading mw-heading3"><h3 id="3_maart">...</h3>...</div>
+    // <ul><li>Nieuws item 1</li><li>Nieuws item 2</li></ul>
+    // <div class="mw-heading mw-heading3"><h3 id="4_maart">...</h3>...</div>
+    // <ul>...</ul>
+
+    // Parse datum headers en hun items
+    // We zoeken naar <h3 id="X_maand"> gevolgd door <ul><li> items
+    
+    const monthNames = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 
+                        'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+    const monthName = monthNames[month - 1]
+    
+    // Regex om datum headers te vinden: <h3 id="3_maart"> of <h3 id="15_maart">
+    const dateHeaderPattern = new RegExp(
+      `<h3[^>]*id="(\\d{1,2})_${monthName}"[^>]*>`,
+      'gi'
+    )
+
+    // Vind alle datum posities
+    const datePositions: { day: number, startIndex: number }[] = []
+    let headerMatch
+    
+    while ((headerMatch = dateHeaderPattern.exec(contentHtml)) !== null) {
+      const day = parseInt(headerMatch[1], 10)
+      datePositions.push({
+        day,
+        startIndex: headerMatch.index
+      })
+      datesFound.push(`${day} ${monthName}`)
+    }
+
+    // Voor elke datum, vind de <ul> die erna komt
+    for (let i = 0; i < datePositions.length; i++) {
+      const currentPos = datePositions[i]
+      const nextPos = datePositions[i + 1]
+      
+      // Bepaal het bereik voor deze datum
+      const startIndex = currentPos.startIndex
+      const endIndex = nextPos ? nextPos.startIndex : contentHtml.length
+      
+      const sectionHtml = contentHtml.substring(startIndex, endIndex)
+      
+      // Zoek de <ul> in deze sectie
+      const ulMatch = sectionHtml.match(/<ul>([\s\S]*?)<\/ul>/i)
+      if (!ulMatch) continue
+      
+      const ulContent = ulMatch[1]
+      
+      // Parse <li> items
+      const liItems = parseListItems(ulContent)
+      
+      for (const itemText of liItems) {
+        if (itemText.length > 15) {
+          items.push({
+            day: currentPos.day,
+            text: itemText
+          })
+        }
       }
     }
 
-    // Sorteer items die met een dagnummer beginnen naar voren
-    items.sort((a, b) => {
-      const aStartsWithDay = /^\d{1,2}[\s\-–]/.test(a)
-      const bStartsWithDay = /^\d{1,2}[\s\-–]/.test(b)
-      if (aStartsWithDay && !bStartsWithDay) return -1
-      if (!aStartsWithDay && bStartsWithDay) return 1
-      return 0
-    })
+    // Sorteer op dag
+    items.sort((a, b) => a.day - b.day)
 
   } catch (error) {
     console.error('[NewsMonthly] Parse error:', error)
   }
 
+  return { items, datesFound }
+}
+
+function parseListItems(ulContent: string): string[] {
+  const items: string[] = []
+  
+  // Split op </li> tags
+  const liParts = ulContent.split(/<\/li>/i)
+  
+  for (const part of liParts) {
+    // Zoek <li> start
+    const liStart = part.lastIndexOf('<li')
+    if (liStart === -1) continue
+    
+    // Neem content na <li>
+    let liContent = part.substring(liStart)
+    liContent = liContent.replace(/<li[^>]*>/i, '')
+    
+    // Clean de tekst
+    const cleanedText = cleanText(liContent)
+    
+    // Filter te korte items en navigatie
+    if (cleanedText.length > 15 && !isNavigationText(cleanedText)) {
+      items.push(cleanedText)
+    }
+  }
+  
   return items
 }
 
-function cleanWikiText(html: string): string {
-  let text = html
-    // Verwijder HTML comments
-    .replace(/<!--[\s\S]*?-->/g, '')
-    // Verwijder sup tags (referenties)
-    .replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, '')
-    // Verwijder small tags
-    .replace(/<small[^>]*>[\s\S]*?<\/small>/gi, '')
-    // Converteer links naar tekst
-    .replace(/<a[^>]*>([^<]*)<\/a>/gi, '$1')
-    // Verwijder overige HTML tags
-    .replace(/<[^>]+>/g, ' ')
-    // Verwijder Wikipedia markup
-    .replace(/\[\[(?:[^\]|]*\|)?([^\]]+)\]\]/g, '$1')
-    .replace(/\[\[([^\]]+)\]\]/g, '$1')
-    // Verwijder referenties
-    .replace(/\[\d+\]/g, '')
-    // Verwijder URLs
-    .replace(/https?:\/\/[^\s)]+/g, '')
-    // Normaliseer whitespace
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  // Decode HTML entities
-  text = decodeHtmlEntities(text)
-
-  return text
+function isNavigationText(text: string): boolean {
+  const lowerText = text.toLowerCase()
+  
+  // Filter navigatie en intro tekst
+  const skipPatterns = [
+    'chronologisch overzicht',
+    'belangrijkste gebeurtenissen',
+    'bewerken',
+    'brontekst',
+    'lees verder',
+    '← ·',
+    '· →',
+    'wikinieuws'
+  ]
+  
+  return skipPatterns.some(pattern => lowerText.includes(pattern))
 }
 
-function decodeHtmlEntities(text: string): string {
+function cleanText(html: string): string {
+  let text = html
+  
+  // Verwijder HTML comments
+  text = text.replace(/<!--[\s\S]*?-->/g, '')
+  
+  // Verwijder scripts en styles
+  text = text.replace(/<script[\s\S]*?<\/script>/gi, '')
+  text = text.replace(/<style[\s\S]*?<\/style>/gi, '')
+  
+  // Verwijder edit section links
+  text = text.replace(/<span class="mw-editsection">[\s\S]*?<\/span>/gi, '')
+  
+  // Verwijder referentie/citation links [1], [2] etc
+  text = text.replace(/<sup[^>]*class="reference"[^>]*>[\s\S]*?<\/sup>/gi, '')
+  
+  // Verwijder Wikinieuws iconen en links
+  text = text.replace(/<span[^>]*class="nowrap"[^>]*>[\s\S]*?Wikinieuws[\s\S]*?<\/span>/gi, '')
+  
+  // Converteer <a> tags naar hun tekst
+  text = text.replace(/<a[^>]*title="([^"]*)"[^>]*>[^<]*<\/a>/gi, '$1')
+  text = text.replace(/<a[^>]*>([^<]*)<\/a>/gi, '$1')
+  
+  // Verwijder geneste lijsten
+  text = text.replace(/<\/?ul[^>]*>/gi, ' ')
+  text = text.replace(/<\/?li[^>]*>/gi, ' ')
+  
+  // Verwijder "(Lees verder)" links
+  text = text.replace(/\(Lees verder\)/gi, '')
+  
+  // Verwijder overige HTML tags
+  text = text.replace(/<[^>]+>/g, ' ')
+  
+  // Decode HTML entities
+  text = text.replace(/&nbsp;/g, ' ')
+  text = text.replace(/&amp;/g, '&')
+  text = text.replace(/&lt;/g, '<')
+  text = text.replace(/&gt;/g, '>')
+  text = text.replace(/&quot;/g, '"')
+  text = text.replace(/&#39;/g, "'")
+  text = text.replace(/&#91;/g, '[')
+  text = text.replace(/&#93;/g, ']')
+  text = text.replace(/&#160;/g, ' ')
+  text = text.replace(/&#95;/g, '_')
+  
+  // Verwijder dubbele spaties en trim
+  text = text.replace(/\s+/g, ' ').trim()
+  
   return text
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&ndash;/g, '–')
-    .replace(/&mdash;/g, '—')
-    .replace(/&eacute;/g, 'é')
-    .replace(/&euml;/g, 'ë')
-    .replace(/&iuml;/g, 'ï')
-    .replace(/&ouml;/g, 'ö')
-    .replace(/&uuml;/g, 'ü')
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
 }

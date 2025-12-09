@@ -1,10 +1,19 @@
 // lib/newsAPI.ts
-// @version 1.0.0
-// Client voor nieuws API's
-// Bronnen: Wikipedia Current Events (EN) en Wikipedia Maandoverzicht (NL)
+// @version 1.1.0
+// Client-side wrapper voor de nieuws API endpoints
+// UPDATE v1.1.0: Ondersteuning voor NewsItem met dag-informatie
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface NewsEvent {
   category: string
+  text: string
+}
+
+export interface NewsItem {
+  day: number
   text: string
 }
 
@@ -14,7 +23,11 @@ export interface DailyNewsResult {
   totalEvents: number
   source: string
   sourceUrl: string
-  apiVersion?: string
+  apiVersion: string
+  debug?: {
+    categoriesFound: string[]
+    rawCategoryCount: number
+  }
   error?: string
 }
 
@@ -22,112 +35,181 @@ export interface MonthNewsResult {
   year: number
   month: number
   monthName: string
-  items: string[]
+  items: NewsItem[]
   totalItems: number
   source: string
   sourceUrl: string
-  apiVersion?: string
+  apiVersion: string
+  debug?: {
+    datesFound: string[]
+    rawItemCount: number
+  }
   error?: string
 }
 
+export interface AllNewsResult {
+  daily: DailyNewsResult | null
+  monthly: MonthNewsResult | null
+}
+
+// ============================================================================
+// API Functions
+// ============================================================================
+
 /**
- * Haalt internationaal nieuws op voor een specifieke datum
- * Bron: Wikipedia Portal:Current_events (Engels)
+ * Haalt internationaal nieuws op voor een specifieke dag
  * @param date - Datum in YYYY-MM-DD formaat
  */
 export async function getDailyNews(date: string): Promise<DailyNewsResult> {
-  const emptyResult: DailyNewsResult = {
-    date,
-    events: [],
-    totalEvents: 0,
-    source: 'Wikipedia Portal:Current_events',
-    sourceUrl: ''
-  }
-
   try {
-    const response = await fetch(`/api/news/daily?date=${date}`)
+    const response = await fetch(`/api/news/daily?date=${encodeURIComponent(date)}`)
     
     if (!response.ok) {
-      console.error(`[NewsAPI] Daily news error: ${response.status}`)
-      return emptyResult
+      throw new Error(`HTTP ${response.status}`)
     }
-
-    return await response.json()
-
+    
+    const data: DailyNewsResult = await response.json()
+    return data
   } catch (error) {
-    console.error('[NewsAPI] Error fetching daily news:', error)
-    return emptyResult
+    console.error('[newsAPI] getDailyNews error:', error)
+    return {
+      date,
+      events: [],
+      totalEvents: 0,
+      source: 'Wikipedia Portal:Current_events',
+      sourceUrl: '',
+      apiVersion: 'error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
 }
 
 /**
- * Haalt het maandoverzicht op (Nederlands nieuws en context)
- * Bron: Wikipedia NL maandpagina
- * @param date - Datum in YYYY-MM-DD of YYYY-MM formaat
+ * Haalt Nederlands maandoverzicht nieuws op
+ * @param date - Datum in YYYY-MM-DD formaat (dag wordt genegeerd, alleen jaar+maand gebruikt)
  */
 export async function getMonthlyNews(date: string): Promise<MonthNewsResult> {
-  const emptyResult: MonthNewsResult = {
-    year: 0,
-    month: 0,
-    monthName: '',
-    items: [],
-    totalItems: 0,
-    source: 'Wikipedia NL Maandoverzicht',
-    sourceUrl: ''
-  }
-
   try {
-    const response = await fetch(`/api/news/monthly?date=${date}`)
+    const response = await fetch(`/api/news/monthly?date=${encodeURIComponent(date)}`)
     
     if (!response.ok) {
-      console.error(`[NewsAPI] Monthly news error: ${response.status}`)
-      return emptyResult
+      throw new Error(`HTTP ${response.status}`)
     }
-
-    return await response.json()
-
+    
+    const data: MonthNewsResult = await response.json()
+    return data
   } catch (error) {
-    console.error('[NewsAPI] Error fetching monthly news:', error)
-    return emptyResult
+    console.error('[newsAPI] getMonthlyNews error:', error)
+    const [yearStr, monthStr] = date.split('-')
+    const monthNames = ['januari', 'februari', 'maart', 'april', 'mei', 'juni',
+                        'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+    const month = parseInt(monthStr, 10)
+    
+    return {
+      year: parseInt(yearStr, 10),
+      month,
+      monthName: monthNames[month - 1] || '',
+      items: [],
+      totalItems: 0,
+      source: 'Wikipedia NL Maandoverzicht',
+      sourceUrl: '',
+      apiVersion: 'error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
 }
 
 /**
- * Haalt zowel dagelijks als maandelijks nieuws op
- * Handig voor het in één keer ophalen van alle nieuws context
+ * Haalt zowel dagelijks als maandelijks nieuws op in parallel
  * @param date - Datum in YYYY-MM-DD formaat
  */
-export async function getAllNews(date: string): Promise<{
-  daily: DailyNewsResult
-  monthly: MonthNewsResult
-}> {
-  const [daily, monthly] = await Promise.all([
-    getDailyNews(date),
-    getMonthlyNews(date)
-  ])
-
-  return { daily, monthly }
+export async function getAllNews(date: string): Promise<AllNewsResult> {
+  try {
+    const [daily, monthly] = await Promise.all([
+      getDailyNews(date),
+      getMonthlyNews(date)
+    ])
+    
+    return { daily, monthly }
+  } catch (error) {
+    console.error('[newsAPI] getAllNews error:', error)
+    return { daily: null, monthly: null }
+  }
 }
 
-/**
- * Formatteert een nieuws event voor weergave
- */
-export function formatNewsEvent(event: NewsEvent): string {
-  return `${event.category}: ${event.text}`
-}
+// ============================================================================
+// Helper Functions
+// ============================================================================
 
 /**
  * Groepeert nieuws events per categorie
  */
-export function groupNewsByCategory(events: NewsEvent[]): Record<string, string[]> {
-  const grouped: Record<string, string[]> = {}
+export function groupNewsByCategory(events: NewsEvent[]): Map<string, NewsEvent[]> {
+  const grouped = new Map<string, NewsEvent[]>()
   
   for (const event of events) {
-    if (!grouped[event.category]) {
-      grouped[event.category] = []
-    }
-    grouped[event.category].push(event.text)
+    const existing = grouped.get(event.category) || []
+    existing.push(event)
+    grouped.set(event.category, existing)
   }
   
   return grouped
+}
+
+/**
+ * Groepeert maandelijks nieuws per dag
+ */
+export function groupNewsByDay(items: NewsItem[]): Map<number, NewsItem[]> {
+  const grouped = new Map<number, NewsItem[]>()
+  
+  for (const item of items) {
+    const existing = grouped.get(item.day) || []
+    existing.push(item)
+    grouped.set(item.day, existing)
+  }
+  
+  return grouped
+}
+
+/**
+ * Formatteert een nieuws event voor display
+ */
+export function formatNewsEvent(event: NewsEvent): string {
+  return `[${event.category}] ${event.text}`
+}
+
+/**
+ * Formatteert een nieuws item met dag voor display
+ */
+export function formatNewsItem(item: NewsItem, monthName: string): string {
+  return `${item.day} ${monthName}: ${item.text}`
+}
+
+/**
+ * Trunceert tekst tot een maximum lengte
+ */
+export function truncateText(text: string, maxLength: number = 200): string {
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength - 3) + '...'
+}
+
+/**
+ * Filtert nieuws items voor een specifieke dag
+ */
+export function filterItemsByDay(items: NewsItem[], day: number): NewsItem[] {
+  return items.filter(item => item.day === day)
+}
+
+/**
+ * Haalt unieke categorieën uit nieuws events
+ */
+export function getUniqueCategories(events: NewsEvent[]): string[] {
+  return [...new Set(events.map(e => e.category))]
+}
+
+/**
+ * Haalt unieke dagen uit nieuws items
+ */
+export function getUniqueDays(items: NewsItem[]): number[] {
+  return [...new Set(items.map(i => i.day))].sort((a, b) => a - b)
 }
