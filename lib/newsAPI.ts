@@ -204,12 +204,12 @@ export function filterItemsByDay(items: NewsItem[], day: number): NewsItem[] {
  * Haalt unieke categorieën uit nieuws events
  */
 export function getUniqueCategories(events: NewsEvent[]): string[] {
-  return [...new Set(events.map(e => e.category))]
+  return Array.from(new Set(events.map(e => e.category)))
 }
 
 /**
  * Haalt unieke dagen uit nieuws items
  */
 export function getUniqueDays(items: NewsItem[]): number[] {
-  return [...new Set(items.map(i => i.day))].sort((a, b) => a - b)
+  return Array.from(new Set(items.map(i => i.day))).sort((a, b) => a - b)
 }
