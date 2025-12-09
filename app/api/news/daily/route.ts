@@ -1,12 +1,13 @@
 // app/api/news/daily/route.ts
-// @version 1.3.0
+// @version 1.4.0
 // Wikipedia Current Events scraper voor internationaal nieuws op een specifieke dag
 // Bron: https://en.wikipedia.org/wiki/Portal:Current_events/{jaar}_{maand}_{dag}
 // FIX v1.3.0: Robuustere content extractie met meerdere fallbacks
+// FIX v1.4.0: Ondersteuning voor oudere Wikipedia structuur (current-events-content-heading divs)
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_VERSION = '1.3.0'
+const API_VERSION = '1.4.0'
 
 const MONTHS_EN = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -195,10 +196,18 @@ function parseCurrentEventsHtml(html: string): { events: NewsEvent[], categories
     // </p>
     // <ul><li>Item 1</li></ul>
 
-    // Probeer eerst de primaire regex
-    parseWithCategoryPattern(contentHtml, events, categoriesFound)
+    // Probeer eerst de oudere Wikipedia structuur (2012 en eerder)
+    // Deze gebruikt: <div class="current-events-content-heading">Category</div><ul>...</ul>
+    parseWithContentHeadingDivs(contentHtml, events, categoriesFound)
 
-    // Als dat niet werkt, probeer alternatieve methode
+    // Als dat niet werkt, probeer de nieuwere structuur (2022+)
+    // Deze gebruikt: <p><b>Category</b></p><ul>...</ul>
+    if (events.length === 0) {
+      console.log('[NewsDaily] Content-heading method failed, trying p/b pattern')
+      parseWithCategoryPattern(contentHtml, events, categoriesFound)
+    }
+
+    // Als dat niet werkt, probeer split methode
     if (events.length === 0) {
       console.log('[NewsDaily] Primary pattern failed, trying split method')
       parseWithSplitMethod(contentHtml, events, categoriesFound)
@@ -215,6 +224,37 @@ function parseCurrentEventsHtml(html: string): { events: NewsEvent[], categories
   }
 
   return { events, categoriesFound, contentMethod }
+}
+
+function parseWithContentHeadingDivs(contentHtml: string, events: NewsEvent[], categoriesFound: string[]): void {
+  // Oudere Wikipedia structuur (pre-2020):
+  // <div class="current-events-content-heading" role="heading">Category Name</div>
+  // <ul><li>Item 1</li><li>Item 2</li></ul>
+  
+  const headingPattern = /<div\s+class="current-events-content-heading"[^>]*>([^<]+)<\/div>\s*<ul>([\s\S]*?)<\/ul>/gi
+  
+  let match
+  while ((match = headingPattern.exec(contentHtml)) !== null) {
+    const categoryName = cleanText(match[1])
+    const ulContent = match[2]
+    
+    if (!categoryName || categoryName.length < 2 || categoryName.length > 80) continue
+    
+    categoriesFound.push(categoryName)
+    
+    const items = parseListItems(ulContent)
+    
+    for (const itemText of items) {
+      if (itemText.length > 10) {
+        events.push({
+          category: categoryName,
+          text: itemText
+        })
+      }
+    }
+  }
+  
+  console.log(`[NewsDaily] Content-heading divs found ${events.length} events in ${categoriesFound.length} categories`)
 }
 
 function parseWithCategoryPattern(contentHtml: string, events: NewsEvent[], categoriesFound: string[]): void {
