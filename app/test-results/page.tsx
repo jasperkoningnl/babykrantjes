@@ -1,9 +1,9 @@
 // app/test-results/page.tsx
-// @version 1.9.0
-// FIX: Aangepast aan nieuws API v1.2.0 met NewsItem { day, text } structuur
+// @version 2.0.0
+// UPDATE: Toegevoegd Dutch News (Volkskrant headlines)
 'use client'
 
-const PAGE_VERSION = '1.9.0'
+const PAGE_VERSION = '2.0.0'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -19,7 +19,7 @@ import { getTop40ByDate, type Top40Result } from '@/lib/top40API'
 import { getYearOverview, type DutchChartsYearResult } from '@/lib/dutchChartsAPI'
 import { getTVProgramsOnDate, filterInterestingPrograms, type TVOnDateResult } from '@/lib/tvOnDateAPI'
 import { getWikipediaTVByYear, type WikipediaTVResult } from '@/lib/wikipediaTVAPI'
-import { getDailyNews, getMonthlyNews, groupNewsByCategory, type DailyNewsResult, type MonthNewsResult, type NewsEvent } from '@/lib/newsAPI'
+import { getDailyNews, getMonthlyNews, getDutchNews, groupNewsByCategory, type DailyNewsResult, type MonthNewsResult, type DutchNewsResult, type NewsEvent } from '@/lib/newsAPI'
 
 export default function TestResultsPage() {
   const [data, setData] = useState<BabykrantData | null>(null)
@@ -36,6 +36,7 @@ export default function TestResultsPage() {
   const [wikipediaTV, setWikipediaTV] = useState<WikipediaTVResult | null>(null)
   const [dailyNews, setDailyNews] = useState<DailyNewsResult | null>(null)
   const [monthlyNews, setMonthlyNews] = useState<MonthNewsResult | null>(null)
+  const [dutchNews, setDutchNews] = useState<DutchNewsResult | null>(null)
   
   const [loading, setLoading] = useState(true)
   const [weatherLoading, setWeatherLoading] = useState(false)
@@ -50,6 +51,7 @@ export default function TestResultsPage() {
   const [wikipediaTVLoading, setWikipediaTVLoading] = useState(false)
   const [dailyNewsLoading, setDailyNewsLoading] = useState(false)
   const [monthlyNewsLoading, setMonthlyNewsLoading] = useState(false)
+  const [dutchNewsLoading, setDutchNewsLoading] = useState(false)
 
   useEffect(() => {
     console.log(`[Babykrant] test-results page v${PAGE_VERSION}`)
@@ -183,6 +185,20 @@ export default function TestResultsPage() {
           setMonthlyNews(result)
           setMonthlyNewsLoading(false)
         })
+      }
+
+      // Nederlandse headlines (Volkskrant) - alleen vanaf 18 aug 2017
+      if (birthDate) {
+        const birthDateObj = new Date(birthDate)
+        const earliestDate = new Date('2017-08-18')
+        if (birthDateObj >= earliestDate) {
+          setDutchNewsLoading(true)
+          getDutchNews(birthDate).then(result => {
+            console.log(`[Babykrant] Dutch news response:`, result?.totalHeadlines, 'headlines, apiVersion:', result?.apiVersion)
+            setDutchNews(result)
+            setDutchNewsLoading(false)
+          })
+        }
       }
     }
     setLoading(false)
@@ -406,6 +422,72 @@ export default function TestResultsPage() {
             
             {!monthlyNewsLoading && !monthlyNews?.error && monthlyNews?.items.length === 0 && (
               <p className="text-gray-500 italic">Geen maandoverzicht gevonden</p>
+            )}
+          </div>
+
+          {/* Nederlandse nieuwsheadlines (Volkskrant) */}
+          <div className="bg-red-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">📰 Nederlandse Headlines</h2>
+            
+            {dutchNewsLoading && (
+              <p className="text-gray-500 italic">Nederlandse headlines worden opgehaald...</p>
+            )}
+            
+            {!dutchNewsLoading && dutchNews && dutchNews.headlines.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 mb-3">
+                  Nieuws uit de Volkskrant op {new Date(dutchNews.date).toLocaleDateString('nl-NL', { 
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+                  })}:
+                </p>
+                
+                <div className="space-y-2">
+                  {dutchNews.headlines.slice(0, 10).map((headline, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border border-red-200">
+                      <div className="flex flex-col">
+                        {headline.category && (
+                          <span className="text-xs font-medium text-red-600 mb-1">{headline.category}</span>
+                        )}
+                        <a 
+                          href={headline.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm text-gray-900 hover:text-red-700 hover:underline"
+                        >
+                          {headline.title}
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {dutchNews.headlines.length > 10 && (
+                  <p className="text-xs text-red-600">
+                    + {dutchNews.headlines.length - 10} meer headlines...
+                  </p>
+                )}
+                
+                <p className="text-xs text-gray-500 mt-3">
+                  <a href={dutchNews.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">
+                    Bron: {dutchNews.source} →
+                  </a>
+                  {' '}• {dutchNews.totalHeadlines} headlines gevonden
+                </p>
+              </div>
+            )}
+            
+            {!dutchNewsLoading && dutchNews?.error && (
+              <p className="text-amber-600 italic">{dutchNews.error}</p>
+            )}
+            
+            {!dutchNewsLoading && !dutchNews?.error && dutchNews?.headlines.length === 0 && (
+              <p className="text-gray-500 italic">Geen Nederlandse headlines gevonden</p>
+            )}
+            
+            {!dutchNewsLoading && !dutchNews && (
+              <p className="text-gray-500 italic text-sm">
+                Nederlandse headlines zijn alleen beschikbaar voor geboortedatums vanaf 18 augustus 2017
+              </p>
             )}
           </div>
 
@@ -936,6 +1018,13 @@ export default function TestResultsPage() {
               <summary className="font-medium text-orange-600 mb-2">▶ Monthly News ({monthlyNews?.totalItems || 0} items, apiVersion: {monthlyNews?.apiVersion || '?'})</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
                 {JSON.stringify(monthlyNews, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-red-600 mb-2">▶ Dutch News ({dutchNews?.totalHeadlines || 0} headlines, apiVersion: {dutchNews?.apiVersion || '?'})</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(dutchNews, null, 2)}
               </pre>
             </details>
             
