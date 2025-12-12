@@ -1,8 +1,9 @@
 // lib/newsAPI.ts
-// @version 1.2.0
+// @version 1.3.0
 // Client-side wrapper voor de nieuws API endpoints
 // UPDATE v1.1.0: Ondersteuning voor NewsItem met dag-informatie
-// UPDATE v1.2.0: Ondersteuning voor Dutch headlines (Volkskrant)
+// UPDATE v1.2.0: Ondersteuning voor Dutch headlines (Volkskrant) - DEPRECATED
+// UPDATE v1.3.0: Vervangen Volkskrant met Wayback Machine (NU.nl via Internet Archive)
 
 // ============================================================================
 // Types
@@ -18,10 +19,11 @@ export interface NewsItem {
   text: string
 }
 
-export interface DutchHeadline {
+export interface WaybackHeadline {
   title: string
   url: string
   category: string | null
+  time: string | null
 }
 
 export interface DailyNewsResult {
@@ -54,12 +56,13 @@ export interface MonthNewsResult {
   error?: string
 }
 
-export interface DutchNewsResult {
+export interface WaybackNewsResult {
   date: string
-  headlines: DutchHeadline[]
+  headlines: WaybackHeadline[]
   totalHeadlines: number
   source: string
   sourceUrl: string
+  snapshotTimestamp: string | null
   apiVersion: string
   error?: string
 }
@@ -67,8 +70,12 @@ export interface DutchNewsResult {
 export interface AllNewsResult {
   daily: DailyNewsResult | null
   monthly: MonthNewsResult | null
-  dutch: DutchNewsResult | null
+  wayback: WaybackNewsResult | null
 }
+
+// Legacy alias voor backwards compatibility
+export type DutchHeadline = WaybackHeadline
+export type DutchNewsResult = WaybackNewsResult
 
 // ============================================================================
 // API Functions
@@ -138,32 +145,42 @@ export async function getMonthlyNews(date: string): Promise<MonthNewsResult> {
 }
 
 /**
- * Haalt Nederlandse nieuwsheadlines op van de Volkskrant
+ * Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
  * @param date - Datum in YYYY-MM-DD formaat
- * @note Archief beschikbaar vanaf 18 augustus 2017
+ * @note Archief beschikbaar vanaf ~2005, beste resultaten vanaf 2010
  */
-export async function getDutchNews(date: string): Promise<DutchNewsResult> {
+export async function getWaybackNews(date: string): Promise<WaybackNewsResult> {
   try {
-    const response = await fetch(`/api/news/dutch?date=${encodeURIComponent(date)}`)
+    const response = await fetch(`/api/news/wayback?date=${encodeURIComponent(date)}`)
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`)
     }
     
-    const data: DutchNewsResult = await response.json()
+    const data: WaybackNewsResult = await response.json()
     return data
   } catch (error) {
-    console.error('[newsAPI] getDutchNews error:', error)
+    console.error('[newsAPI] getWaybackNews error:', error)
     return {
       date,
       headlines: [],
       totalHeadlines: 0,
-      source: 'de Volkskrant',
+      source: 'NU.nl via Internet Archive',
       sourceUrl: '',
+      snapshotTimestamp: null,
       apiVersion: 'error',
       error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
+}
+
+/**
+ * @deprecated Gebruik getWaybackNews() in plaats van getDutchNews()
+ * Legacy wrapper voor backwards compatibility
+ */
+export async function getDutchNews(date: string): Promise<WaybackNewsResult> {
+  console.warn('[newsAPI] getDutchNews is deprecated, use getWaybackNews instead')
+  return getWaybackNews(date)
 }
 
 /**
@@ -172,16 +189,16 @@ export async function getDutchNews(date: string): Promise<DutchNewsResult> {
  */
 export async function getAllNews(date: string): Promise<AllNewsResult> {
   try {
-    const [daily, monthly, dutch] = await Promise.all([
+    const [daily, monthly, wayback] = await Promise.all([
       getDailyNews(date),
       getMonthlyNews(date),
-      getDutchNews(date)
+      getWaybackNews(date)
     ])
     
-    return { daily, monthly, dutch }
+    return { daily, monthly, wayback }
   } catch (error) {
     console.error('[newsAPI] getAllNews error:', error)
-    return { daily: null, monthly: null, dutch: null }
+    return { daily: null, monthly: null, wayback: null }
   }
 }
 
@@ -205,10 +222,10 @@ export function groupNewsByCategory(events: NewsEvent[]): Map<string, NewsEvent[
 }
 
 /**
- * Groepeert Dutch headlines per categorie
+ * Groepeert Wayback headlines per categorie
  */
-export function groupHeadlinesByCategory(headlines: DutchHeadline[]): Map<string, DutchHeadline[]> {
-  const grouped = new Map<string, DutchHeadline[]>()
+export function groupHeadlinesByCategory(headlines: WaybackHeadline[]): Map<string, WaybackHeadline[]> {
+  const grouped = new Map<string, WaybackHeadline[]>()
   
   for (const headline of headlines) {
     const category = headline.category || 'Overig'
@@ -276,4 +293,20 @@ export function getUniqueCategories(events: NewsEvent[]): string[] {
  */
 export function getUniqueDays(items: NewsItem[]): number[] {
   return Array.from(new Set(items.map(i => i.day))).sort((a, b) => a - b)
+}
+
+/**
+ * Formatteert Wayback timestamp naar leesbare datum
+ * @param timestamp - Wayback timestamp format: YYYYMMDDHHMMSS
+ */
+export function formatWaybackTimestamp(timestamp: string): string {
+  if (!timestamp || timestamp.length < 8) return ''
+  
+  const year = timestamp.substring(0, 4)
+  const month = timestamp.substring(4, 6)
+  const day = timestamp.substring(6, 8)
+  const hour = timestamp.substring(8, 10) || '00'
+  const minute = timestamp.substring(10, 12) || '00'
+  
+  return `${day}-${month}-${year} ${hour}:${minute}`
 }

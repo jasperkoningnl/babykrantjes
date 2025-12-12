@@ -1,9 +1,10 @@
 // app/test-results/page.tsx
-// @version 2.0.0
-// UPDATE: Toegevoegd Dutch News (Volkskrant headlines)
+// @version 2.1.0
+// UPDATE v2.0.0: Toegevoegd Dutch News (Volkskrant headlines)
+// UPDATE v2.1.0: Vervangen Volkskrant met Wayback Machine (NU.nl via Internet Archive)
 'use client'
 
-const PAGE_VERSION = '2.0.0'
+const PAGE_VERSION = '2.1.0'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -19,7 +20,7 @@ import { getTop40ByDate, type Top40Result } from '@/lib/top40API'
 import { getYearOverview, type DutchChartsYearResult } from '@/lib/dutchChartsAPI'
 import { getTVProgramsOnDate, filterInterestingPrograms, type TVOnDateResult } from '@/lib/tvOnDateAPI'
 import { getWikipediaTVByYear, type WikipediaTVResult } from '@/lib/wikipediaTVAPI'
-import { getDailyNews, getMonthlyNews, getDutchNews, groupNewsByCategory, type DailyNewsResult, type MonthNewsResult, type DutchNewsResult, type NewsEvent } from '@/lib/newsAPI'
+import { getDailyNews, getMonthlyNews, getWaybackNews, groupNewsByCategory, formatWaybackTimestamp, type DailyNewsResult, type MonthNewsResult, type WaybackNewsResult, type NewsEvent } from '@/lib/newsAPI'
 
 export default function TestResultsPage() {
   const [data, setData] = useState<BabykrantData | null>(null)
@@ -36,7 +37,7 @@ export default function TestResultsPage() {
   const [wikipediaTV, setWikipediaTV] = useState<WikipediaTVResult | null>(null)
   const [dailyNews, setDailyNews] = useState<DailyNewsResult | null>(null)
   const [monthlyNews, setMonthlyNews] = useState<MonthNewsResult | null>(null)
-  const [dutchNews, setDutchNews] = useState<DutchNewsResult | null>(null)
+  const [waybackNews, setWaybackNews] = useState<WaybackNewsResult | null>(null)
   
   const [loading, setLoading] = useState(true)
   const [weatherLoading, setWeatherLoading] = useState(false)
@@ -51,7 +52,7 @@ export default function TestResultsPage() {
   const [wikipediaTVLoading, setWikipediaTVLoading] = useState(false)
   const [dailyNewsLoading, setDailyNewsLoading] = useState(false)
   const [monthlyNewsLoading, setMonthlyNewsLoading] = useState(false)
-  const [dutchNewsLoading, setDutchNewsLoading] = useState(false)
+  const [waybackNewsLoading, setWaybackNewsLoading] = useState(false)
 
   useEffect(() => {
     console.log(`[Babykrant] test-results page v${PAGE_VERSION}`)
@@ -187,16 +188,17 @@ export default function TestResultsPage() {
         })
       }
 
-      // Nederlandse headlines (Volkskrant) - alleen vanaf 18 aug 2017
+      // Nederlandse headlines via Wayback Machine (NU.nl)
+      // Beschikbaar vanaf ~2005
       if (birthDate) {
         const birthDateObj = new Date(birthDate)
-        const earliestDate = new Date('2017-08-18')
+        const earliestDate = new Date('2005-01-01')
         if (birthDateObj >= earliestDate) {
-          setDutchNewsLoading(true)
-          getDutchNews(birthDate).then(result => {
-            console.log(`[Babykrant] Dutch news response:`, result?.totalHeadlines, 'headlines, apiVersion:', result?.apiVersion)
-            setDutchNews(result)
-            setDutchNewsLoading(false)
+          setWaybackNewsLoading(true)
+          getWaybackNews(birthDate).then(result => {
+            console.log(`[Babykrant] Wayback news response:`, result?.totalHeadlines, 'headlines, apiVersion:', result?.apiVersion)
+            setWaybackNews(result)
+            setWaybackNewsLoading(false)
           })
         }
       }
@@ -425,68 +427,75 @@ export default function TestResultsPage() {
             )}
           </div>
 
-          {/* Nederlandse nieuwsheadlines (Volkskrant) */}
+          {/* Nederlandse nieuwsheadlines (Wayback Machine / NU.nl) */}
           <div className="bg-red-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">📰 Nederlandse Headlines</h2>
             
-            {dutchNewsLoading && (
+            {waybackNewsLoading && (
               <p className="text-gray-500 italic">Nederlandse headlines worden opgehaald...</p>
             )}
             
-            {!dutchNewsLoading && dutchNews && dutchNews.headlines.length > 0 && (
+            {!waybackNewsLoading && waybackNews && waybackNews.headlines.length > 0 && (
               <div className="space-y-3">
                 <p className="text-sm text-gray-600 mb-3">
-                  Nieuws uit de Volkskrant op {new Date(dutchNews.date).toLocaleDateString('nl-NL', { 
+                  Nieuws van NU.nl op {new Date(waybackNews.date).toLocaleDateString('nl-NL', { 
                     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
                   })}:
                 </p>
                 
                 <div className="space-y-2">
-                  {dutchNews.headlines.slice(0, 10).map((headline, idx) => (
+                  {waybackNews.headlines.slice(0, 10).map((headline, idx) => (
                     <div key={idx} className="bg-white p-3 rounded border border-red-200">
                       <div className="flex flex-col">
                         {headline.category && (
                           <span className="text-xs font-medium text-red-600 mb-1">{headline.category}</span>
                         )}
-                        <a 
-                          href={headline.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-sm text-gray-900 hover:text-red-700 hover:underline"
-                        >
-                          {headline.title}
-                        </a>
+                        {headline.url ? (
+                          <a 
+                            href={headline.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-gray-900 hover:text-red-700 hover:underline"
+                          >
+                            {headline.title}
+                          </a>
+                        ) : (
+                          <span className="text-sm text-gray-900">{headline.title}</span>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
                 
-                {dutchNews.headlines.length > 10 && (
+                {waybackNews.headlines.length > 10 && (
                   <p className="text-xs text-red-600">
-                    + {dutchNews.headlines.length - 10} meer headlines...
+                    + {waybackNews.headlines.length - 10} meer headlines...
                   </p>
                 )}
                 
                 <p className="text-xs text-gray-500 mt-3">
-                  <a href={dutchNews.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">
-                    Bron: {dutchNews.source} →
+                  <a href={waybackNews.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">
+                    Bron: {waybackNews.source} →
                   </a>
-                  {' '}• {dutchNews.totalHeadlines} headlines gevonden
+                  {' '}• {waybackNews.totalHeadlines} headlines gevonden
+                  {waybackNews.snapshotTimestamp && (
+                    <span className="ml-2">• Snapshot: {formatWaybackTimestamp(waybackNews.snapshotTimestamp)}</span>
+                  )}
                 </p>
               </div>
             )}
             
-            {!dutchNewsLoading && dutchNews?.error && (
-              <p className="text-amber-600 italic">{dutchNews.error}</p>
+            {!waybackNewsLoading && waybackNews?.error && (
+              <p className="text-amber-600 italic">{waybackNews.error}</p>
             )}
             
-            {!dutchNewsLoading && !dutchNews?.error && dutchNews?.headlines.length === 0 && (
+            {!waybackNewsLoading && !waybackNews?.error && waybackNews?.headlines.length === 0 && (
               <p className="text-gray-500 italic">Geen Nederlandse headlines gevonden</p>
             )}
             
-            {!dutchNewsLoading && !dutchNews && (
+            {!waybackNewsLoading && !waybackNews && (
               <p className="text-gray-500 italic text-sm">
-                Nederlandse headlines zijn alleen beschikbaar voor geboortedatums vanaf 18 augustus 2017
+                Nederlandse headlines zijn beschikbaar vanaf 2005 (via Internet Archive)
               </p>
             )}
           </div>
@@ -1022,9 +1031,9 @@ export default function TestResultsPage() {
             </details>
             
             <details className="cursor-pointer mt-4">
-              <summary className="font-medium text-red-600 mb-2">▶ Dutch News ({dutchNews?.totalHeadlines || 0} headlines, apiVersion: {dutchNews?.apiVersion || '?'})</summary>
+              <summary className="font-medium text-red-600 mb-2">▶ Wayback News ({waybackNews?.totalHeadlines || 0} headlines, apiVersion: {waybackNews?.apiVersion || '?'})</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
-                {JSON.stringify(dutchNews, null, 2)}
+                {JSON.stringify(waybackNews, null, 2)}
               </pre>
             </details>
             
