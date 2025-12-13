@@ -1,9 +1,10 @@
 // lib/newsAPI.ts
-// @version 1.3.0
+// @version 1.3.1
 // Client-side wrapper voor de nieuws API endpoints
 // UPDATE v1.1.0: Ondersteuning voor NewsItem met dag-informatie
 // UPDATE v1.2.0: Ondersteuning voor Dutch headlines (Volkskrant) - DEPRECATED
 // UPDATE v1.3.0: Vervangen Volkskrant met Wayback Machine (NU.nl via Internet Archive)
+// UPDATE v1.3.1: Added cacheHit property to WaybackNewsResult interface
 
 // ============================================================================
 // Types
@@ -64,6 +65,7 @@ export interface WaybackNewsResult {
   sourceUrl: string
   snapshotTimestamp: string | null
   apiVersion: string
+  cacheHit?: boolean
   error?: string
 }
 
