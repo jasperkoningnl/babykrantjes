@@ -169,7 +169,7 @@ export async function getWaybackNews(date: string): Promise<WaybackNewsResult> {
       date,
       headlines: [],
       totalHeadlines: 0,
-      source: 'NU.nl via Internet Archive',
+      sources: [],
       sourceUrl: '',
       snapshotTimestamp: null,
       apiVersion: 'error',
