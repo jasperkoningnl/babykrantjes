@@ -532,7 +532,7 @@ export async function GET(request: NextRequest) {
     if (allHeadlines.length > 0) {
       await updateCache(dateParam, {
         status: 'found',
-        timestamp: primaryTimestamp,
+        timestamp: primaryTimestamp || undefined,
         headlines: allHeadlines.length
       })
       
