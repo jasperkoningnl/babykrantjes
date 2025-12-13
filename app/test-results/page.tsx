@@ -190,15 +190,14 @@ export default function TestResultsPage() {
         })
       }
 
-      // Nederlandse headlines via Wayback Machine (NU.nl)
-      // Beschikbaar vanaf ~2005
+      // Nederlandse headlines (Wayback Machine) - alleen vanaf 2005
       if (birthDate) {
         const birthDateObj = new Date(birthDate)
         const earliestDate = new Date('2005-01-01')
         if (birthDateObj >= earliestDate) {
           setWaybackNewsLoading(true)
           getWaybackNews(birthDate).then(result => {
-            console.log(`[Babykrant] Wayback news response:`, result?.totalHeadlines, 'headlines, cacheHit:', result?.cacheHit, 'apiVersion:', result?.apiVersion)
+            console.log(`[Babykrant] Wayback news response:`, result?.totalHeadlines, 'headlines, sources:', result?.sources, 'apiVersion:', result?.apiVersion)
             setWaybackNews(result)
             setWaybackNewsLoading(false)
           })
@@ -524,403 +523,593 @@ export default function TestResultsPage() {
           </div>
 
           {/* ============================================== */}
-          {/* CULTUUR & CONTEXT SECTIES */}
+          {/* MUZIEK EN CULTUUR SECTIES */}
           {/* ============================================== */}
 
-          {/* Weer */}
-          {data && data.basisGegevens.geboorteDatum && data.basisGegevens.geboorteplaats && (
-            <div className="bg-blue-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">☀️ Weer op de Geboortedag</h2>
-              
-              {weatherLoading && (
-                <p className="text-gray-500 italic">Weergegevens worden opgehaald...</p>
-              )}
-              
-              {!weatherLoading && weather && (
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    {formatWeatherReport(weather, data.basisGegevens.geboorteplaats)}
-                  </p>
+          {/* #1 Hit op geboortedatum */}
+          <div className="bg-green-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">🎵 #1 Hit op geboortedatum</h2>
+            
+            {top40Loading && (
+              <p className="text-gray-500 italic">Hitlijst wordt opgehaald...</p>
+            )}
+            
+            {!top40Loading && top40?.numberOne && (
+              <div className="space-y-3">
+                <div className="bg-white p-4 rounded-lg border-2 border-green-300">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl font-bold text-green-600">#1</span>
+                    <div>
+                      <p className="text-xl font-semibold text-gray-900">{top40.numberOne.title}</p>
+                      <p className="text-lg text-gray-600">{top40.numberOne.artist}</p>
+                    </div>
+                  </div>
                 </div>
-              )}
-              
-              {!weatherLoading && !weather && (
-                <p className="text-amber-600 italic">Geen weergegevens beschikbaar</p>
-              )}
+                <p className="text-sm text-gray-500">
+                  Top 40 week {top40.weekNumber}, {top40.year}
+                </p>
+                {top40.sourceUrl && (
+                  <a href={top40.sourceUrl} target="_blank" rel="noopener noreferrer" 
+                     className="text-xs text-green-600 hover:underline">
+                    Bron: Top40.nl →
+                  </a>
+                )}
+              </div>
+            )}
+            
+            {!top40Loading && !top40?.numberOne && (
+              <p className="text-gray-500 italic">Geen hitlijst gevonden voor deze datum</p>
+            )}
+          </div>
+
+          {/* Populaire artiesten van het jaar */}
+          <div className="bg-emerald-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">🎤 Populaire hits in {birthYear}</h2>
+            
+            {yearChartLoading && (
+              <p className="text-gray-500 italic">Jaaroverzicht wordt opgehaald...</p>
+            )}
+            
+            {!yearChartLoading && yearChart && yearChart.entries.length > 0 && (
+              <div className="space-y-2">
+                {yearChart.entries.slice(0, 5).map((entry, idx) => (
+                  <div key={idx} className="flex items-center gap-3 bg-white p-2 rounded border">
+                    <span className="text-lg font-bold text-emerald-600 w-8">{entry.position}.</span>
+                    <div className="flex-1">
+                      <span className="font-medium">{entry.artist}</span>
+                      <span className="text-gray-500"> - </span>
+                      <span className="text-gray-700">{entry.title}</span>
+                    </div>
+                  </div>
+                ))}
+                {yearChart.sourceUrl && (
+                  <a href={yearChart.sourceUrl} target="_blank" rel="noopener noreferrer" 
+                     className="text-xs text-emerald-600 hover:underline block mt-2">
+                    Bron: DutchCharts.nl →
+                  </a>
+                )}
+              </div>
+            )}
+            
+            {!yearChartLoading && (!yearChart || yearChart.entries.length === 0) && (
+              <p className="text-gray-500 italic">Geen jaaroverzicht gevonden</p>
+            )}
+          </div>
+
+          {/* Films rond geboortedatum */}
+          <div className="bg-amber-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">🎬 Films in de bioscoop</h2>
+            
+            {moviesLoading && (
+              <p className="text-gray-500 italic">Films worden opgehaald...</p>
+            )}
+            
+            {!moviesLoading && movies && movies.movies.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 mb-3">
+                  Films in Nederland rond {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL')}:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {movies.movies.slice(0, 6).map((movie) => (
+                    <div key={movie.id} className="bg-white p-3 rounded border flex gap-3">
+                      {movie.posterPath && (
+                        <img 
+                          src={getPosterUrl(movie.posterPath, 'w92') || ''} 
+                          alt={movie.title}
+                          className="w-12 h-18 object-cover rounded"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{movie.title}</p>
+                        <p className="text-xs text-gray-500">
+                          {formatGenres(movie.genreIds).slice(0, 2).join(', ')}
+                        </p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-yellow-500">★</span>
+                          <span className="text-sm text-gray-600">{movie.voteAverage.toFixed(1)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Bron: TMDB • Totaal {movies.totalResults} films gevonden
+                </p>
+              </div>
+            )}
+            
+            {!moviesLoading && (!movies || movies.movies.length === 0) && (
+              <p className="text-gray-500 italic">Geen films gevonden voor deze periode</p>
+            )}
+          </div>
+
+          {/* Top films van het jaar */}
+          {topMovies && topMovies.movies.length > 0 && (
+            <div className="bg-orange-50 rounded-lg p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-4">🏆 Populairste films van {birthYear}</h2>
+              <div className="space-y-2">
+                {topMovies.movies.map((movie, idx) => (
+                  <div key={movie.id} className="flex items-center gap-3 bg-white p-2 rounded border">
+                    <span className="text-lg font-bold text-orange-600 w-8">{idx + 1}.</span>
+                    <div className="flex-1">
+                      <span className="font-medium">{movie.title}</span>
+                      <span className="text-gray-500 text-sm ml-2">★ {movie.voteAverage.toFixed(1)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Geboren op deze dag */}
-          {data && data.basisGegevens.geboorteDatum && (
-            <div className="bg-purple-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">🎂 Ook Geboren op Deze Dag</h2>
-              
-              {bornLoading && (
-                <p className="text-gray-500 italic">Bekende personen worden opgehaald...</p>
-              )}
-              
-              {!bornLoading && bornPersons.length > 0 && (
-                <div className="space-y-3">
-                  {bornPersons.slice(0, 5).map((person, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border border-purple-200">
-                      <h3 className="font-medium text-gray-900">{person.name}</h3>
+          {/* Populaire series van het jaar */}
+          <div className="bg-indigo-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">📺 Populaire series in {birthYear}</h2>
+            
+            {seriesLoading && (
+              <p className="text-gray-500 italic">Series worden opgehaald...</p>
+            )}
+            
+            {!seriesLoading && series && series.movies.length > 0 && (
+              <div className="space-y-2">
+                {series.movies.map((show, idx) => (
+                  <div key={show.id} className="flex items-center gap-3 bg-white p-2 rounded border">
+                    <span className="text-lg font-bold text-indigo-600 w-8">{idx + 1}.</span>
+                    {show.posterPath && (
+                      <img 
+                        src={getPosterUrl(show.posterPath, 'w92') || ''} 
+                        alt={show.title}
+                        className="w-10 h-14 object-cover rounded"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <span className="font-medium">{show.title}</span>
+                      <span className="text-gray-500 text-sm ml-2">★ {show.voteAverage.toFixed(1)}</span>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-gray-500 mt-2">
+                  Bron: TMDB
+                </p>
+              </div>
+            )}
+            
+            {!seriesLoading && (!series || series.movies.length === 0) && (
+              <p className="text-gray-500 italic">Geen series gevonden voor dit jaar</p>
+            )}
+          </div>
+
+          {/* TV Programma's op geboortedatum */}
+          <div className="bg-violet-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">📺 Op TV op de geboortedag</h2>
+            
+            {tvLoading && (
+              <p className="text-gray-500 italic">TV programma's worden opgehaald...</p>
+            )}
+            
+            {!tvLoading && tvPrograms && tvPrograms.programs.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 mb-3">
+                  Dit was er op TV op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { 
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+                  })}:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {filterInterestingPrograms(tvPrograms.programs).map((program, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border border-violet-200">
+                      <p className="font-semibold text-gray-900">{program.title}</p>
+                      {program.episodeTitle && (
+                        <p className="text-sm text-violet-700">{program.episodeTitle}</p>
+                      )}
+                      {(program.channel || program.broadcaster) && (
+                        <p className="text-xs text-violet-500 mt-1">
+                          {program.channel || program.broadcaster}
+                        </p>
+                      )}
+                      {program.description && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{program.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  <a href={tvPrograms.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">
+                    Bron: {tvPrograms.source} →
+                  </a>
+                  {' '}• {filterInterestingPrograms(tvPrograms.programs).length} van {tvPrograms.totalFound} programma's getoond (gefilterd op interessante content)
+                </p>
+              </div>
+            )}
+            
+            {!tvLoading && (!tvPrograms || tvPrograms.programs.length === 0) && (
+              <p className="text-gray-500 italic">Geen TV programma's gevonden voor deze datum</p>
+            )}
+          </div>
+
+          {/* Wikipedia TV Context */}
+          <div className="bg-slate-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">📖 TV Highlights {birthYear}</h2>
+            
+            {wikipediaTVLoading && (
+              <p className="text-gray-500 italic">Wikipedia data wordt opgehaald...</p>
+            )}
+            
+            {!wikipediaTVLoading && wikipediaTV && (
+              <div className="space-y-4">
+                {/* Events */}
+                {wikipediaTV.events.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Belangrijke TV-momenten</h3>
+                    <div className="space-y-2">
+                      {wikipediaTV.events.map((event, idx) => (
+                        <div key={idx} className="bg-white p-2 rounded border text-sm">
+                          {event.date && <span className="font-medium text-slate-600">{event.date}: </span>}
+                          <span className="text-gray-700">{event.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Lopende shows */}
+                {wikipediaTV.runningShows.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Populaire programma's in {birthYear}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {wikipediaTV.runningShows.slice(0, 15).map((show, idx) => (
+                        <span key={idx} className="bg-white px-2 py-1 rounded border text-sm">
+                          {show.title}
+                          {show.years && <span className="text-gray-400 text-xs ml-1">({show.years})</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Debuts */}
+                {wikipediaTV.debuts.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Nieuwe programma's in {birthYear}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {wikipediaTV.debuts.map((show, idx) => (
+                        <span key={idx} className="bg-green-100 px-2 py-1 rounded text-sm text-green-800">
+                          {show}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Endings */}
+                {wikipediaTV.endings.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Gestopte programma's in {birthYear}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {wikipediaTV.endings.map((show, idx) => (
+                        <span key={idx} className="bg-red-100 px-2 py-1 rounded text-sm text-red-800">
+                          {show}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {wikipediaTV.sourceUrl && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    <a href={wikipediaTV.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:underline">
+                      Bron: Wikipedia →
+                    </a>
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {!wikipediaTVLoading && (!wikipediaTV || (wikipediaTV.events.length === 0 && wikipediaTV.runningShows.length === 0)) && (
+              <p className="text-gray-500 italic">Geen Wikipedia TV data gevonden voor dit jaar</p>
+            )}
+          </div>
+
+          {/* ============================================== */}
+          {/* PERSOONLIJKE INFO SECTIES */}
+          {/* ============================================== */}
+
+          {/* Naambetekenis */}
+          <div className="bg-purple-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">📛 Betekenis naam {firstName}</h2>
+            
+            {nameMeaningLoading && (
+              <p className="text-gray-500 italic">Naambetekenis wordt opgehaald...</p>
+            )}
+            
+            {!nameMeaningLoading && nameMeaning && (
+              <div className="space-y-4">
+                {nameMeaning.meaning ? (
+                  <div>
+                    <span className="font-medium text-gray-600">Betekenis:</span>
+                    <p className="text-gray-900 mt-1">{nameMeaning.meaning}</p>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 italic">Geen betekenis gevonden</p>
+                )}
+                
+                {nameMeaning.origin && (
+                  <div>
+                    <span className="font-medium text-gray-600">Oorsprong:</span>
+                    <p className="text-gray-900 mt-1">{nameMeaning.origin}</p>
+                  </div>
+                )}
+                
+                {nameMeaning.gender && (
+                  <div>
+                    <span className="font-medium text-gray-600">Geslacht:</span>
+                    <p className="text-gray-900 mt-1">{nameMeaning.gender}</p>
+                  </div>
+                )}
+                
+                <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-purple-200">
+                  <span className="font-medium">Bron: </span>
+                  {nameMeaning.source ? (
+                    <a href={nameMeaning.source} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
+                      {nameMeaning.source.includes('naamdokter') ? 'Naamdokter.nl' : 
+                       nameMeaning.source.includes('betekenisnamen') ? 'Betekenisnamen.nl' : 'Bron'}
+                    </a>
+                  ) : (
+                    <span>Geen bron gevonden</span>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {!nameMeaningLoading && !nameMeaning && (
+              <p className="text-red-500">Naambetekenis kon niet worden opgehaald</p>
+            )}
+          </div>
+
+          {/* Bekende naamdragers */}
+          <div className="bg-pink-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">⭐ Bekende mensen die {firstName} heten</h2>
+            
+            {namesakesLoading && (
+              <p className="text-gray-500 italic">Bekende naamdragers worden opgehaald...</p>
+            )}
+            
+            {!namesakesLoading && famousNamesakes && famousNamesakes.persons.length > 0 && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3">
+                  {famousNamesakes.persons.map((person, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border border-pink-200">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          {person.wikipediaUrl ? (
+                            <a href={person.wikipediaUrl} target="_blank" rel="noopener noreferrer"
+                               className="font-semibold text-pink-700 hover:underline">
+                              {person.name}
+                            </a>
+                          ) : (
+                            <span className="font-semibold text-gray-900">{person.name}</span>
+                          )}
+                          <span className="text-xs text-gray-400 ml-2">({person.source.toUpperCase()})</span>
+                        </div>
+                      </div>
                       {person.description && (
                         <p className="text-sm text-gray-600 mt-1">{person.description}</p>
                       )}
                     </div>
                   ))}
-                  {bornPersons.length > 5 && (
-                    <p className="text-xs text-purple-600">+ {bornPersons.length - 5} anderen...</p>
-                  )}
                 </div>
-              )}
-              
-              {!bornLoading && bornPersons.length === 0 && (
-                <p className="text-gray-500 italic">Geen bekende personen gevonden voor deze datum</p>
-              )}
-            </div>
-          )}
-
-          {/* Naambetekenis */}
-          {data && data.basisGegevens.volledigeNaam && (
-            <div className="bg-green-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">📖 Naambetekenis</h2>
-              
-              {nameMeaningLoading && (
-                <p className="text-gray-500 italic">Naambetekenis wordt opgehaald...</p>
-              )}
-              
-              {!nameMeaningLoading && nameMeaning && !nameMeaning.error && nameMeaning.meanings.length > 0 && (
-                <div className="space-y-3">
-                  {nameMeaning.meanings.map((meaning, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border border-green-200">
-                      <h3 className="font-medium text-green-800">{meaning.name}</h3>
-                      <p className="text-sm text-gray-700 mt-1">{meaning.meaning}</p>
-                      {meaning.origin && (
-                        <p className="text-xs text-gray-500 mt-1">Oorsprong: {meaning.origin}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {!nameMeaningLoading && nameMeaning?.error && (
-                <p className="text-amber-600 italic">{nameMeaning.error}</p>
-              )}
-            </div>
-          )}
-
-          {/* Bekende naamgenoten */}
-          {data && data.basisGegevens.volledigeNaam && (
-            <div className="bg-yellow-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">⭐ Bekende Naamgenoten</h2>
-              
-              {namesakesLoading && (
-                <p className="text-gray-500 italic">Bekende naamgenoten worden opgehaald...</p>
-              )}
-              
-              {!namesakesLoading && famousNamesakes && !famousNamesakes.error && famousNamesakes.namesakes.length > 0 && (
-                <div className="space-y-3">
-                  {famousNamesakes.namesakes.slice(0, 5).map((namesake, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border border-yellow-200">
-                      <h3 className="font-medium text-gray-900">{namesake.name}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{namesake.description}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {!namesakesLoading && famousNamesakes?.error && (
-                <p className="text-amber-600 italic">{famousNamesakes.error}</p>
-              )}
-            </div>
-          )}
-
-          {/* Films rond geboortedatum */}
-          {data && data.basisGegevens.geboorteDatum && (
-            <div className="bg-indigo-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">🎬 Films in de Bioscoop</h2>
-              
-              {moviesLoading && (
-                <p className="text-gray-500 italic">Films worden opgehaald...</p>
-              )}
-              
-              {!moviesLoading && movies && !movies.error && movies.movies.length > 0 && (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600">
-                    Films die rond {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })} uitkwamen:
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {movies.movies.slice(0, 4).map((movie, idx) => (
-                      <div key={idx} className="bg-white p-3 rounded border border-indigo-200">
-                        {movie.poster_path && (
-                          <img 
-                            src={getPosterUrl(movie.poster_path, 'w185')} 
-                            alt={movie.title}
-                            className="w-full rounded mb-2"
-                          />
-                        )}
-                        <h3 className="font-medium text-sm text-gray-900">{movie.title}</h3>
-                        {movie.genres && movie.genres.length > 0 && (
-                          <p className="text-xs text-gray-500 mt-1">{formatGenres(movie.genres)}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {!moviesLoading && movies?.error && (
-                <p className="text-amber-600 italic">{movies.error}</p>
-              )}
-            </div>
-          )}
-
-          {/* Top films van het jaar */}
-          {data && data.basisGegevens.geboorteDatum && topMovies && topMovies.movies.length > 0 && (
-            <div className="bg-pink-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">🏆 Top Films van {new Date(data.basisGegevens.geboorteDatum).getFullYear()}</h2>
-              
-              <div className="space-y-2">
-                {topMovies.movies.slice(0, 5).map((movie, idx) => (
-                  <div key={idx} className="bg-white p-3 rounded border border-pink-200">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl font-bold text-pink-600">#{idx + 1}</span>
-                      <div>
-                        <h3 className="font-medium text-gray-900">{movie.title}</h3>
-                        {movie.genres && movie.genres.length > 0 && (
-                          <p className="text-xs text-gray-500">{formatGenres(movie.genres)}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Muziek - Top 40 */}
-          {data && data.basisGegevens.geboorteDatum && (
-            <div className="bg-cyan-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">🎵 #1 Hit in de Top 40</h2>
-              
-              {top40Loading && (
-                <p className="text-gray-500 italic">Top 40 wordt opgehaald...</p>
-              )}
-              
-              {!top40Loading && top40 && !top40.error && top40.song && (
-                <div className="bg-white p-4 rounded border border-cyan-200">
-                  <h3 className="font-bold text-lg text-cyan-800">{top40.song.title}</h3>
-                  <p className="text-gray-700 mt-1">{top40.song.artist}</p>
-                  {top40.song.weeks && (
-                    <p className="text-sm text-gray-500 mt-2">{top40.song.weeks} weken op #1</p>
-                  )}
-                </div>
-              )}
-              
-              {!top40Loading && top40?.error && (
-                <p className="text-amber-600 italic">{top40.error}</p>
-              )}
-            </div>
-          )}
-
-          {/* Populaire artiesten van het jaar */}
-          {data && data.basisGegevens.geboorteDatum && (
-            <div className="bg-teal-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">🎤 Populaire Artiesten van {new Date(data.basisGegevens.geboorteDatum).getFullYear()}</h2>
-              
-              {yearChartLoading && (
-                <p className="text-gray-500 italic">Jaaroverzicht wordt opgehaald...</p>
-              )}
-              
-              {!yearChartLoading && yearChart && !yearChart.error && yearChart.artists.length > 0 && (
-                <div className="space-y-2">
-                  {yearChart.artists.slice(0, 10).map((artist, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border border-teal-200 flex items-center gap-3">
-                      <span className="text-lg font-bold text-teal-600">#{idx + 1}</span>
-                      <div>
-                        <h3 className="font-medium text-gray-900">{artist.name}</h3>
-                        <p className="text-xs text-gray-500">{artist.hits} hit(s)</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {!yearChartLoading && yearChart?.error && (
-                <p className="text-amber-600 italic">{yearChart.error}</p>
-              )}
-            </div>
-          )}
-
-          {/* TV Programma's */}
-          {data && data.basisGegevens.geboorteDatum && (
-            <div className="bg-violet-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">📺 TV op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}</h2>
-              
-              {tvLoading && (
-                <p className="text-gray-500 italic">TV-programma's worden opgehaald...</p>
-              )}
-              
-              {!tvLoading && tvPrograms && !tvPrograms.error && tvPrograms.programs.length > 0 && (
-                <div className="space-y-2">
-                  {filterInterestingPrograms(tvPrograms.programs).slice(0, 10).map((program, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border border-violet-200">
-                      <div className="flex items-start gap-3">
-                        {program.time && (
-                          <span className="text-sm font-mono text-violet-600 whitespace-nowrap">{program.time}</span>
-                        )}
-                        <div>
-                          <h3 className="font-medium text-gray-900">{program.title}</h3>
-                          {program.channel && (
-                            <p className="text-xs text-gray-500">{program.channel}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  <p className="text-xs text-gray-500 mt-3">
-                    {tvPrograms.totalFound} programma's gevonden • API v{tvPrograms.apiVersion}
-                  </p>
-                </div>
-              )}
-              
-              {!tvLoading && tvPrograms?.error && (
-                <p className="text-amber-600 italic">{tvPrograms.error}</p>
-              )}
-            </div>
-          )}
-
-          {/* Populaire series */}
-          {data && data.basisGegevens.geboorteDatum && series && series.movies.length > 0 && (
-            <div className="bg-fuchsia-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">📺 Populaire Series van {new Date(data.basisGegevens.geboorteDatum).getFullYear()}</h2>
-              
-              <div className="grid grid-cols-2 gap-3">
-                {series.movies.slice(0, 6).map((show, idx) => (
-                  <div key={idx} className="bg-white p-3 rounded border border-fuchsia-200">
-                    {show.poster_path && (
-                      <img 
-                        src={getPosterUrl(show.poster_path, 'w185')} 
-                        alt={show.title}
-                        className="w-full rounded mb-2"
-                      />
-                    )}
-                    <h3 className="font-medium text-sm text-gray-900">{show.title}</h3>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Wikipedia TV Context */}
-          {data && data.basisGegevens.geboorteDatum && wikipediaTV && wikipediaTV.events.length > 0 && (
-            <div className="bg-slate-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">📡 TV Context {new Date(data.basisGegevens.geboorteDatum).getFullYear()}</h2>
-              
-              <div className="space-y-3">
-                <h3 className="font-medium text-slate-700">Belangrijke TV-gebeurtenissen:</h3>
-                {wikipediaTV.events.slice(0, 5).map((event, idx) => (
-                  <div key={idx} className="bg-white p-3 rounded border border-slate-200">
-                    <p className="text-sm text-gray-700">{event.text}</p>
-                  </div>
-                ))}
                 
                 <p className="text-xs text-gray-500 mt-3">
-                  {wikipediaTV.events.length} gebeurtenissen • API v{wikipediaTV.apiVersion}
+                  Totaal {famousNamesakes.persons.length} bekende naamdragers gevonden
+                </p>
+                
+                <div className="text-xs text-gray-500 pt-3 border-t border-pink-200">
+                  <span className="font-medium">Bronnen: </span>
+                  {famousNamesakes.sources.nl && (
+                    <a href={famousNamesakes.sources.nl} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline mr-3">
+                      Wikipedia NL
+                    </a>
+                  )}
+                  {famousNamesakes.sources.en && (
+                    <a href={famousNamesakes.sources.en} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline">
+                      Wikipedia EN
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {!namesakesLoading && famousNamesakes && famousNamesakes.persons.length === 0 && (
+              <p className="text-gray-500 italic">Geen bekende naamdragers gevonden</p>
+            )}
+            
+            {!namesakesLoading && !famousNamesakes && (
+              <p className="text-gray-500 italic">Kon geen gegevens ophalen</p>
+            )}
+          </div>
+
+          {/* Weerbericht */}
+          <div className="bg-gray-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">🌤️ Weerbericht</h2>
+            
+            {weatherLoading && (
+              <p className="text-gray-500 italic">Weerbericht wordt opgehaald...</p>
+            )}
+            
+            {!weatherLoading && weather && (
+              <div className="space-y-3">
+                <div>
+                  <span className="font-medium text-gray-600">
+                    Weer in {weather.city} op {new Date(weather.date).toLocaleDateString('nl-NL', { 
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+                    })}:
+                  </span>
+                  <p className="text-gray-900 mt-2">{formatWeatherReport(weather)}</p>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Max temperatuur</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.temperature_max}°C</div>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Min temperatuur</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.temperature_min}°C</div>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Neerslag</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.precipitation}mm</div>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Zonneschijn</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.sunshine_duration}u</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {!weatherLoading && !weather && (
+              <p className="text-red-500">Weerbericht kon niet worden opgehaald</p>
+            )}
+          </div>
+
+          {/* Ook geboren op deze dag */}
+          <div className="bg-gray-50 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">🎂 Ook geboren op deze dag</h2>
+            
+            {bornLoading && (
+              <p className="text-gray-500 italic">Bekende personen worden opgehaald...</p>
+            )}
+            
+            {!bornLoading && bornPersons.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 mb-3">
+                  Ook geboren op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { 
+                    day: 'numeric', month: 'long'
+                  })}:
+                </p>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  {bornPersons.map((person, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-semibold text-gray-900">{person.name}</span>
+                          <span className="text-gray-500 ml-2">({person.year})</span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{person.description}</p>
+                    </div>
+                  ))}
+                </div>
+                
+                <p className="text-xs text-gray-500 mt-3">
+                  Totaal {bornPersons.length} bekende personen gevonden
                 </p>
               </div>
-            </div>
-          )}
-
-          {/* Debug Info Sectie */}
-          <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">🔍 Debug Info</h2>
+            )}
             
-            <div className="space-y-4 font-mono text-xs">
-              <div>
-                <h3 className="font-bold mb-2">Basis Gegevens:</h3>
-                <pre className="bg-white p-3 rounded overflow-x-auto">
-                  {JSON.stringify(data?.basisGegevens, null, 2)}
-                </pre>
-              </div>
-              
-              {weather && (
-                <div>
-                  <h3 className="font-bold mb-2">Weer API Response:</h3>
-                  <pre className="bg-white p-3 rounded overflow-x-auto">
-                    {JSON.stringify(weather, null, 2)}
-                  </pre>
-                </div>
-              )}
-              
-              {dailyNews && (
-                <div>
-                  <h3 className="font-bold mb-2">Daily News API Response:</h3>
-                  <pre className="bg-white p-3 rounded overflow-x-auto">
-                    {JSON.stringify({ 
-                      totalEvents: dailyNews.totalEvents, 
-                      source: dailyNews.source,
-                      apiVersion: dailyNews.apiVersion,
-                      debug: dailyNews.debug 
-                    }, null, 2)}
-                  </pre>
-                </div>
-              )}
-              
-              {monthlyNews && (
-                <div>
-                  <h3 className="font-bold mb-2">Monthly News API Response:</h3>
-                  <pre className="bg-white p-3 rounded overflow-x-auto">
-                    {JSON.stringify({
-                      totalItems: monthlyNews.totalItems,
-                      source: monthlyNews.source,
-                      apiVersion: monthlyNews.apiVersion,
-                      debug: monthlyNews.debug
-                    }, null, 2)}
-                  </pre>
-                </div>
-              )}
-              
-              {waybackNews && (
-                <div>
-                  <h3 className="font-bold mb-2">Wayback News API Response:</h3>
-                  <pre className="bg-white p-3 rounded overflow-x-auto">
-                    {JSON.stringify({
-                      totalHeadlines: waybackNews.totalHeadlines,
-                      sources: waybackNews.sources,
-                      cacheHit: waybackNews.cacheHit,
-                      snapshotTimestamp: waybackNews.snapshotTimestamp,
-                      apiVersion: waybackNews.apiVersion
-                    }, null, 2)}
-                  </pre>
-                </div>
-              )}
-              
-              {tvPrograms && (
-                <div>
-                  <h3 className="font-bold mb-2">TV Programs API Response:</h3>
-                  <pre className="bg-white p-3 rounded overflow-x-auto">
-                    {JSON.stringify({
-                      totalFound: tvPrograms.totalFound,
-                      apiVersion: tvPrograms.apiVersion
-                    }, null, 2)}
-                  </pre>
-                </div>
-              )}
-              
-              {wikipediaTV && (
-                <div>
-                  <h3 className="font-bold mb-2">Wikipedia TV API Response:</h3>
-                  <pre className="bg-white p-3 rounded overflow-x-auto">
-                    {JSON.stringify({
-                      totalEvents: wikipediaTV.events.length,
-                      apiVersion: wikipediaTV.apiVersion
-                    }, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
+            {!bornLoading && bornPersons.length === 0 && (
+              <p className="text-gray-500 italic">Geen bekende personen gevonden voor deze datum</p>
+            )}
+          </div>
+
+          {/* Debug: ingevoerde data */}
+          <div className="bg-gray-50 rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">📋 Debug Data</h2>
+            <details className="cursor-pointer">
+              <summary className="font-medium text-blue-600 mb-2">▶ Toon ingevoerde data</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs">
+                {JSON.stringify(data, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-sky-600 mb-2">▶ Daily News ({dailyNews?.totalEvents || 0} events, apiVersion: {dailyNews?.apiVersion || '?'})</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(dailyNews, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-orange-600 mb-2">▶ Monthly News ({monthlyNews?.totalItems || 0} items, apiVersion: {monthlyNews?.apiVersion || '?'})</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(monthlyNews, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-red-600 mb-2">▶ Wayback News ({waybackNews?.totalHeadlines || 0} headlines, sources: {waybackNews?.sources?.join(', ') || '?'}, apiVersion: {waybackNews?.apiVersion || '?'})</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(waybackNews, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ Top 40 ({top40?.topTen?.length || 0} entries)</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(top40, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ Jaaroverzicht ({yearChart?.entries?.length || 0} entries)</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(yearChart, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ Films ({movies?.movies?.length || 0} films)</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(movies, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ Series ({series?.movies?.length || 0} series)</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(series, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ TV Programma's ({tvPrograms?.totalFound || 0} totaal, {filterInterestingPrograms(tvPrograms?.programs || []).length} na filter, apiVersion: {tvPrograms?.apiVersion || '?'})</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(tvPrograms, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-green-600 mb-2">▶ Wikipedia TV ({wikipediaTV?.events?.length || 0} events, {wikipediaTV?.runningShows?.length || 0} shows, apiVersion: {wikipediaTV?.apiVersion || '?'})</summary>
+              <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
+                {JSON.stringify(wikipediaTV, null, 2)}
+              </pre>
+            </details>
+          </div>
+
+          <div className="mt-6 flex gap-4">
+            <Link href="/wizard" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold">
+              Nieuwe babykrant maken
+            </Link>
           </div>
           
           {/* Versie footer */}
