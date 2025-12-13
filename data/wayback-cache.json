@@ -1,0 +1,24 @@
+{
+  "2022-03-28": {
+    "status": "found",
+    "timestamp": "20220328004153",
+    "headlines": 76,
+    "lastChecked": "2024-12-13T12:00:00.000Z"
+  },
+  "2020-05-18": {
+    "status": "found",
+    "timestamp": "20200518120000",
+    "headlines": 45,
+    "lastChecked": "2024-12-13T12:00:00.000Z"
+  },
+  "2005-01-15": {
+    "status": "not_found",
+    "reason": "No snapshot available for this date",
+    "lastChecked": "2024-12-13T12:00:00.000Z"
+  },
+  "1999-06-20": {
+    "status": "too_old",
+    "reason": "News archives available from 2005 onwards",
+    "lastChecked": "2024-12-13T12:00:00.000Z"
+  }
+}

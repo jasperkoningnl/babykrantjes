@@ -1,10 +1,11 @@
 // app/test-results/page.tsx
-// @version 2.1.0
+// @version 2.2.0
 // UPDATE v2.0.0: Toegevoegd Dutch News (Volkskrant headlines)
 // UPDATE v2.1.0: Vervangen Volkskrant met Wayback Machine (NU.nl via Internet Archive)
+// UPDATE v2.2.0: Wayback cache hit indicator toegevoegd
 'use client'
 
-const PAGE_VERSION = '2.1.0'
+const PAGE_VERSION = '2.2.0'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -196,7 +197,7 @@ export default function TestResultsPage() {
         if (birthDateObj >= earliestDate) {
           setWaybackNewsLoading(true)
           getWaybackNews(birthDate).then(result => {
-            console.log(`[Babykrant] Wayback news response:`, result?.totalHeadlines, 'headlines, apiVersion:', result?.apiVersion)
+            console.log(`[Babykrant] Wayback news response:`, result?.totalHeadlines, 'headlines, cacheHit:', result?.cacheHit, 'apiVersion:', result?.apiVersion)
             setWaybackNews(result)
             setWaybackNewsLoading(false)
           })
@@ -429,7 +430,12 @@ export default function TestResultsPage() {
 
           {/* Nederlandse nieuwsheadlines (Wayback Machine / NU.nl) */}
           <div className="bg-red-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">📰 Nederlandse Headlines</h2>
+            <h2 className="text-xl font-semibold mb-4">
+              📰 Nederlandse Headlines
+              {waybackNews?.cacheHit && (
+                <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-normal">⚡ Cached</span>
+              )}
+            </h2>
             
             {waybackNewsLoading && (
               <p className="text-gray-500 italic">Nederlandse headlines worden opgehaald...</p>
@@ -480,6 +486,9 @@ export default function TestResultsPage() {
                   {' '}• {waybackNews.totalHeadlines} headlines gevonden
                   {waybackNews.snapshotTimestamp && (
                     <span className="ml-2">• Snapshot: {formatWaybackTimestamp(waybackNews.snapshotTimestamp)}</span>
+                  )}
+                  {waybackNews.cacheHit && (
+                    <span className="ml-2 text-green-600">• Cache hit ⚡</span>
                   )}
                 </p>
               </div>
@@ -1031,7 +1040,7 @@ export default function TestResultsPage() {
             </details>
             
             <details className="cursor-pointer mt-4">
-              <summary className="font-medium text-red-600 mb-2">▶ Wayback News ({waybackNews?.totalHeadlines || 0} headlines, apiVersion: {waybackNews?.apiVersion || '?'})</summary>
+              <summary className="font-medium text-red-600 mb-2">▶ Wayback News ({waybackNews?.totalHeadlines || 0} headlines, cacheHit: {waybackNews?.cacheHit ? 'YES ⚡' : 'no'}, apiVersion: {waybackNews?.apiVersion || '?'})</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs max-h-96">
                 {JSON.stringify(waybackNews, null, 2)}
               </pre>

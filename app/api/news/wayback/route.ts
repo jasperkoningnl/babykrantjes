@@ -1,11 +1,13 @@
 // app/api/news/wayback/route.ts
-// @version 1.0.0
+// @version 1.1.0
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
 // Bron: Gearchiveerde snapshots van nu.nl
+// UPDATE v1.1.0: Wayback cache toegevoegd voor snellere lookups
 
 import { NextRequest, NextResponse } from 'next/server'
+import { checkCache, updateCache } from '@/lib/waybackCache'
 
-const API_VERSION = '1.0.0'
+const API_VERSION = '1.1.0'
 
 // Types
 interface WaybackSnapshot {
@@ -30,6 +32,7 @@ interface WaybackNewsResult {
   sourceUrl: string
   snapshotTimestamp: string | null
   apiVersion: string
+  cacheHit?: boolean
   error?: string
 }
 
@@ -297,6 +300,12 @@ export async function GET(request: NextRequest) {
   // Nu.nl bestaat sinds 1999, maar goede snapshots vanaf ~2005
   const minDate = new Date('2005-01-01')
   if (requestDate < minDate) {
+    // Update cache voor te oude datums
+    await updateCache(dateParam, {
+      status: 'too_old',
+      reason: 'News archives available from 2005 onwards. Earlier dates may have limited or no snapshots.'
+    })
+    
     return NextResponse.json({
       date: dateParam,
       headlines: [],
@@ -310,10 +319,74 @@ export async function GET(request: NextRequest) {
   }
   
   try {
+    // === CACHE CHECK ===
+    const cached = await checkCache(dateParam)
+    
+    if (cached) {
+      console.log(`[Wayback] Cache hit for ${dateParam}: ${cached.status}`)
+      
+      if (cached.status === 'not_found' || cached.status === 'too_old') {
+        return NextResponse.json({
+          date: dateParam,
+          headlines: [],
+          totalHeadlines: 0,
+          source: 'NU.nl via Internet Archive',
+          sourceUrl: '',
+          snapshotTimestamp: null,
+          apiVersion: API_VERSION,
+          cacheHit: true,
+          error: cached.reason || `No archived snapshot found for ${dateParam}`
+        } as WaybackNewsResult)
+      }
+      
+      // Cache hit with found snapshot - gebruik cached timestamp voor snellere fetch
+      if (cached.timestamp) {
+        console.log(`[Wayback] Using cached timestamp: ${cached.timestamp}`)
+        
+        const html = await fetchSnapshotContent(cached.timestamp)
+        if (!html) {
+          return NextResponse.json({
+            date: dateParam,
+            headlines: [],
+            totalHeadlines: 0,
+            source: 'NU.nl via Internet Archive',
+            sourceUrl: getWaybackUrl(cached.timestamp),
+            snapshotTimestamp: cached.timestamp,
+            apiVersion: API_VERSION,
+            cacheHit: true,
+            error: 'Failed to fetch archived page content'
+          } as WaybackNewsResult)
+        }
+        
+        const headlines = parseHeadlines(html)
+        
+        return NextResponse.json({
+          date: dateParam,
+          headlines,
+          totalHeadlines: headlines.length,
+          source: 'NU.nl via Internet Archive',
+          sourceUrl: getWaybackUrl(cached.timestamp),
+          snapshotTimestamp: cached.timestamp,
+          apiVersion: API_VERSION,
+          cacheHit: true
+        } as WaybackNewsResult)
+      }
+    }
+    
+    console.log(`[Wayback] Cache miss for ${dateParam}, querying Archive.org...`)
+    
+    // === NO CACHE - QUERY WAYBACK MACHINE ===
+    
     // Stap 1: Zoek een snapshot op deze datum
     const snapshot = await findSnapshot(dateParam)
     
     if (!snapshot) {
+      // Update cache: not found
+      await updateCache(dateParam, {
+        status: 'not_found',
+        reason: `No archived snapshot found for ${dateParam}. The Wayback Machine may not have captured this date.`
+      })
+      
       return NextResponse.json({
         date: dateParam,
         headlines: [],
@@ -330,6 +403,7 @@ export async function GET(request: NextRequest) {
     const html = await fetchSnapshotContent(snapshot.timestamp)
     
     if (!html) {
+      // Don't cache this - fetching might work later
       return NextResponse.json({
         date: dateParam,
         headlines: [],
@@ -345,6 +419,13 @@ export async function GET(request: NextRequest) {
     // Stap 3: Parse headlines uit de HTML
     const headlines = parseHeadlines(html)
     
+    // Update cache: found
+    await updateCache(dateParam, {
+      status: 'found',
+      timestamp: snapshot.timestamp,
+      headlines: headlines.length
+    })
+    
     return NextResponse.json({
       date: dateParam,
       headlines,
@@ -352,7 +433,8 @@ export async function GET(request: NextRequest) {
       source: 'NU.nl via Internet Archive',
       sourceUrl: getWaybackUrl(snapshot.timestamp),
       snapshotTimestamp: snapshot.timestamp,
-      apiVersion: API_VERSION
+      apiVersion: API_VERSION,
+      cacheHit: false
     } as WaybackNewsResult)
     
   } catch (error) {
