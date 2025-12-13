@@ -536,7 +536,7 @@ export default function TestResultsPage() {
                 <p className="text-gray-500 italic">Weergegevens worden opgehaald...</p>
               )}
               
-              {!weatherLoading && weather && !weather.error && (
+              {!weatherLoading && weather && (
                 <div className="space-y-2">
                   <p className="text-sm">
                     {formatWeatherReport(weather, data.basisGegevens.geboorteplaats)}
@@ -544,8 +544,8 @@ export default function TestResultsPage() {
                 </div>
               )}
               
-              {!weatherLoading && weather?.error && (
-                <p className="text-amber-600 italic">{weather.error}</p>
+              {!weatherLoading && !weather && (
+                <p className="text-amber-600 italic">Geen weergegevens beschikbaar</p>
               )}
             </div>
           )}
