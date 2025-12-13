@@ -1,10 +1,11 @@
 // lib/newsAPI.ts
-// @version 1.3.1
+// @version 1.4.0
 // Client-side wrapper voor de nieuws API endpoints
 // UPDATE v1.1.0: Ondersteuning voor NewsItem met dag-informatie
 // UPDATE v1.2.0: Ondersteuning voor Dutch headlines (Volkskrant) - DEPRECATED
 // UPDATE v1.3.0: Vervangen Volkskrant met Wayback Machine (NU.nl via Internet Archive)
 // UPDATE v1.3.1: Added cacheHit property to WaybackNewsResult interface
+// UPDATE v1.4.0: Multi-source support - added sources array and source to headline
 
 // ============================================================================
 // Types
@@ -25,6 +26,7 @@ export interface WaybackHeadline {
   url: string
   category: string | null
   time: string | null
+  source: string
 }
 
 export interface DailyNewsResult {
@@ -61,7 +63,7 @@ export interface WaybackNewsResult {
   date: string
   headlines: WaybackHeadline[]
   totalHeadlines: number
-  source: string
+  sources: string[]
   sourceUrl: string
   snapshotTimestamp: string | null
   apiVersion: string
