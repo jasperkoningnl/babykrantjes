@@ -233,74 +233,121 @@ function parseNuNlHeadlines(html: string, source: string): Headline[] {
 
 /**
  * Parseert headlines uit nos.nl HTML content
- * NOS.nl gebruikt een andere HTML structuur
+ * NOS.nl gebruikt een andere HTML structuur dan NU.nl
  */
 function parseNosNlHeadlines(html: string, source: string): Headline[] {
   const headlines: Headline[] = []
   const seen = new Set<string>()
   
-  // NOS.nl patronen:
-  // <h2>Headline text</h2>
-  // <h3>Headline text</h3>
-  // <a href="/artikel/...">Headline</a>
+  // Patroon 1: Top story
+  // <div class="top-story item click"> ... <strong><a href="...">HEADLINE</a></strong>
+  const topStoryPattern = /<div[^>]*class="[^"]*top-story[^"]*"[^>]*>[\s\S]*?<strong>\s*<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>\s*<\/strong>/gi
   
-  const h2Pattern = /<h2[^>]*>(.*?)<\/h2>/gi
-  const h3Pattern = /<h3[^>]*>(.*?)<\/h3>/gi
-  const linkPattern = /<a[^>]*href="([^"]*\/artikel\/[^"]+)"[^>]*>(.*?)<\/a>/gi
+  // Patroon 2: Headlines in featured section (img-list)
+  // <a href="...">HEADLINE</a> binnen <li class="big">
+  const featuredPattern = /<li[^>]*class="[^"]*big[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>/gi
   
-  // Clean HTML tags from text
-  const cleanHtml = (text: string): string => {
-    return text.replace(/<[^>]+>/g, '').trim()
+  // Patroon 3: Category headlines
+  // <a href="..." title="HEADLINE">HEADLINE</a> binnen <li class="click">
+  const categoryPattern = /<li[^>]*class="[^"]*click[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*title="([^"]*)"[^>]*>/gi
+  
+  // Patroon 4: Laatste nieuws lijst
+  // <span class="time">HH:MM</span> <strong>HEADLINE</strong> binnen <a href="...">
+  const latestPattern = /<a[^>]*href="([^"]*)"[^>]*title="([^"]*)"[^>]*>[\s\S]*?<span[^>]*class="time"[^>]*>(\d{1,2}:\d{2})<\/span>[\s\S]*?<strong>([^<]+)<\/strong>/gi
+  
+  // Extract categorie uit URL: /nieuws/binnenland/, /sport/, etc.
+  const extractCategory = (url: string): string | null => {
+    const match = url.match(/nos\.nl\/(nieuws\/)?([a-z-]+)\//)
+    if (match && match[2]) {
+      const cat = match[2]
+      // Filter non-news categories
+      if (['artikel', 'video', 'audio', 'uitzending'].includes(cat)) return null
+      // Capitalize
+      return cat.charAt(0).toUpperCase() + cat.slice(1)
+    }
+    return null
   }
   
-  // Extract h2 headlines
+  // Extract original URL from Wayback URL
+  const cleanWaybackUrl = (url: string): string => {
+    const match = url.match(/\/web\/\d+\/(.+)/)
+    if (match) {
+      const cleanedUrl = match[1].replace(/^https?:\/\//, '')
+      return 'https://' + cleanedUrl
+    }
+    return url
+  }
+  
   let match
-  while ((match = h2Pattern.exec(html)) !== null) {
-    const title = decodeHtmlEntities(cleanHtml(match[1]))
-    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
-      seen.add(title.toLowerCase())
-      headlines.push({
-        title,
-        url: '',
-        category: null,
-        time: null,
-        source
-      })
-    }
-  }
   
-  // Extract h3 headlines
-  while ((match = h3Pattern.exec(html)) !== null) {
-    const title = decodeHtmlEntities(cleanHtml(match[1]))
-    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
-      seen.add(title.toLowerCase())
-      headlines.push({
-        title,
-        url: '',
-        category: null,
-        time: null,
-        source
-      })
-    }
-  }
-  
-  // Extract link headlines
-  while ((match = linkPattern.exec(html)) !== null) {
+  // Extract top story
+  while ((match = topStoryPattern.exec(html)) !== null) {
     const url = match[1]
-    const title = decodeHtmlEntities(cleanHtml(match[2]))
+    const title = decodeHtmlEntities(match[2].trim())
     
     if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
       seen.add(title.toLowerCase())
-      
-      // Extract original URL from wayback URL
-      const originalUrlMatch = url.match(/\/web\/\d+\/(.+)/)
-      const originalUrl = originalUrlMatch ? 'https://' + originalUrlMatch[1].replace(/^https?:\/\//, '') : url
-      
       headlines.push({
         title,
-        url: originalUrl,
-        category: null,
+        url: cleanWaybackUrl(url),
+        category: 'Top Story',
         time: null,
+        source
+      })
+    }
+  }
+  
+  // Extract featured headlines
+  while ((match = featuredPattern.exec(html)) !== null) {
+    const url = match[1]
+    const title = decodeHtmlEntities(match[2].trim())
+    
+    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
+      seen.add(title.toLowerCase())
+      headlines.push({
+        title,
+        url: cleanWaybackUrl(url),
+        category: extractCategory(url),
+        time: null,
+        source
+      })
+    }
+  }
+  
+  // Extract category headlines
+  while ((match = categoryPattern.exec(html)) !== null) {
+    const url = match[1]
+    const title = decodeHtmlEntities(match[2].trim())
+    
+    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
+      seen.add(title.toLowerCase())
+      headlines.push({
+        title,
+        url: cleanWaybackUrl(url),
+        category: extractCategory(url),
+        time: null,
+        source
+      })
+    }
+  }
+  
+  // Extract latest news with timestamps
+  while ((match = latestPattern.exec(html)) !== null) {
+    const url = match[1]
+    const titleAttr = match[2]
+    const time = match[3]
+    const titleStrong = match[4]
+    
+    // Prefer title from strong tag, fallback to title attribute
+    const title = decodeHtmlEntities((titleStrong || titleAttr).trim())
+    
+    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
+      seen.add(title.toLowerCase())
+      headlines.push({
+        title,
+        url: cleanWaybackUrl(url),
+        category: extractCategory(url),
+        time,
         source
       })
     }
