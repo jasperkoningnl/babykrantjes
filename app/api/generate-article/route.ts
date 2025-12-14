@@ -293,14 +293,14 @@ Schrijf de tekst:`
         return `Schrijf over beroemde mensen die ${roepnaam} heten. Helaas is er geen data beschikbaar. Gebruik algemene kennis. LENGTE: 80-100 woorden, levendig en anekdotisch.`
       }
       
-      const persons = famousNamesakes.persons.slice(0, 6).map((p: any) => 
+      const famousPersonsList = famousNamesakes.persons.slice(0, 6).map((p: any) => 
         `${p.name}: ${p.description}`
       ).join('\n')
       
       return `Schrijf over beroemde mensen die ${roepnaam} heten.
 
 BEKENDE PERSONEN:
-${persons}
+${famousPersonsList}
 
 STRUCTUUR:
 1. Intro: "Beroemde mensen met de naam ${roepnaam}..."
@@ -315,20 +315,20 @@ Schrijf de tekst:`
 
     case 'geboren_op_dag':
       const bornPersons = data.bornPersons || []
+      const datumDag = new Date(datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
+      
       if (bornPersons.length === 0) {
-        const datumDag = new Date(datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
         return `Schrijf over bekende mensen geboren op ${datumDag}. Helaas is er geen data beschikbaar. Gebruik algemene kennis. LENGTE: 80-100 woorden.`
       }
       
-      const datumDag = new Date(datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
-      const persons = bornPersons.slice(0, 6).map((p: any) => 
+      const bornPersonsList = bornPersons.slice(0, 6).map((p: any) => 
         `${p.name} (${p.year}): ${p.description}`
       ).join('\n')
       
       return `Schrijf over bekende mensen geboren op ${datumDag}.
 
 PERSONEN:
-${persons}
+${bornPersonsList}
 
 STRUCTUUR:
 1. Intro: "${roepnaam} deelt zijn/haar verjaardag met..."
