@@ -1,12 +1,13 @@
 // app/test-results/page.tsx
-// @version 2.3.0
+// @version 2.4.0
 // UPDATE v2.0.0: Toegevoegd Dutch News (Volkskrant headlines)
 // UPDATE v2.1.0: Vervangen Volkskrant met Wayback Machine (NU.nl via Internet Archive)
 // UPDATE v2.2.0: Wayback cache hit indicator toegevoegd
 // UPDATE v2.3.0: Multi-source support - toon welke bronnen gebruikt zijn (NU.nl, NOS.nl)
+// UPDATE v2.4.0: Wizard data structuur update - Ouder 1/2, gestructureerde ExtraVragen
 'use client'
 
-const PAGE_VERSION = '2.3.0'
+const PAGE_VERSION = '2.4.0'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -1032,11 +1033,71 @@ export default function TestResultsPage() {
             )}
           </div>
 
-          {/* Debug: ingevoerde data */}
+          {/* Ingevoerde wizard data - UPDATED v2.4.0 */}
           <div className="bg-gray-50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">📋 Debug Data</h2>
-            <details className="cursor-pointer">
-              <summary className="font-medium text-blue-600 mb-2">▶ Toon ingevoerde data</summary>
+            <h2 className="text-xl font-semibold mb-4">📋 Ingevoerde Wizard Data</h2>
+            
+            {/* Ouders info */}
+            <div className="mb-4">
+              <h3 className="font-semibold text-gray-700 mb-2">👨‍👩‍👧 Ouders</h3>
+              <div className="bg-white p-3 rounded border text-sm">
+                <p><strong>Ouder 1:</strong> {data.basisGegevens.ouder1Naam || '-'}</p>
+                <p><strong>Ouder 2:</strong> {data.basisGegevens.ouder2Naam || '-'}</p>
+                <p><strong>Alleenstaand:</strong> {data.basisGegevens.alleenstaand ? 'Ja' : 'Nee'}</p>
+              </div>
+            </div>
+
+            {/* Bevalling info */}
+            {data.extraVragen?.bevallingVerloop && (
+              <div className="mb-4">
+                <h3 className="font-semibold text-gray-700 mb-2">🏥 Bevalling</h3>
+                <div className="bg-white p-3 rounded border text-sm">
+                  <p><strong>Verloop:</strong> {data.extraVragen.bevallingVerloop}</p>
+                  {data.extraVragen.bevallingAndersOmschrijving && (
+                    <p><strong>Omschrijving:</strong> {data.extraVragen.bevallingAndersOmschrijving}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Naam reden */}
+            {data.extraVragen?.naamReden && (
+              <div className="mb-4">
+                <h3 className="font-semibold text-gray-700 mb-2">💭 Naamkeuze</h3>
+                <div className="bg-white p-3 rounded border text-sm">
+                  <p>{data.extraVragen.naamReden}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Broertjes/zusjes */}
+            {data.extraVragen?.heeftBroertjesZusjes && data.extraVragen.broertjesZusjes?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="font-semibold text-gray-700 mb-2">👶 Broertjes/Zusjes</h3>
+                <div className="bg-white p-3 rounded border text-sm space-y-1">
+                  {data.extraVragen.broertjesZusjes.map((sibling: any, idx: number) => (
+                    <p key={idx}>
+                      • {sibling.naam}
+                      {sibling.leeftijd && <span className="text-gray-600"> ({sibling.leeftijd} jaar)</span>}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Bijzonderheden */}
+            {data.extraVragen?.bijzonderheden && (
+              <div className="mb-4">
+                <h3 className="font-semibold text-gray-700 mb-2">✨ Bijzonderheden</h3>
+                <div className="bg-white p-3 rounded border text-sm">
+                  <p>{data.extraVragen.bijzonderheden}</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Debug: volledige data */}
+            <details className="cursor-pointer mt-4">
+              <summary className="font-medium text-blue-600 mb-2">▶ Toon volledige JSON data</summary>
               <pre className="bg-white p-4 rounded border overflow-auto text-xs">
                 {JSON.stringify(data, null, 2)}
               </pre>

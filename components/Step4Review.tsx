@@ -1,3 +1,7 @@
+// components/Step4Review.tsx
+// @version 2.0.0
+// UPDATED: Aangepast voor nieuwe ExtraVragen structuur en ouder1/ouder2 velden
+
 'use client'
 
 import { useRouter } from 'next/navigation'
@@ -45,6 +49,31 @@ export default function Step4Review({ data, onBack }: Props) {
     return `${locatie}, ${geboorteplaats}`
   }
 
+  const formatBevallingVerloop = (verloop?: string) => {
+    if (!verloop) return '-'
+    
+    const labels: Record<string, string> = {
+      'snel': 'Snel en voorspoedig',
+      'langdurig': 'Langdurig maar goed verlopen',
+      'spannend': 'Spannend met complicaties',
+      'gepland': 'Gepland (keizersnede)',
+      'anders': 'Anders',
+      'niet-delen': 'Wil ik niet delen'
+    }
+    
+    return labels[verloop] || verloop
+  }
+
+  const formatOuders = () => {
+    const { ouder1Naam, ouder2Naam, alleenstaand } = data.basisGegevens
+    
+    if (alleenstaand || !ouder2Naam) {
+      return ouder1Naam || '-'
+    }
+    
+    return `${ouder1Naam} & ${ouder2Naam}`
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -74,7 +103,7 @@ export default function Step4Review({ data, onBack }: Props) {
           
           <div>
             <span className="font-medium text-gray-600">Tijdstip:</span>
-            <p className="text-gray-900">{data.basisGegevens.geboorteTijd} uur</p>
+            <p className="text-gray-900">{data.basisGegevens.geboorteTijd || '-'} uur</p>
           </div>
           
           <div>
@@ -93,75 +122,71 @@ export default function Step4Review({ data, onBack }: Props) {
           </div>
           
           <div>
-            <span className="font-medium text-gray-600">Ouders:</span>
-            <p className="text-gray-900">
-              {data.basisGegevens.naamVader || '-'} & {data.basisGegevens.naamMoeder || '-'}
-            </p>
+            <span className="font-medium text-gray-600">
+              {data.basisGegevens.alleenstaand ? 'Ouder:' : 'Ouders:'}
+            </span>
+            <p className="text-gray-900">{formatOuders()}</p>
           </div>
         </div>
       </div>
 
-      {/* Extra vragen */}
+      {/* Extra vragen - UPDATED v2.0.0 */}
       <div className="bg-gray-50 rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center">
           <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center mr-3 text-sm">2</span>
-          Extra informatie voor artikel
+          Verhaal van de geboorte
         </h3>
         
         <div className="space-y-3 text-sm">
-          {data.extraVragen.waarWarenOuders && (
+          {/* Bevalling verloop */}
+          {data.extraVragen.bevallingVerloop && (
             <div>
-              <span className="font-medium text-gray-600">Waar waren ouders:</span>
-              <p className="text-gray-900 mt-1">{data.extraVragen.waarWarenOuders}</p>
+              <span className="font-medium text-gray-600">Hoe was de bevalling:</span>
+              <p className="text-gray-900 mt-1">
+                {formatBevallingVerloop(data.extraVragen.bevallingVerloop)}
+                {data.extraVragen.bevallingVerloop === 'anders' && data.extraVragen.bevallingAndersOmschrijving && (
+                  <span className="text-gray-700"> - {data.extraVragen.bevallingAndersOmschrijving}</span>
+                )}
+              </p>
             </div>
           )}
           
-          {data.extraVragen.hoeGingBevalling && (
+          {/* Naam reden */}
+          {data.extraVragen.naamReden && (
             <div>
-              <span className="font-medium text-gray-600">Hoe ging de bevalling:</span>
-              <p className="text-gray-900 mt-1">{data.extraVragen.hoeGingBevalling}</p>
+              <span className="font-medium text-gray-600">Waarom deze naam:</span>
+              <p className="text-gray-900 mt-1">{data.extraVragen.naamReden}</p>
             </div>
           )}
           
-          {data.extraVragen.wieWarenBij && (
+          {/* Broertjes/zusjes */}
+          {data.extraVragen.heeftBroertjesZusjes && data.extraVragen.broertjesZusjes.length > 0 && (
             <div>
-              <span className="font-medium text-gray-600">Wie waren bij de bevalling:</span>
-              <p className="text-gray-900 mt-1">{data.extraVragen.wieWarenBij}</p>
+              <span className="font-medium text-gray-600">Broertjes/zusjes:</span>
+              <div className="mt-1 space-y-1">
+                {data.extraVragen.broertjesZusjes.map((sibling, idx) => (
+                  <p key={idx} className="text-gray-900">
+                    • {sibling.naam}
+                    {sibling.leeftijd && <span className="text-gray-600"> ({sibling.leeftijd} jaar)</span>}
+                  </p>
+                ))}
+              </div>
             </div>
           )}
           
-          {data.extraVragen.waarWarenGrootouders && (
+          {/* Bijzonderheden */}
+          {data.extraVragen.bijzonderheden && (
             <div>
-              <span className="font-medium text-gray-600">Waar waren grootouders:</span>
-              <p className="text-gray-900 mt-1">{data.extraVragen.waarWarenGrootouders}</p>
+              <span className="font-medium text-gray-600">Bijzonderheden:</span>
+              <p className="text-gray-900 mt-1">{data.extraVragen.bijzonderheden}</p>
             </div>
           )}
           
-          {data.extraVragen.eersteKraamvisite && (
-            <div>
-              <span className="font-medium text-gray-600">Eerste kraamvisite:</span>
-              <p className="text-gray-900 mt-1">{data.extraVragen.eersteKraamvisite}</p>
-            </div>
-          )}
-          
-          {data.extraVragen.zwangerschapVerloop && (
-            <div>
-              <span className="font-medium text-gray-600">Zwangerschapsverloop:</span>
-              <p className="text-gray-900 mt-1">{data.extraVragen.zwangerschapVerloop}</p>
-            </div>
-          )}
-          
-          {data.extraVragen.andereDetails && (
-            <div>
-              <span className="font-medium text-gray-600">Andere details:</span>
-              <p className="text-gray-900 mt-1">{data.extraVragen.andereDetails}</p>
-            </div>
-          )}
-          
-          {!data.extraVragen.waarWarenOuders && !data.extraVragen.hoeGingBevalling && 
-           !data.extraVragen.wieWarenBij && !data.extraVragen.waarWarenGrootouders &&
-           !data.extraVragen.eersteKraamvisite && !data.extraVragen.zwangerschapVerloop &&
-           !data.extraVragen.andereDetails && (
+          {/* Geen informatie ingevuld */}
+          {!data.extraVragen.bevallingVerloop && 
+           !data.extraVragen.naamReden && 
+           !data.extraVragen.heeftBroertjesZusjes &&
+           !data.extraVragen.bijzonderheden && (
             <p className="text-gray-500 italic">Geen extra informatie ingevuld</p>
           )}
         </div>

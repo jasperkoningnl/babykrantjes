@@ -1,3 +1,7 @@
+// app/wizard/page.tsx
+// @version 2.0.0
+// UPDATED: Nieuwe initiële state voor ouder1/ouder2 en ExtraVragen v2.0
+
 'use client'
 
 import { useState } from 'react'
@@ -18,17 +22,19 @@ export default function WizardPage() {
       geboorteLocatie: 'ziekenhuis',
       gewicht: 0,
       lengte: 0,
-      naamVader: '',
-      naamMoeder: '',
+      // UPDATED v2.0.0: Nieuwe ouder-velden
+      ouder1Naam: '',
+      ouder2Naam: '',
+      alleenstaand: false,
     },
     extraVragen: {
-      waarWarenOuders: '',
-      hoeGingBevalling: '',
-      wieWarenBij: '',
-      waarWarenGrootouders: '',
-      eersteKraamvisite: '',
-      zwangerschapVerloop: '',
-      andereDetails: '',
+      // UPDATED v2.0.0: Nieuwe gestructureerde vragen
+      bevallingVerloop: undefined,
+      bevallingAndersOmschrijving: undefined,
+      naamReden: undefined,
+      heeftBroertjesZusjes: false,
+      broertjesZusjes: [],
+      bijzonderheden: undefined,
     },
     fotos: {
       foto1: null,
@@ -73,7 +79,7 @@ export default function WizardPage() {
         {/* Progress bar */}
         <div className="mb-8">
           <div className="flex justify-between mb-2">
-            {['Basisgegevens', 'Extra vragen', 'Foto\'s', 'Review'].map((label, idx) => (
+            {['Basisgegevens', 'Geboorte verhaal', 'Foto\'s', 'Review'].map((label, idx) => (
               <div 
                 key={idx}
                 className={`text-sm font-medium ${

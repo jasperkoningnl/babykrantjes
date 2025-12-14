@@ -1,3 +1,7 @@
+// components/Step1BasisGegevens.tsx
+// @version 2.0.0
+// UPDATED: Inclusieve ouder-velden (Ouder 1/2 i.p.v. vader/moeder)
+
 'use client'
 
 import type { BasisGegevens } from '@/lib/types'
@@ -17,6 +21,13 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
       alert('Vul minimaal de naam, geboortedatum en geboorteplaats in')
       return
     }
+    
+    // Check: als alleenstaand = false, moet ouder2Naam ingevuld zijn
+    // NOTE: Voor testing is dit uitgeschakeld, maar voor release moet dit weer aan
+    // if (!data.alleenstaand && !data.ouder2Naam) {
+    //   alert('Vul de naam van de tweede ouder in, of vink "Alleenstaande ouder" aan')
+    //   return
+    // }
     
     onNext()
   }
@@ -38,7 +49,7 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
           value={data.volledigeNaam}
           onChange={(e) => updateData({ volledigeNaam: e.target.value })}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Bijv. Anne Lisa Koning"
+          placeholder="Bijv. Emma Sophie Jansen"
           required
         />
       </div>
@@ -180,32 +191,63 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
         </div>
       </div>
 
-      {/* Ouders */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Naam vader
-          </label>
-          <input
-            type="text"
-            value={data.naamVader}
-            onChange={(e) => updateData({ naamVader: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Volledige naam"
-          />
-        </div>
+      {/* UPDATED v2.0.0: Inclusieve ouder-velden */}
+      <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+        <h3 className="font-semibold text-blue-900 mb-3">👨‍👩‍👧 Oudergegevens</h3>
         
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Naam moeder
-          </label>
-          <input
-            type="text"
-            value={data.naamMoeder}
-            onChange={(e) => updateData({ naamMoeder: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Volledige naam"
-          />
+        <div className="space-y-4">
+          {/* Ouder 1 */}
+          <div>
+            <label className="block text-sm font-medium mb-2 text-blue-900">
+              Ouder 1 (bijv. moeder) *
+            </label>
+            <input
+              type="text"
+              value={data.ouder1Naam}
+              onChange={(e) => updateData({ ouder1Naam: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Volledige naam"
+            />
+            <p className="text-xs text-blue-600 mt-1">
+              Vul de naam in zoals je deze in de krant wilt zien
+            </p>
+          </div>
+          
+          {/* Alleenstaand checkbox */}
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="alleenstaand"
+              checked={data.alleenstaand}
+              onChange={(e) => updateData({ 
+                alleenstaand: e.target.checked,
+                ouder2Naam: e.target.checked ? undefined : data.ouder2Naam
+              })}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="alleenstaand" className="ml-2 text-sm font-medium text-blue-900">
+              ☐ Alleenstaande ouder (vul alleen Ouder 1 in)
+            </label>
+          </div>
+          
+          {/* Ouder 2 - alleen tonen als niet alleenstaand */}
+          {!data.alleenstaand && (
+            <div>
+              <label className="block text-sm font-medium mb-2 text-blue-900">
+                Ouder 2 (bijv. vader/partner)
+              </label>
+              <input
+                type="text"
+                value={data.ouder2Naam || ''}
+                onChange={(e) => updateData({ ouder2Naam: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Volledige naam"
+              />
+              <p className="text-xs text-blue-600 mt-1">
+                Laat leeg als er geen tweede ouder is, of vink hierboven "Alleenstaande ouder" aan
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
