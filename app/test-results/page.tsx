@@ -855,6 +855,7 @@ export default function TestResultsPage() {
 
           <div className="mt-6 flex gap-4">
             <Link href="/wizard" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold">Nieuwe babykrant maken</Link>
+            <Link href="/generate-articles" className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold">→ AI Artikelen Genereren ✨</Link>
           </div>
           
           <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 text-right">
