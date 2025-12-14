@@ -417,6 +417,8 @@ export async function POST(request: NextRequest) {
 
     const usage = getUsageStats(sessionId)
     
+    // RATE LIMITING DISABLED FOR TESTING
+    /*
     if (usage.requestsToday >= USAGE_LIMITS.maxRequestsPerDay) {
       return NextResponse.json({
         success: false,
@@ -434,6 +436,7 @@ export async function POST(request: NextRequest) {
         dailyCost: usage.costToday
       } as ArticleGenerationResponse, { status: 429 })
     }
+    */
 
     console.log(`[API] Generating ${section} (session: ${sessionId})`)
     
