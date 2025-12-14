@@ -376,9 +376,11 @@ async function callGemini(prompt: string, systemPrompt: string): Promise<{ text:
   )
 
   if (!response.ok) {
-    const error = await response.text()
-    console.error('[Gemini] API error:', error)
-    throw new Error(`Gemini API error: ${response.status}`)
+    const errorText = await response.text()
+    console.error('[Gemini] API error response:', errorText)
+    console.error('[Gemini] Status:', response.status)
+    console.error('[Gemini] Headers:', Object.fromEntries(response.headers.entries()))
+    throw new Error(`Gemini API error: ${response.status} - ${errorText}`)
   }
 
   const result = await response.json()
