@@ -7,6 +7,7 @@
 // UPDATE v2.4.0: Wizard data structuur update - Ouder 1/2, gestructureerde ExtraVragen
 // UPDATE v3.0.0: ExtraVragen uitbreiding - 10 vragen in 5 secties
 // UPDATE v3.0.0: ExtraVragen uitbreiding - 10 vragen in 5 secties
+// UPDATE v3.0.0: ExtraVragen uitbreiding - 10 vragen in 5 secties
 'use client'
 
 const PAGE_VERSION = '3.0.0'
@@ -891,6 +892,7 @@ export default function TestResultsPage() {
           <div className="bg-pink-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">⭐ Bekende mensen die {firstName} heten</h2>
             
+
 
           {/* Ingevoerde wizard data - UPDATED v3.0.0 */}
           <div className="bg-gray-50 rounded-lg p-6">
