@@ -1,15 +1,14 @@
 // lib/types.ts
-// @version 2.0.0
-// Types voor de babykrant applicatie - UPDATED voor AI implementatie
+// @version 3.0.0
+// Types voor de babykrant applicatie - AI implementatie compleet
 // 
+// BREAKING CHANGES v3.0.0:
+// - BasisGegevens: geboorteLocatie/geboorteLocatieNaam verplaatst naar ExtraVragen
+// - ExtraVragen: Volledige uitbreiding met 10 vragen voor rijk hoofdartikel
+//
 // BREAKING CHANGES v2.0.0:
 // - BasisGegevens: naamVader/naamMoeder -> ouder1Naam/ouder2Naam/alleenstaand
 // - ExtraVragen: Volledig herzien voor gestructureerde AI input
-// 
-// Let op: NameMeaningData, FamousNamesakesData en FamousPerson types
-// worden nu geëxporteerd vanuit hun eigen API bestanden:
-// - nameMeaningAPI.ts
-// - famousNamesakesAPI.ts
 
 export interface BroertjeZusje {
   naam: string
@@ -21,8 +20,7 @@ export interface BasisGegevens {
   geboorteDatum: string // YYYY-MM-DD
   geboorteTijd: string // HH:MM
   geboorteplaats: string // Stad/plaats - verplicht voor weerbericht
-  geboorteLocatie: 'thuis' | 'ziekenhuis' | 'anders'
-  geboorteLocatieNaam?: string // Naam van ziekenhuis of andere locatie
+  // REMOVED v3.0.0: geboorteLocatie en geboorteLocatieNaam -> verplaatst naar ExtraVragen
   gewicht: number // in grammen
   lengte: number // in cm
   
@@ -34,23 +32,54 @@ export interface BasisGegevens {
 
 export interface ExtraVragen {
   // ========================================================================
-  // TIER 2: Heel belangrijk voor hoofdartikel
-  // RELEASE: bevallingVerloop wordt VERPLICHT (nu optioneel voor testing)
+  // SECTIE 1: DE BEVALLING
+  // Voor het hoofdverhaal - het moment zelf
   // ========================================================================
   
+  // Waar geboren (MOVED van BasisGegevens v3.0.0)
+  geboorteLocatie: 'thuis' | 'ziekenhuis' | 'geboortecentrum' | 'anders'
+  geboorteLocatieNaam?: string  // Alleen ingevuld als ziekenhuis of anders
+  
+  // Hoe was bevalling
+  // RELEASE: wordt VERPLICHT (nu optioneel voor testing)
   bevallingVerloop?: 'snel' | 'langdurig' | 'spannend' | 'gepland' | 'anders' | 'niet-delen'
   bevallingAndersOmschrijving?: string  // Alleen ingevuld als bevallingVerloop === 'anders'
   
-  naamReden?: string  // Waarom deze naam? Max 100 karakters, optioneel
+  // Wie waren erbij (TIER 3 - optioneel)
+  wieWarenErbij?: string[]  // ["Partner", "Opa/oma", "Doula", "Vriendin", "Niemand anders"]
+  
+  // ========================================================================
+  // SECTIE 2: DE ZWANGERSCHAP
+  // Context vooraf - geeft kleur aan het verhaal
+  // ========================================================================
+  
+  zwangerschapVerloop?: string  // Vrij tekstveld, max 200 karakters
+  
+  // ========================================================================
+  // SECTIE 3: DE NAAM
+  // Belangrijk verhaal element
+  // ========================================================================
+  
+  voornaamReden?: string  // Waarom deze voornaam? Max 300 karakters
+  achternaamReden?: string  // Waarom deze achternaam? Max 300 karakters, optioneel
+  
+  // ========================================================================
+  // SECTIE 4: FAMILIE & EERSTE DAGEN
+  // Emotionele momenten
+  // ========================================================================
   
   heeftBroertjesZusjes: boolean  // Toggle: heeft dit kindje broertjes/zusjes?
   broertjesZusjes: BroertjeZusje[]  // Alleen ingevuld als heeftBroertjesZusjes === true
+  reactieBroertjesZusjes?: string  // Hoe reageerden ze? Max 150 karakters, alleen als heeftBroertjesZusjes
+  
+  eersteKraamvisite?: string  // Wie kwam als eerste op kraamvisite? Max 100 karakters
   
   // ========================================================================
-  // TIER 3: Leuk maar optioneel - voor extra kleur in het artikel
+  // SECTIE 5: BIJZONDERHEDEN
+  // Unieke details
   // ========================================================================
   
-  bijzonderheden?: string  // Bijzonderheden bij geboorte (vrij tekstveld)
+  bijzonderheden?: string  // Bijzonderheden of leuke details? Max 300 karakters
 }
 
 export interface GeuploadeFotos {

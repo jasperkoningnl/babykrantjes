@@ -1,6 +1,6 @@
 // components/Step4Review.tsx
-// @version 2.0.0
-// UPDATED: Aangepast voor nieuwe ExtraVragen structuur en ouder1/ouder2 velden
+// @version 3.0.0
+// UPDATED: Alle nieuwe ExtraVragen velden + geboorteLocatie verplaatst
 
 'use client'
 
@@ -16,10 +16,7 @@ export default function Step4Review({ data, onBack }: Props) {
   const router = useRouter()
   
   const handleGenerate = () => {
-    // Sla data op in localStorage voor testpagina
     localStorage.setItem('babykrant_test_data', JSON.stringify(data))
-    
-    // Navigeer naar testpagina
     router.push('/test-results')
   }
 
@@ -27,31 +24,29 @@ export default function Step4Review({ data, onBack }: Props) {
     if (!dateString) return '-'
     const date = new Date(dateString)
     return date.toLocaleDateString('nl-NL', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
     })
   }
 
   const geboorteLocatieText = () => {
-    const { geboorteLocatie, geboorteLocatieNaam, geboorteplaats } = data.basisGegevens
+    const { geboorteLocatie, geboorteLocatieNaam } = data.extraVragen
     
     let locatie = ''
     if (geboorteLocatie === 'thuis') {
       locatie = 'Thuis'
-    } else if (geboorteLocatieNaam) {
-      locatie = geboorteLocatieNaam
+    } else if (geboorteLocatie === 'ziekenhuis') {
+      locatie = geboorteLocatieNaam || 'Ziekenhuis'
+    } else if (geboorteLocatie === 'geboortecentrum') {
+      locatie = 'Geboortecentrum'
     } else {
-      locatie = geboorteLocatie.charAt(0).toUpperCase() + geboorteLocatie.slice(1)
+      locatie = geboorteLocatieNaam || 'Anders'
     }
     
-    return `${locatie}, ${geboorteplaats}`
+    return locatie
   }
 
   const formatBevallingVerloop = (verloop?: string) => {
     if (!verloop) return '-'
-    
     const labels: Record<string, string> = {
       'snel': 'Snel en voorspoedig',
       'langdurig': 'Langdurig maar goed verlopen',
@@ -60,17 +55,14 @@ export default function Step4Review({ data, onBack }: Props) {
       'anders': 'Anders',
       'niet-delen': 'Wil ik niet delen'
     }
-    
     return labels[verloop] || verloop
   }
 
   const formatOuders = () => {
     const { ouder1Naam, ouder2Naam, alleenstaand } = data.basisGegevens
-    
     if (alleenstaand || !ouder2Naam) {
       return ouder1Naam || '-'
     }
-    
     return `${ouder1Naam} & ${ouder2Naam}`
   }
 
@@ -95,32 +87,26 @@ export default function Step4Review({ data, onBack }: Props) {
             <span className="font-medium text-gray-600">Naam:</span>
             <p className="text-gray-900">{data.basisGegevens.volledigeNaam}</p>
           </div>
-          
           <div>
             <span className="font-medium text-gray-600">Geboortedatum:</span>
             <p className="text-gray-900">{formatDate(data.basisGegevens.geboorteDatum)}</p>
           </div>
-          
           <div>
             <span className="font-medium text-gray-600">Tijdstip:</span>
             <p className="text-gray-900">{data.basisGegevens.geboorteTijd || '-'} uur</p>
           </div>
-          
           <div>
             <span className="font-medium text-gray-600">Geboorteplaats:</span>
-            <p className="text-gray-900">{geboorteLocatieText()}</p>
+            <p className="text-gray-900">{data.basisGegevens.geboorteplaats}</p>
           </div>
-          
           <div>
             <span className="font-medium text-gray-600">Gewicht:</span>
             <p className="text-gray-900">{data.basisGegevens.gewicht ? `${data.basisGegevens.gewicht} gram` : '-'}</p>
           </div>
-          
           <div>
             <span className="font-medium text-gray-600">Lengte:</span>
             <p className="text-gray-900">{data.basisGegevens.lengte ? `${data.basisGegevens.lengte} cm` : '-'}</p>
           </div>
-          
           <div>
             <span className="font-medium text-gray-600">
               {data.basisGegevens.alleenstaand ? 'Ouder:' : 'Ouders:'}
@@ -130,7 +116,7 @@ export default function Step4Review({ data, onBack }: Props) {
         </div>
       </div>
 
-      {/* Extra vragen - UPDATED v2.0.0 */}
+      {/* Geboorte verhaal */}
       <div className="bg-gray-50 rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center">
           <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center mr-3 text-sm">2</span>
@@ -138,10 +124,16 @@ export default function Step4Review({ data, onBack }: Props) {
         </h3>
         
         <div className="space-y-3 text-sm">
-          {/* Bevalling verloop */}
+          {/* Geboortelocatie */}
+          <div>
+            <span className="font-medium text-gray-600">Locatie:</span>
+            <p className="text-gray-900 mt-1">{geboorteLocatieText()}, {data.basisGegevens.geboorteplaats}</p>
+          </div>
+          
+          {/* Bevalling */}
           {data.extraVragen.bevallingVerloop && (
             <div>
-              <span className="font-medium text-gray-600">Hoe was de bevalling:</span>
+              <span className="font-medium text-gray-600">Bevalling:</span>
               <p className="text-gray-900 mt-1">
                 {formatBevallingVerloop(data.extraVragen.bevallingVerloop)}
                 {data.extraVragen.bevallingVerloop === 'anders' && data.extraVragen.bevallingAndersOmschrijving && (
@@ -151,11 +143,35 @@ export default function Step4Review({ data, onBack }: Props) {
             </div>
           )}
           
-          {/* Naam reden */}
-          {data.extraVragen.naamReden && (
+          {/* Wie erbij */}
+          {data.extraVragen.wieWarenErbij && data.extraVragen.wieWarenErbij.length > 0 && (
             <div>
-              <span className="font-medium text-gray-600">Waarom deze naam:</span>
-              <p className="text-gray-900 mt-1">{data.extraVragen.naamReden}</p>
+              <span className="font-medium text-gray-600">Wie waren erbij:</span>
+              <p className="text-gray-900 mt-1">{data.extraVragen.wieWarenErbij.join(', ')}</p>
+            </div>
+          )}
+          
+          {/* Zwangerschap */}
+          {data.extraVragen.zwangerschapVerloop && (
+            <div>
+              <span className="font-medium text-gray-600">Zwangerschap:</span>
+              <p className="text-gray-900 mt-1">{data.extraVragen.zwangerschapVerloop}</p>
+            </div>
+          )}
+          
+          {/* Voornaam reden */}
+          {data.extraVragen.voornaamReden && (
+            <div>
+              <span className="font-medium text-gray-600">Waarom voornaam:</span>
+              <p className="text-gray-900 mt-1">{data.extraVragen.voornaamReden}</p>
+            </div>
+          )}
+          
+          {/* Achternaam reden */}
+          {data.extraVragen.achternaamReden && (
+            <div>
+              <span className="font-medium text-gray-600">Waarom achternaam:</span>
+              <p className="text-gray-900 mt-1">{data.extraVragen.achternaamReden}</p>
             </div>
           )}
           
@@ -171,6 +187,17 @@ export default function Step4Review({ data, onBack }: Props) {
                   </p>
                 ))}
               </div>
+              {data.extraVragen.reactieBroertjesZusjes && (
+                <p className="text-gray-700 mt-1 italic">Reactie: {data.extraVragen.reactieBroertjesZusjes}</p>
+              )}
+            </div>
+          )}
+          
+          {/* Eerste kraamvisite */}
+          {data.extraVragen.eersteKraamvisite && (
+            <div>
+              <span className="font-medium text-gray-600">Eerste kraamvisite:</span>
+              <p className="text-gray-900 mt-1">{data.extraVragen.eersteKraamvisite}</p>
             </div>
           )}
           
@@ -180,14 +207,6 @@ export default function Step4Review({ data, onBack }: Props) {
               <span className="font-medium text-gray-600">Bijzonderheden:</span>
               <p className="text-gray-900 mt-1">{data.extraVragen.bijzonderheden}</p>
             </div>
-          )}
-          
-          {/* Geen informatie ingevuld */}
-          {!data.extraVragen.bevallingVerloop && 
-           !data.extraVragen.naamReden && 
-           !data.extraVragen.heeftBroertjesZusjes &&
-           !data.extraVragen.bijzonderheden && (
-            <p className="text-gray-500 italic">Geen extra informatie ingevuld</p>
           )}
         </div>
       </div>

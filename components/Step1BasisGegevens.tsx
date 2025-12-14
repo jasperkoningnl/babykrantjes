@@ -1,6 +1,7 @@
 // components/Step1BasisGegevens.tsx
-// @version 2.0.0
-// UPDATED: Inclusieve ouder-velden (Ouder 1/2 i.p.v. vader/moeder)
+// @version 3.0.0
+// BREAKING CHANGE: geboorteLocatie verplaatst naar Step 2
+// UPDATE v2.0.0: Inclusieve ouder-velden (Ouder 1/2 i.p.v. vader/moeder)
 
 'use client'
 
@@ -113,10 +114,10 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
         </div>
       </div>
 
-      {/* Geboorteplaats */}
+      {/* Geboorteplaats (STAD - voor weerbericht) */}
       <div>
         <label className="block text-sm font-medium mb-2">
-          Geboorteplaats *
+          Geboorteplaats (stad/dorp) *
         </label>
         <input
           type="text"
@@ -129,66 +130,6 @@ export default function Step1BasisGegevens({ data, updateData, onNext }: Props) 
         <p className="text-xs text-gray-500 mt-1">
           We gebruiken dit voor het lokale weerbericht op de geboortedatum
         </p>
-      </div>
-
-      {/* Geboortelocatie */}
-      <div>
-        <label className="block text-sm font-medium mb-2">
-          Type geboortelocatie
-        </label>
-        <div className="space-y-2">
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="thuis"
-                checked={data.geboorteLocatie === 'thuis'}
-                onChange={(e) => updateData({ 
-                  geboorteLocatie: e.target.value as 'thuis' | 'ziekenhuis' | 'anders',
-                  geboorteLocatieNaam: undefined
-                })}
-                className="mr-2"
-              />
-              Thuis
-            </label>
-            
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="ziekenhuis"
-                checked={data.geboorteLocatie === 'ziekenhuis'}
-                onChange={(e) => updateData({ 
-                  geboorteLocatie: e.target.value as 'thuis' | 'ziekenhuis' | 'anders'
-                })}
-                className="mr-2"
-              />
-              Ziekenhuis
-            </label>
-            
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="anders"
-                checked={data.geboorteLocatie === 'anders'}
-                onChange={(e) => updateData({ 
-                  geboorteLocatie: e.target.value as 'thuis' | 'ziekenhuis' | 'anders'
-                })}
-                className="mr-2"
-              />
-              Anders
-            </label>
-          </div>
-          
-          {(data.geboorteLocatie === 'ziekenhuis' || data.geboorteLocatie === 'anders') && (
-            <input
-              type="text"
-              value={data.geboorteLocatieNaam || ''}
-              onChange={(e) => updateData({ geboorteLocatieNaam: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder={data.geboorteLocatie === 'ziekenhuis' ? 'Naam ziekenhuis (bijv. Isala Ziekenhuis)' : 'Bijv. geboortecentrum, onderweg...'}
-            />
-          )}
-        </div>
       </div>
 
       {/* UPDATED v2.0.0: Inclusieve ouder-velden */}

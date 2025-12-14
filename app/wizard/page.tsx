@@ -1,6 +1,6 @@
 // app/wizard/page.tsx
-// @version 2.0.0
-// UPDATED: Nieuwe initiële state voor ouder1/ouder2 en ExtraVragen v2.0
+// @version 3.0.0
+// UPDATED: Nieuwe initiële state voor ExtraVragen v3.0
 
 'use client'
 
@@ -19,21 +19,34 @@ export default function WizardPage() {
       geboorteDatum: '',
       geboorteTijd: '',
       geboorteplaats: '',
-      geboorteLocatie: 'ziekenhuis',
       gewicht: 0,
       lengte: 0,
-      // UPDATED v2.0.0: Nieuwe ouder-velden
       ouder1Naam: '',
       ouder2Naam: '',
       alleenstaand: false,
     },
     extraVragen: {
-      // UPDATED v2.0.0: Nieuwe gestructureerde vragen
+      // SECTIE 1: Bevalling (MOVED van BasisGegevens)
+      geboorteLocatie: 'ziekenhuis',
+      geboorteLocatieNaam: undefined,
       bevallingVerloop: undefined,
       bevallingAndersOmschrijving: undefined,
-      naamReden: undefined,
+      wieWarenErbij: [],
+      
+      // SECTIE 2: Zwangerschap
+      zwangerschapVerloop: undefined,
+      
+      // SECTIE 3: Naam
+      voornaamReden: undefined,
+      achternaamReden: undefined,
+      
+      // SECTIE 4: Familie
       heeftBroertjesZusjes: false,
       broertjesZusjes: [],
+      reactieBroertjesZusjes: undefined,
+      eersteKraamvisite: undefined,
+      
+      // SECTIE 5: Bijzonderheden
       bijzonderheden: undefined,
     },
     fotos: {

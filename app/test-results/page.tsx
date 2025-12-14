@@ -1,13 +1,14 @@
 // app/test-results/page.tsx
-// @version 2.4.0
+// @version 3.0.0
 // UPDATE v2.0.0: Toegevoegd Dutch News (Volkskrant headlines)
 // UPDATE v2.1.0: Vervangen Volkskrant met Wayback Machine (NU.nl via Internet Archive)
 // UPDATE v2.2.0: Wayback cache hit indicator toegevoegd
 // UPDATE v2.3.0: Multi-source support - toon welke bronnen gebruikt zijn (NU.nl, NOS.nl)
 // UPDATE v2.4.0: Wizard data structuur update - Ouder 1/2, gestructureerde ExtraVragen
+// UPDATE v3.0.0: ExtraVragen uitbreiding - 10 vragen in 5 secties
 'use client'
 
-const PAGE_VERSION = '2.4.0'
+const PAGE_VERSION = '3.0.0'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -890,205 +891,100 @@ export default function TestResultsPage() {
             <h2 className="text-xl font-semibold mb-4">⭐ Bekende mensen die {firstName} heten</h2>
             
             {namesakesLoading && (
-              <p className="text-gray-500 italic">Bekende naamdragers worden opgehaald...</p>
-            )}
-            
-            {!namesakesLoading && famousNamesakes && famousNamesakes.persons.length > 0 && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-3">
-                  {famousNamesakes.persons.map((person, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border border-pink-200">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          {person.wikipediaUrl ? (
-                            <a href={person.wikipediaUrl} target="_blank" rel="noopener noreferrer"
-                               className="font-semibold text-pink-700 hover:underline">
-                              {person.name}
-                            </a>
-                          ) : (
-                            <span className="font-semibold text-gray-900">{person.name}</span>
-                          )}
-                          <span className="text-xs text-gray-400 ml-2">({person.source.toUpperCase()})</span>
-                        </div>
-                      </div>
-                      {person.description && (
-                        <p className="text-sm text-gray-600 mt-1">{person.description}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                
-                <p className="text-xs text-gray-500 mt-3">
-                  Totaal {famousNamesakes.persons.length} bekende naamdragers gevonden
-                </p>
-                
-                <div className="text-xs text-gray-500 pt-3 border-t border-pink-200">
-                  <span className="font-medium">Bronnen: </span>
-                  {famousNamesakes.sources.nl && (
-                    <a href={famousNamesakes.sources.nl} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline mr-3">
-                      Wikipedia NL
-                    </a>
-                  )}
-                  {famousNamesakes.sources.en && (
-                    <a href={famousNamesakes.sources.en} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline">
-                      Wikipedia EN
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            {!namesakesLoading && famousNamesakes && famousNamesakes.persons.length === 0 && (
-              <p className="text-gray-500 italic">Geen bekende naamdragers gevonden</p>
-            )}
-            
-            {!namesakesLoading && !famousNamesakes && (
-              <p className="text-gray-500 italic">Kon geen gegevens ophalen</p>
-            )}
-          </div>
 
-          {/* Weerbericht */}
-          <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">🌤️ Weerbericht</h2>
-            
-            {weatherLoading && (
-              <p className="text-gray-500 italic">Weerbericht wordt opgehaald...</p>
-            )}
-            
-            {!weatherLoading && weather && (
-              <div className="space-y-3">
-                <div>
-                  <span className="font-medium text-gray-600">
-                    Weer in {weather.city} op {new Date(weather.date).toLocaleDateString('nl-NL', { 
-                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-                    })}:
-                  </span>
-                  <p className="text-gray-900 mt-2">{formatWeatherReport(weather)}</p>
-                </div>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
-                  <div className="bg-white p-3 rounded border">
-                    <div className="text-gray-600 text-xs">Max temperatuur</div>
-                    <div className="text-xl font-semibold text-blue-600">{weather.temperature_max}°C</div>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <div className="text-gray-600 text-xs">Min temperatuur</div>
-                    <div className="text-xl font-semibold text-blue-600">{weather.temperature_min}°C</div>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <div className="text-gray-600 text-xs">Neerslag</div>
-                    <div className="text-xl font-semibold text-blue-600">{weather.precipitation}mm</div>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <div className="text-gray-600 text-xs">Zonneschijn</div>
-                    <div className="text-xl font-semibold text-blue-600">{weather.sunshine_duration}u</div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {!weatherLoading && !weather && (
-              <p className="text-red-500">Weerbericht kon niet worden opgehaald</p>
-            )}
-          </div>
-
-          {/* Ook geboren op deze dag */}
-          <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">🎂 Ook geboren op deze dag</h2>
-            
-            {bornLoading && (
-              <p className="text-gray-500 italic">Bekende personen worden opgehaald...</p>
-            )}
-            
-            {!bornLoading && bornPersons.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600 mb-3">
-                  Ook geboren op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { 
-                    day: 'numeric', month: 'long'
-                  })}:
-                </p>
-                
-                <div className="grid grid-cols-1 gap-3">
-                  {bornPersons.map((person, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="font-semibold text-gray-900">{person.name}</span>
-                          <span className="text-gray-500 ml-2">({person.year})</span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">{person.description}</p>
-                    </div>
-                  ))}
-                </div>
-                
-                <p className="text-xs text-gray-500 mt-3">
-                  Totaal {bornPersons.length} bekende personen gevonden
-                </p>
-              </div>
-            )}
-            
-            {!bornLoading && bornPersons.length === 0 && (
-              <p className="text-gray-500 italic">Geen bekende personen gevonden voor deze datum</p>
-            )}
-          </div>
-
-          {/* Ingevoerde wizard data - UPDATED v2.4.0 */}
+          {/* Ingevoerde wizard data - UPDATED v3.0.0 */}
           <div className="bg-gray-50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">📋 Ingevoerde Wizard Data</h2>
+            <h2 className="text-xl font-semibold mb-4">📋 Ingevoerde Wizard Data (v3.0)</h2>
             
-            {/* Ouders info */}
+            {/* Basisgegevens */}
             <div className="mb-4">
-              <h3 className="font-semibold text-gray-700 mb-2">👨‍👩‍👧 Ouders</h3>
-              <div className="bg-white p-3 rounded border text-sm">
+              <h3 className="font-semibold text-gray-700 mb-2">👤 Basisgegevens</h3>
+              <div className="bg-white p-3 rounded border text-sm space-y-1">
+                <p><strong>Naam:</strong> {data.basisGegevens.volledigeNaam}</p>
+                <p><strong>Datum:</strong> {data.basisGegevens.geboorteDatum} om {data.basisGegevens.geboorteTijd}</p>
+                <p><strong>Plaats (stad):</strong> {data.basisGegevens.geboorteplaats}</p>
+                <p><strong>Gewicht:</strong> {data.basisGegevens.gewicht} gram</p>
+                <p><strong>Lengte:</strong> {data.basisGegevens.lengte} cm</p>
                 <p><strong>Ouder 1:</strong> {data.basisGegevens.ouder1Naam || '-'}</p>
                 <p><strong>Ouder 2:</strong> {data.basisGegevens.ouder2Naam || '-'}</p>
                 <p><strong>Alleenstaand:</strong> {data.basisGegevens.alleenstaand ? 'Ja' : 'Nee'}</p>
               </div>
             </div>
 
-            {/* Bevalling info */}
-            {data.extraVragen?.bevallingVerloop && (
+            {/* SECTIE 1: Bevalling */}
+            <div className="mb-4">
+              <h3 className="font-semibold text-gray-700 mb-2">🏥 Sectie 1: Bevalling</h3>
+              <div className="bg-white p-3 rounded border text-sm space-y-1">
+                <p><strong>Locatie:</strong> {data.extraVragen.geboorteLocatie} {data.extraVragen.geboorteLocatieNaam && `(${data.extraVragen.geboorteLocatieNaam})`}</p>
+                {data.extraVragen.bevallingVerloop && (
+                  <>
+                    <p><strong>Verloop:</strong> {data.extraVragen.bevallingVerloop}</p>
+                    {data.extraVragen.bevallingAndersOmschrijving && (
+                      <p><strong>Omschrijving:</strong> {data.extraVragen.bevallingAndersOmschrijving}</p>
+                    )}
+                  </>
+                )}
+                {data.extraVragen.wieWarenErbij && data.extraVragen.wieWarenErbij.length > 0 && (
+                  <p><strong>Wie erbij:</strong> {data.extraVragen.wieWarenErbij.join(', ')}</p>
+                )}
+              </div>
+            </div>
+
+            {/* SECTIE 2: Zwangerschap */}
+            {data.extraVragen.zwangerschapVerloop && (
               <div className="mb-4">
-                <h3 className="font-semibold text-gray-700 mb-2">🏥 Bevalling</h3>
+                <h3 className="font-semibold text-gray-700 mb-2">🤰 Sectie 2: Zwangerschap</h3>
                 <div className="bg-white p-3 rounded border text-sm">
-                  <p><strong>Verloop:</strong> {data.extraVragen.bevallingVerloop}</p>
-                  {data.extraVragen.bevallingAndersOmschrijving && (
-                    <p><strong>Omschrijving:</strong> {data.extraVragen.bevallingAndersOmschrijving}</p>
+                  <p>{data.extraVragen.zwangerschapVerloop}</p>
+                </div>
+              </div>
+            )}
+
+            {/* SECTIE 3: Naam */}
+            {(data.extraVragen.voornaamReden || data.extraVragen.achternaamReden) && (
+              <div className="mb-4">
+                <h3 className="font-semibold text-gray-700 mb-2">💭 Sectie 3: Naamkeuze</h3>
+                <div className="bg-white p-3 rounded border text-sm space-y-1">
+                  {data.extraVragen.voornaamReden && (
+                    <p><strong>Voornaam:</strong> {data.extraVragen.voornaamReden}</p>
+                  )}
+                  {data.extraVragen.achternaamReden && (
+                    <p><strong>Achternaam:</strong> {data.extraVragen.achternaamReden}</p>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Naam reden */}
-            {data.extraVragen?.naamReden && (
+            {/* SECTIE 4: Familie */}
+            {(data.extraVragen.heeftBroertjesZusjes || data.extraVragen.eersteKraamvisite) && (
               <div className="mb-4">
-                <h3 className="font-semibold text-gray-700 mb-2">💭 Naamkeuze</h3>
-                <div className="bg-white p-3 rounded border text-sm">
-                  <p>{data.extraVragen.naamReden}</p>
+                <h3 className="font-semibold text-gray-700 mb-2">👶 Sectie 4: Familie & Eerste Dagen</h3>
+                <div className="bg-white p-3 rounded border text-sm space-y-2">
+                  {data.extraVragen.heeftBroertjesZusjes && data.extraVragen.broertjesZusjes.length > 0 && (
+                    <div>
+                      <strong>Broertjes/Zusjes:</strong>
+                      {data.extraVragen.broertjesZusjes.map((sibling: any, idx: number) => (
+                        <div key={idx} className="ml-3">
+                          • {sibling.naam}
+                          {sibling.leeftijd && <span className="text-gray-600"> ({sibling.leeftijd} jaar)</span>}
+                        </div>
+                      ))}
+                      {data.extraVragen.reactieBroertjesZusjes && (
+                        <p className="ml-3 text-gray-600 italic">Reactie: {data.extraVragen.reactieBroertjesZusjes}</p>
+                      )}
+                    </div>
+                  )}
+                  {data.extraVragen.eersteKraamvisite && (
+                    <p><strong>Eerste kraamvisite:</strong> {data.extraVragen.eersteKraamvisite}</p>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Broertjes/zusjes */}
-            {data.extraVragen?.heeftBroertjesZusjes && data.extraVragen.broertjesZusjes?.length > 0 && (
+            {/* SECTIE 5: Bijzonderheden */}
+            {data.extraVragen.bijzonderheden && (
               <div className="mb-4">
-                <h3 className="font-semibold text-gray-700 mb-2">👶 Broertjes/Zusjes</h3>
-                <div className="bg-white p-3 rounded border text-sm space-y-1">
-                  {data.extraVragen.broertjesZusjes.map((sibling: any, idx: number) => (
-                    <p key={idx}>
-                      • {sibling.naam}
-                      {sibling.leeftijd && <span className="text-gray-600"> ({sibling.leeftijd} jaar)</span>}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Bijzonderheden */}
-            {data.extraVragen?.bijzonderheden && (
-              <div className="mb-4">
-                <h3 className="font-semibold text-gray-700 mb-2">✨ Bijzonderheden</h3>
+                <h3 className="font-semibold text-gray-700 mb-2">✨ Sectie 5: Bijzonderheden</h3>
                 <div className="bg-white p-3 rounded border text-sm">
                   <p>{data.extraVragen.bijzonderheden}</p>
                 </div>
