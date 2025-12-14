@@ -1,5 +1,5 @@
 // app/api/generate-article/route.ts
-// @version 1.0.0 - PLACEHOLDER voor Gemini integratie
+// @version 1.0.0 - COMPLETE Gemini integratie met alle 8 secties
 
 import { NextRequest, NextResponse } from 'next/server'
 import type { ArticleGenerationRequest, ArticleGenerationResponse, UsageStats } from '@/lib/articleTypes'
@@ -36,6 +36,360 @@ function updateUsageStats(sessionId: string, cost: number) {
 function calculateCost(inputTokens: number, outputTokens: number): number {
   return ((inputTokens / 1_000_000) * GEMINI_PRICING.inputCostPer1MTokens) +
          ((outputTokens / 1_000_000) * GEMINI_PRICING.outputCostPer1MTokens)
+}
+
+// SYSTEM PROMPT - Algemeen voor alle secties
+const SYSTEM_PROMPT = `Je bent een professionele journalist die babykranten schrijft voor Nederlandse ouders.
+
+TONE-OF-VOICE REGELS:
+- Warm maar niet overdreven sentimenteel
+- Informatief zonder saai te zijn
+- Persoonlijk maar professioneel
+- Balans tussen positief en realistisch
+- Concrete feiten, geen vage taal
+- Nederlandse context en taalgebruik
+
+SCHRIJFSTIJL:
+- Gebruik derde persoon tenzij anders gevraagd
+- Wissel af tussen algemeen en specifiek
+- Voeg nuances toe (niet alleen positief)
+- Eindig met persoonlijke koppeling waar relevant
+- Gebruik correcte Nederlandse spelling en grammatica
+- Geen Markdown formatting (geen **, ##, etc.)
+
+VERBODEN:
+- Overdreven lyrisch of poëtisch
+- Te abstract of filosofisch
+- Alleen maar superlatieven
+- Amerikaanse "zo bijzonder!" taal
+- Saaie opsommingen zonder context
+- Te lang doordraven over 1 onderwerp
+
+Je schrijft ALLEEN de gevraagde tekst, zonder preamble, uitleg of meta-commentaar.`
+
+// PROMPTS PER SECTIE
+function buildPrompt(section: string, data: any): string {
+  const { basisGegevens, extraVragen } = data
+  const naam = basisGegevens?.volledigeNaam || 'de baby'
+  const roepnaam = naam.split(' ')[0]
+  const datum = basisGegevens?.geboorteDatum || ''
+  const plaats = basisGegevens?.geboorteplaats || ''
+  
+  switch(section) {
+    
+    case 'hoofdartikel':
+      const tijd = basisGegevens?.geboorteTijd || '00:00'
+      const gewicht = basisGegevens?.gewicht || 0
+      const lengte = basisGegevens?.lengte || 0
+      const ouder1 = basisGegevens?.ouder1Naam || 'de ouders'
+      const ouder2 = basisGegevens?.ouder2Naam
+      const alleenstaand = basisGegevens?.alleenstaand || false
+      
+      const locatie = extraVragen?.geboorteLocatie || 'ziekenhuis'
+      const locatieNaam = extraVragen?.geboorteLocatieNaam || ''
+      const bevalling = extraVragen?.bevallingVerloop || ''
+      const broertjesZusjes = extraVragen?.broertjesZusjes || []
+      const voornaamReden = extraVragen?.voornaamReden || ''
+      const achternaamReden = extraVragen?.achternaamReden || ''
+      
+      const datumObj = new Date(datum)
+      const dagNaam = datumObj.toLocaleDateString('nl-NL', { weekday: 'long' })
+      const volledigeDatum = datumObj.toLocaleDateString('nl-NL', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+      
+      return `Schrijf een hoofdartikel voor een babykrant over de geboorte van ${naam}.
+
+FEITEN:
+- Plaats: ${plaats}${locatieNaam ? ` (${locatieNaam})` : ''}
+- Locatie type: ${locatie}
+- Datum: ${dagNaam} ${volledigeDatum}
+- Tijd: ${tijd} uur
+- Ouders: ${alleenstaand ? ouder1 : `${ouder1} en ${ouder2}`}
+- Gewicht: ${gewicht} gram
+- Lengte: ${lengte} cm
+${bevalling ? `- Bevalling: ${bevalling}` : ''}
+${broertjesZusjes.length > 0 ? `- Broertjes/zusjes: ${broertjesZusjes.map((s: any) => `${s.naam} (${s.leeftijd || '?'} jaar)`).join(', ')}` : ''}
+${voornaamReden ? `- Waarom voornaam: ${voornaamReden}` : ''}
+${achternaamReden ? `- Waarom achternaam: ${achternaamReden}` : ''}
+
+STRUCTUUR:
+1. Opening in krantstijl: "${plaats.toUpperCase()} - Op ${dagNaam} ${volledigeDatum} werden [ouders] de trotse ouders van ${naam}..."
+2. Beschrijf de bevalling en geboorte${bevalling ? ` (${bevalling})` : ''}
+3. Eerste momenten (gewicht, lengte, eerste indrukken)
+${broertjesZusjes.length > 0 ? '4. Reactie broertjes/zusjes' : ''}
+${voornaamReden || achternaamReden ? `${broertjesZusjes.length > 0 ? '5' : '4'}. Verhaal achter de naam` : ''}
+${broertjesZusjes.length > 0 || voornaamReden || achternaamReden ? `${5 + (broertjesZusjes.length > 0 ? 1 : 0) + ((voornaamReden || achternaamReden) ? 1 : 0)}. Afsluiting met toekomstblik` : '4. Afsluiting met toekomstblik'}
+
+LENGTE: 200-250 woorden
+TONE: Warm, persoonlijk, verhalend zoals in een nieuwsartikel
+
+Schrijf de tekst:`
+
+    case 'sterrenbeeld':
+      const sterrenbeeld = data.berekend?.sterrenbeeld || 'onbekend'
+      const chineesJaar = data.berekend?.chineesJaar || 'onbekend'
+      
+      return `Schrijf een tekst over het sterrenbeeld en Chinese teken voor ${naam}.
+
+GEGEVENS:
+- Naam: ${roepnaam}
+- Sterrenbeeld: ${sterrenbeeld}
+- Chinees teken: ${chineesJaar}
+
+STRUCTUUR:
+1. Paragraaf 1: Algemene info sterrenbeeld (datums, element waar bekend)
+2. Paragraaf 2-3: Karaktereigenschappen sterrenbeeld (balans positief + nuances)
+3. Paragraaf 4: Chinees teken eigenschappen
+4. Paragraaf 5: Koppeling aan ${roepnaam}
+
+VOORBEELDEN STIJL:
+"Mensen geboren tussen 21 april en 21 mei horen bij het sterrenbeeld Stier. De stier is het toonbeeld van doelgerichtheid en heeft een extreme belangstelling en sterke wilskracht. De stier is een liefde. Stabiel, evenwichtig, en graag bezig..."
+
+LENGTE: 150-180 woorden
+TONE: Informatief, beschrijvend, gebruik derde persoon ("De stier is...")
+
+Schrijf de tekst:`
+
+    case 'nieuws':
+      const dailyNews = data.dailyNews?.events || []
+      const waybackNews = data.waybackNews?.headlines || []
+      const monthNews = data.monthlyNews?.items || []
+      
+      const topDaily = dailyNews.slice(0, 8).map((e: any) => `[${e.category}] ${e.text}`).join('\n')
+      const topWayback = waybackNews.slice(0, 5).map((h: any) => `${h.title}`).join('\n')
+      const topMonth = monthNews.slice(0, 5).map((m: any) => `${m.day}: ${m.text}`).join('\n')
+      
+      const datumVolledig = new Date(datum).toLocaleDateString('nl-NL', { 
+        weekday: 'long',
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+      
+      return `Schrijf een nieuwsoverzicht voor de babykrant over wat er gebeurde op ${datumVolledig}.
+
+BESCHIKBAAR NIEUWS:
+
+Internationaal (Wikipedia):
+${topDaily || 'Geen data'}
+
+Nederlands (NOS/NU.nl):
+${topWayback || 'Geen data'}
+
+Maand context:
+${topMonth || 'Geen data'}
+
+STRUCTUUR:
+1. Intro: "De geboorte van ${roepnaam} was het grote nieuws van ${datumVolledig}, maar er gebeurde meer..."
+2. Selecteer 3-5 belangrijkste nieuwsitems
+3. Mix: Nederlands + internationaal
+4. Mix: politiek, sport, cultuur, wetenschap
+5. Feitelijk, zakelijk, journalistieke toon
+
+LENGTE: 120-150 woorden
+TONE: Journalistiek, geen mening
+
+Schrijf de tekst:`
+
+    case 'weer':
+      const weather = data.weather
+      if (!weather) {
+        return `Schrijf een kort weerbericht voor de geboortedag van ${roepnaam} op ${datum} in ${plaats}. Helaas is er geen data beschikbaar, schrijf een algemene tekst over het seizoen. LENGTE: 60-80 woorden.`
+      }
+      
+      const datumWeer = new Date(weather.date).toLocaleDateString('nl-NL', { 
+        weekday: 'long',
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+      
+      return `Schrijf een weerbericht voor de babykrant.
+
+GEGEVENS:
+- Locatie: ${weather.city}
+- Datum: ${datumWeer}
+- Max temperatuur: ${weather.temperature_max}°C
+- Min temperatuur: ${weather.temperature_min}°C
+- Neerslag: ${weather.precipitation}mm
+- Zonneschijn: ${weather.sunshine_duration} uur
+
+STRUCTUUR:
+1. Beschrijf het weer op de geboortedag
+2. Context: normaal voor het seizoen?
+3. Luchtige observatie ("perfect weer voor..." of "typisch Nederlands weer...")
+
+LENGTE: 60-100 woorden
+TONE: Beschrijvend, luchtig, toegankelijk
+
+Schrijf de tekst:`
+
+    case 'cultuur':
+      const top40 = data.top40
+      const yearChart = data.yearChart
+      const tvPrograms = data.tvPrograms?.programs || []
+      const wikipediaTV = data.wikipediaTV
+      
+      const nummer1 = top40?.numberOne ? `${top40.numberOne.artist} - ${top40.numberOne.title}` : null
+      const topYear = yearChart?.entries?.slice(0, 5) || []
+      const tvToday = tvPrograms.slice(0, 6).map((p: any) => `${p.title}${p.channel ? ` (${p.channel})` : ''}`).join('\n')
+      const tvEvents = wikipediaTV?.events?.slice(0, 3) || []
+      
+      return `Schrijf een overzicht van muziek en televisie voor de babykrant.
+
+MUZIEK:
+${nummer1 ? `#1 Hit: ${nummer1}` : 'Geen Top 40 data'}
+${topYear.length > 0 ? `\nTop hits van het jaar:\n${topYear.map((e: any) => `${e.position}. ${e.artist} - ${e.title}`).join('\n')}` : ''}
+
+TELEVISIE:
+${tvToday ? `Op TV die dag:\n${tvToday}` : 'Geen TV data'}
+${tvEvents.length > 0 ? `\nTV momenten dat jaar:\n${tvEvents.map((e: any) => e.description).join('\n')}` : ''}
+
+STRUCTUUR:
+1. Start met #1 hit (prominent)
+2. Noem 2-3 andere populaire hits
+3. Highlight 3-4 TV programma's
+4. Energieke, informatieve toon
+
+LENGTE: 100-140 woorden
+TONE: Energiek, enthousiast maar niet overdreven
+
+Schrijf de tekst:`
+
+    case 'naam_betekenis':
+      const nameMeaning = data.nameMeaning
+      if (!nameMeaning) {
+        return `Schrijf over de betekenis van de naam ${naam}. Helaas is er geen data beschikbaar. Schrijf op basis van algemene kennis over Nederlandse namen. LENGTE: 120-150 woorden, educatief en interessant.`
+      }
+      
+      return `Schrijf over de betekenis van de naam ${naam}.
+
+GEGEVENS:
+- Naam: ${naam}
+- Betekenis: ${nameMeaning.meaning || 'onbekend'}
+- Oorsprong: ${nameMeaning.origin || 'onbekend'}
+- Gender: ${nameMeaning.gender || 'onbekend'}
+
+STRUCTUUR:
+1. Etymologie (oorsprong, betekenis)
+2. Historische context of figuren met deze naam
+3. Populariteit (indien bekend, anders algemeen)
+4. Culturele referenties of varianten
+
+VOORBEELDEN STIJL:
+"Anne is meestal een meisjesnaam maar komt in Nederland ook als jongennaam voor. Anne als meisjessnaam is afgeleid van de Hebreeuwse naam Hanna wat 'lieflijke, genade, begunstigde' betekent..."
+
+LENGTE: 120-180 woorden
+TONE: Educatief, historisch, interessant maar toegankelijk
+
+Schrijf de tekst:`
+
+    case 'beroemde_namen':
+      const famousNamesakes = data.famousNamesakes
+      if (!famousNamesakes || !famousNamesakes.persons || famousNamesakes.persons.length === 0) {
+        return `Schrijf over beroemde mensen die ${roepnaam} heten. Helaas is er geen data beschikbaar. Gebruik algemene kennis. LENGTE: 80-100 woorden, levendig en anekdotisch.`
+      }
+      
+      const persons = famousNamesakes.persons.slice(0, 6).map((p: any) => 
+        `${p.name}: ${p.description}`
+      ).join('\n')
+      
+      return `Schrijf over beroemde mensen die ${roepnaam} heten.
+
+BEKENDE PERSONEN:
+${persons}
+
+STRUCTUUR:
+1. Intro: "Beroemde mensen met de naam ${roepnaam}..."
+2. Beschrijf 4-6 personen kort (1 zin per persoon)
+3. Mix: Nederlands + internationaal
+4. Verschillende domeinen (politiek, kunst, sport, wetenschap)
+
+LENGTE: 80-120 woorden
+TONE: Levendig, anekdotisch, korte krachtige beschrijvingen
+
+Schrijf de tekst:`
+
+    case 'geboren_op_dag':
+      const bornPersons = data.bornPersons || []
+      if (bornPersons.length === 0) {
+        const datumDag = new Date(datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
+        return `Schrijf over bekende mensen geboren op ${datumDag}. Helaas is er geen data beschikbaar. Gebruik algemene kennis. LENGTE: 80-100 woorden.`
+      }
+      
+      const datumDag = new Date(datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
+      const persons = bornPersons.slice(0, 6).map((p: any) => 
+        `${p.name} (${p.year}): ${p.description}`
+      ).join('\n')
+      
+      return `Schrijf over bekende mensen geboren op ${datumDag}.
+
+PERSONEN:
+${persons}
+
+STRUCTUUR:
+1. Intro: "${roepnaam} deelt zijn/haar verjaardag met..."
+2. Beschrijf 3-5 interessantste personen
+3. Mix historisch en recent
+4. Mix Nederlands en internationaal
+
+LENGTE: 80-120 woorden
+TONE: Interessant, trivia-achtig
+
+Schrijf de tekst:`
+
+    default:
+      return `Schrijf een tekst voor sectie "${section}" van een babykrant voor ${naam}. LENGTE: 100-150 woorden.`
+  }
+}
+
+// GEMINI API CALL
+async function callGemini(prompt: string, systemPrompt: string): Promise<{ text: string, tokensUsed: { input: number, output: number } }> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error('API key missing')
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `${systemPrompt}\n\n${prompt}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 600,
+          topP: 0.9,
+          topK: 40
+        }
+      })
+    }
+  )
+
+  if (!response.ok) {
+    const error = await response.text()
+    console.error('[Gemini] API error:', error)
+    throw new Error(`Gemini API error: ${response.status}`)
+  }
+
+  const result = await response.json()
+  
+  const text = result.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const usageMetadata = result.usageMetadata || {}
+  
+  return {
+    text,
+    tokensUsed: {
+      input: usageMetadata.promptTokenCount || 0,
+      output: usageMetadata.candidatesTokenCount || 0
+    }
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -78,26 +432,29 @@ export async function POST(request: NextRequest) {
       } as ArticleGenerationResponse, { status: 429 })
     }
 
-    console.log(`[API] Generating ${section} (session: ${sessionId}, usage: ${usage.requestsToday}/${USAGE_LIMITS.maxRequestsPerDay})`)
+    console.log(`[API] Generating ${section} (session: ${sessionId})`)
     
-    // PLACEHOLDER - wordt vervangen door Gemini
-    const placeholderText = `[TEST] Gegenereerd artikel voor "${section}".
-
-Ontvangen data: ${Object.keys(data).join(', ')}
-
-Dit wordt vervangen door echte AI tekst.`
-
-    const mockCost = calculateCost(200, 150)
-    updateUsageStats(sessionId, mockCost)
+    // Build prompt
+    const userPrompt = buildPrompt(section, data)
+    
+    // Call Gemini
+    const geminiResult = await callGemini(userPrompt, SYSTEM_PROMPT)
+    
+    const totalTokens = geminiResult.tokensUsed.input + geminiResult.tokensUsed.output
+    const cost = calculateCost(geminiResult.tokensUsed.input, geminiResult.tokensUsed.output)
+    
+    updateUsageStats(sessionId, cost)
     const updatedUsage = getUsageStats(sessionId)
+
+    console.log(`[API] Success - ${totalTokens} tokens, €${cost.toFixed(4)}`)
 
     return NextResponse.json({
       success: true,
       section,
-      text: placeholderText,
-      wordCount: placeholderText.split(' ').length,
-      tokensUsed: 350,
-      cost: mockCost,
+      text: geminiResult.text.trim(),
+      wordCount: geminiResult.text.trim().split(/\s+/).length,
+      tokensUsed: totalTokens,
+      cost,
       remainingRequests: USAGE_LIMITS.maxRequestsPerDay - updatedUsage.requestsToday,
       dailyCost: updatedUsage.costToday
     } as ArticleGenerationResponse)
@@ -106,7 +463,7 @@ Dit wordt vervangen door echte AI tekst.`
     console.error('[API] Error:', error)
     return NextResponse.json({
       success: false,
-      error: 'Er ging iets mis'
+      error: error instanceof Error ? error.message : 'Er ging iets mis'
     } as ArticleGenerationResponse, { status: 500 })
   }
 }
