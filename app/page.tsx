@@ -1,10 +1,12 @@
 import Link from 'next/link'
+import { APP_VERSION } from '@/lib/version'
+import VersionFooter from '@/components/VersionFooter'
 
 export default function Home() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-pink-50">
       <div className="text-center px-4">
-        <div className="mb-2 text-sm text-gray-500">v0.4.0-alpha</div>
+        <div className="mb-2 text-sm text-gray-500">{APP_VERSION}</div>
         <h1 className="text-5xl font-bold mb-6 text-gray-800">
           Babykrantjes Generator
         </h1>
@@ -45,6 +47,7 @@ export default function Home() {
           </div>
         </div>
       </div>
+      <VersionFooter />
     </main>
   )
 }

@@ -122,10 +122,10 @@ export const USAGE_LIMITS = {
   maxRequestsPerDay: 50,
   maxCostPerDay: 1.00,
   timeoutMs: 20000,
-  maxTokensPerRequest: 600
+  maxTokensPerRequest: 1000
 }
 
-export const GEMINI_PRICING = {
-  inputCostPer1MTokens: 0.075,
-  outputCostPer1MTokens: 0.30,
+export const CLAUDE_PRICING = {
+  inputCostPer1MTokens: 1.00,
+  outputCostPer1MTokens: 5.00,
 }

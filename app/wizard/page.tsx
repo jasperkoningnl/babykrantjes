@@ -9,6 +9,7 @@ import Step1BasisGegevens from '@/components/Step1BasisGegevens'
 import Step2ExtraVragen from '@/components/Step2ExtraVragen'
 import Step3Fotos from '@/components/Step3Fotos'
 import Step4Review from '@/components/Step4Review'
+import VersionFooter from '@/components/VersionFooter'
 import type { BabykrantData, BasisGegevens, ExtraVragen, GeuploadeFotos } from '@/lib/types'
 
 export default function WizardPage() {
@@ -148,6 +149,7 @@ export default function WizardPage() {
           )}
         </div>
       </div>
+      <VersionFooter />
     </div>
   )
 }

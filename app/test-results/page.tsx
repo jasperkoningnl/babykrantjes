@@ -12,6 +12,7 @@ const PAGE_VERSION = '3.0.0'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import VersionFooter from '@/components/VersionFooter'
 import type { BabykrantData } from '@/lib/types'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen, getKleur } from '@/lib/calculations'
 import { getSterrenbeeldBeschrijving, getChineesTekenBeschrijving } from '@/lib/horoscoopData'
@@ -863,6 +864,7 @@ export default function TestResultsPage() {
           </div>
         </div>
       </div>
+      <VersionFooter />
     </div>
   )
 }
