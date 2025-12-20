@@ -1,5 +1,5 @@
 // app/api/generate-article/route.ts
-// @version 2.0.0 - Claude Haiku 3.5 integratie met alle 8 secties
+// @version 2.1.0 - Claude Haiku 3.5 integratie met alle 8 secties + inline sterrenbeeld fallback
 
 import { NextRequest, NextResponse } from 'next/server'
 import type { ArticleGenerationRequest, ArticleGenerationResponse, UsageStats } from '@/lib/articleTypes'
