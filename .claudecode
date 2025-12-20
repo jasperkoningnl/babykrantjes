@@ -1,0 +1,136 @@
+# Claude Code Instructions - Babykrant Project
+
+## 🎯 Project Overview
+Baby newspaper generator that creates personalized birth announcements with AI-generated articles based on birth date data (weather, news, astrology, name meanings, etc.)
+
+## 👥 Team Workflow
+**IMPORTANT:** We work with two Claudes:
+- **Claude Chat (claude.ai):** Strategy, planning, research, feature design, roadmap decisions
+- **Claude Code (you!):** Implementation, code changes, testing, debugging, commits
+
+**Your role:** Execute tasks defined by Claude Chat. When stuck or need decisions, ask the user to consult Claude Chat.
+
+## 📁 Key Files & Structure
+- `/app/wizard/page.tsx` - Main wizard (3 steps: basis, extra vragen, fotos)
+- `/app/test-results/page.tsx` - Data display & testing page
+- `/app/generate-articles/page.tsx` - AI article generation UI
+- `/app/api/generate-article/route.ts` - Claude Haiku API integration
+- `/lib/types.ts` - Data type definitions
+- `/lib/articleTypes.ts` - Article generation types & config
+- `/lib/version.ts` - Centralized version management
+
+## 🔧 Git Workflow
+**CRITICAL:** Always work directly on `main` branch
+- ❌ NEVER create `claude/*` feature branches
+- ✅ Pull latest from main before starting
+- ✅ Commit directly to main
+- ✅ Push immediately after committing
+- Format: `feat: description` or `fix: description` or `refactor: description`
+
+**If git blocks you:** Don't create workarounds. Tell the user to fix git config.
+
+## 🚀 Deployment
+- Main branch auto-deploys to Vercel production
+- Always test locally on `http://localhost:3000/test-results` before pushing
+- Check Vercel deployment logs after each push
+- Live site: babykrant-claude.vercel.app
+
+## 🔑 Environment Variables (in Vercel)
+- `ANTHROPIC_API_KEY` - Claude 3.5 Haiku (current, primary)
+- `GEMINI_API_KEY` - Gemini 2.5 Flash (backup, not actively used)
+
+**Never hardcode API keys!** Always use `process.env.ANTHROPIC_API_KEY`
+
+## 🤖 AI Article Generation (Current Implementation)
+- **Model:** Claude 3.5 Haiku (`claude-3-5-haiku-20241022`)
+- **Endpoint:** Anthropic Messages API (`https://api.anthropic.com/v1/messages`)
+- **Rate limiting:** 50 requests/day, $1.00 budget cap (currently DISABLED for testing)
+- **Max tokens:** 1000 per section (to prevent truncation)
+- **Temperature:** 0.7 (balance between creative and consistent)
+- **Pricing:** ~$0.04 per complete babykrant (8 articles)
+
+## 📝 Code Standards
+- TypeScript strict mode enabled
+- All new files need version comment at top: `// @version X.X.X`
+- Update version in `lib/version.ts` when making releases
+- Dutch language in UI, English in code/comments
+- Consistent formatting: 2 spaces, semicolons
+- Always provide COMPLETE files, never use placeholders like "// rest remains the same"
+
+## 🧪 Testing Workflow
+1. User fills wizard at `/wizard` with test data
+2. Check data collection at `/test-results`
+3. Generate articles at `/generate-articles`
+4. Review output quality
+5. If issues: report to user → Claude Chat decides next steps
+
+## 🎨 Article Sections (8 total)
+1. **hoofdartikel** (~250 words) - Birth story, warm & personal
+2. **sterrenbeeld** (~180 words) - Zodiac & Chinese year
+3. **nieuws** (~140 words) - News on birth date
+4. **weer** (~80 words) - Weather report
+5. **cultuur** (~130 words) - Music & TV highlights
+6. **naam_betekenis** (~150 words) - Name etymology
+7. **beroemde_namen** (~100 words) - Famous namesakes
+8. **geboren_op_dag** (~100 words) - Born on this day
+
+**Tone-of-voice for all sections:**
+- Warm but not overly sentimental
+- Informative without being boring
+- Balance between positive and realistic
+- Dutch language, proper grammar
+- No markdown formatting in output (no **, ##, etc.)
+
+## 🚨 Common Issues & Solutions
+- **Articles truncated:** Check `maxOutputTokens` in API route (should be 1000)
+- **Rate limit errors:** Check Anthropic Console usage
+- **Missing data:** Ensure all API calls in test-results completed
+- **Build errors:** Run `npm run build` locally before pushing
+- **API 404 errors:** Check model name is exact: `claude-3-5-haiku-20241022`
+- **Empty responses:** Check API key in Vercel env vars
+
+## 📊 Current Status (December 2024)
+- ✅ Wizard data collection working
+- ✅ Test-results showing all APIs
+- ✅ Article generation UI built
+- ✅ Claude Haiku integration complete
+- ⚠️ Prompt quality needs refinement
+- 🎯 Next: Golden dataset creation for prompt testing
+
+## 🎯 How to Work With User
+1. **User comes with task** (defined by Claude Chat)
+2. **You implement** the specific changes
+3. **You test** locally if possible
+4. **You commit & push** to main
+5. **If stuck or need decisions:** Tell user to consult Claude Chat
+6. **If task unclear:** Ask user for clarification from Claude Chat
+
+**Example good workflow:**
+```
+User: "Claude Chat says to add export function for wizard data"
+You: "I'll implement the export function. Where should it be placed?"
+User: "In test-results page, as a download button"
+You: [implements, tests, commits, pushes]
+```
+
+**Example when to escalate:**
+```
+User: "Make the articles better"
+You: "That's too vague. Please ask Claude Chat to define:
+     - Which sections need improvement?
+     - What specific quality issues?
+     - What's the target output?"
+```
+
+## 🔄 Version Management
+- Current version tracked in `lib/version.ts`
+- Version displayed in footer of all pages via `<VersionFooter />`
+- Bump version when:
+  - Major features: X.0.0
+  - New functionality: 0.X.0
+  - Bug fixes: 0.0.X
+
+## 📚 Additional Resources
+- Anthropic Console: https://console.anthropic.com
+- Vercel Dashboard: https://vercel.com/dashboard
+- Project Strategy & Roadmap: Ask user to check Claude Chat
