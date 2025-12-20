@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { ArticleGenerationRequest, ArticleGenerationResponse, UsageStats } from '@/lib/articleTypes'
 import { USAGE_LIMITS, CLAUDE_PRICING } from '@/lib/articleTypes'
+import { getSterrenbeeld, getChineesJaar } from '@/lib/calculations'
 
 const dailyUsage = new Map<string, UsageStats>()
 
@@ -129,9 +130,16 @@ TONE: Warm, persoonlijk, verhalend zoals in een nieuwsartikel
 Schrijf de tekst:`
 
     case 'sterrenbeeld':
-      const sterrenbeeld = data.berekend?.sterrenbeeld || 'onbekend'
-      const chineesJaar = data.berekend?.chineesJaar || 'onbekend'
-      
+      // Fallback: calculate inline if not available in enriched data
+      const geboorteDatum = data.basisGegevens?.geboorteDatum
+      const sterrenbeeld = data.berekend?.sterrenbeeld || (geboorteDatum ? getSterrenbeeld(geboorteDatum) : 'onbekend')
+      const chineesJaar = data.berekend?.chineesJaar || (geboorteDatum ? getChineesJaar(geboorteDatum) : 'onbekend')
+
+      // If still unknown, return error
+      if (sterrenbeeld === 'onbekend' || chineesJaar === 'onbekend') {
+        throw new Error('Geboortedatum niet beschikbaar - kan sterrenbeeld niet berekenen')
+      }
+
       return `Schrijf een tekst over het sterrenbeeld en Chinese teken voor ${naam}.
 
 GEGEVENS:

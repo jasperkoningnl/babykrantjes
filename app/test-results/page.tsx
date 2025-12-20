@@ -223,6 +223,33 @@ export default function TestResultsPage() {
     kleur: getKleur(data.basisGegevens.geboorteDatum),
   }
 
+  // Save enriched data to localStorage whenever it changes
+  useEffect(() => {
+    if (!data) return
+
+    const enrichedData = {
+      ...data,
+      berekend,
+      weather: weather || undefined,
+      dailyNews: dailyNews || undefined,
+      waybackNews: waybackNews || undefined,
+      monthlyNews: monthlyNews || undefined,
+      top40: top40 || undefined,
+      yearChart: yearChart || undefined,
+      tvPrograms: tvPrograms || undefined,
+      wikipediaTV: wikipediaTV || undefined,
+      nameMeaning: nameMeaning || undefined,
+      famousNamesakes: famousNamesakes || undefined,
+      bornPersons: bornPersons.length > 0 ? bornPersons : undefined,
+      movies: movies || undefined,
+      topMovies: topMovies || undefined,
+      series: series || undefined,
+    }
+
+    localStorage.setItem('babykrant_test_data', JSON.stringify(enrichedData))
+    console.log('[Babykrant] Enriched data saved to localStorage', Object.keys(enrichedData))
+  }, [data, berekend, weather, dailyNews, waybackNews, monthlyNews, top40, yearChart, tvPrograms, wikipediaTV, nameMeaning, famousNamesakes, bornPersons, movies, topMovies, series])
+
   const sterrenbeeldInfo = getSterrenbeeldBeschrijving(sterrenbeeld)
   const chineesTekenInfo = getChineesTekenBeschrijving(chineesJaar)
   const firstName = nameMeaning?.firstName || famousNamesakes?.firstName || '...'
