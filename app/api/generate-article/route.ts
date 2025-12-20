@@ -1,9 +1,9 @@
 // app/api/generate-article/route.ts
-// @version 1.0.0 - COMPLETE Gemini integratie met alle 8 secties
+// @version 2.0.0 - Claude Haiku 3.5 integratie met alle 8 secties
 
 import { NextRequest, NextResponse } from 'next/server'
 import type { ArticleGenerationRequest, ArticleGenerationResponse, UsageStats } from '@/lib/articleTypes'
-import { USAGE_LIMITS, GEMINI_PRICING } from '@/lib/articleTypes'
+import { USAGE_LIMITS, CLAUDE_PRICING } from '@/lib/articleTypes'
 
 const dailyUsage = new Map<string, UsageStats>()
 
@@ -34,8 +34,8 @@ function updateUsageStats(sessionId: string, cost: number) {
 }
 
 function calculateCost(inputTokens: number, outputTokens: number): number {
-  return ((inputTokens / 1_000_000) * GEMINI_PRICING.inputCostPer1MTokens) +
-         ((outputTokens / 1_000_000) * GEMINI_PRICING.outputCostPer1MTokens)
+  return ((inputTokens / 1_000_000) * CLAUDE_PRICING.inputCostPer1MTokens) +
+         ((outputTokens / 1_000_000) * CLAUDE_PRICING.outputCostPer1MTokens)
 }
 
 // SYSTEM PROMPT - Algemeen voor alle secties
@@ -346,53 +346,51 @@ Schrijf de tekst:`
   }
 }
 
-// GEMINI API CALL
-async function callGemini(prompt: string, systemPrompt: string): Promise<{ text: string, tokensUsed: { input: number, output: number } }> {
-  const apiKey = process.env.GEMINI_API_KEY
+// CLAUDE API CALL
+async function callClaude(prompt: string, systemPrompt: string): Promise<{ text: string, tokensUsed: { input: number, output: number } }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('API key missing')
 
   const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    'https://api.anthropic.com/v1/messages',
     {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `${systemPrompt}\n\n${prompt}`
-          }]
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{
+          role: 'user',
+          content: prompt
         }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 600,
-          topP: 0.9,
-          topK: 40
-        }
+        temperature: 0.7
       })
     }
   )
 
   if (!response.ok) {
     const errorText = await response.text()
-    console.error('[Gemini] API error response:', errorText)
-    console.error('[Gemini] Status:', response.status)
-    console.error('[Gemini] Headers:', Object.fromEntries(response.headers.entries()))
-    throw new Error(`Gemini API error: ${response.status} - ${errorText}`)
+    console.error('[Claude] API error response:', errorText)
+    console.error('[Claude] Status:', response.status)
+    console.error('[Claude] Headers:', Object.fromEntries(response.headers.entries()))
+    throw new Error(`Claude API error: ${response.status} - ${errorText}`)
   }
 
   const result = await response.json()
-  
-  const text = result.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  const usageMetadata = result.usageMetadata || {}
-  
+
+  const text = result.content?.[0]?.text || ''
+  const usage = result.usage || {}
+
   return {
     text,
     tokensUsed: {
-      input: usageMetadata.promptTokenCount || 0,
-      output: usageMetadata.candidatesTokenCount || 0
+      input: usage.input_tokens || 0,
+      output: usage.output_tokens || 0
     }
   }
 }
@@ -409,7 +407,7 @@ export async function POST(request: NextRequest) {
       } as ArticleGenerationResponse, { status: 400 })
     }
 
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       return NextResponse.json({
         success: false,
@@ -418,9 +416,7 @@ export async function POST(request: NextRequest) {
     }
 
     const usage = getUsageStats(sessionId)
-    
-    // RATE LIMITING DISABLED FOR TESTING
-    /*
+
     if (usage.requestsToday >= USAGE_LIMITS.maxRequestsPerDay) {
       return NextResponse.json({
         success: false,
@@ -433,34 +429,33 @@ export async function POST(request: NextRequest) {
     if (usage.costToday >= USAGE_LIMITS.maxCostPerDay) {
       return NextResponse.json({
         success: false,
-        error: `Budget limiet bereikt (€${USAGE_LIMITS.maxCostPerDay})`,
+        error: `Budget limiet bereikt ($${USAGE_LIMITS.maxCostPerDay})`,
         remainingRequests: USAGE_LIMITS.maxRequestsPerDay - usage.requestsToday,
         dailyCost: usage.costToday
       } as ArticleGenerationResponse, { status: 429 })
     }
-    */
 
     console.log(`[API] Generating ${section} (session: ${sessionId})`)
-    
+
     // Build prompt
     const userPrompt = buildPrompt(section, data)
-    
-    // Call Gemini
-    const geminiResult = await callGemini(userPrompt, SYSTEM_PROMPT)
-    
-    const totalTokens = geminiResult.tokensUsed.input + geminiResult.tokensUsed.output
-    const cost = calculateCost(geminiResult.tokensUsed.input, geminiResult.tokensUsed.output)
-    
+
+    // Call Claude
+    const claudeResult = await callClaude(userPrompt, SYSTEM_PROMPT)
+
+    const totalTokens = claudeResult.tokensUsed.input + claudeResult.tokensUsed.output
+    const cost = calculateCost(claudeResult.tokensUsed.input, claudeResult.tokensUsed.output)
+
     updateUsageStats(sessionId, cost)
     const updatedUsage = getUsageStats(sessionId)
 
-    console.log(`[API] Success - ${totalTokens} tokens, €${cost.toFixed(4)}`)
+    console.log(`[API] Success - ${totalTokens} tokens, $${cost.toFixed(4)}`)
 
     return NextResponse.json({
       success: true,
       section,
-      text: geminiResult.text.trim(),
-      wordCount: geminiResult.text.trim().split(/\s+/).length,
+      text: claudeResult.text.trim(),
+      wordCount: claudeResult.text.trim().split(/\s+/).length,
       tokensUsed: totalTokens,
       cost,
       remainingRequests: USAGE_LIMITS.maxRequestsPerDay - updatedUsage.requestsToday,
