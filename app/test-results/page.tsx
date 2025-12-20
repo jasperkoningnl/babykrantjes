@@ -10,7 +10,7 @@
 
 const PAGE_VERSION = '3.0.0'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import VersionFooter from '@/components/VersionFooter'
 import type { BabykrantData } from '@/lib/types'
@@ -214,19 +214,31 @@ export default function TestResultsPage() {
   const sterrenbeeld = getSterrenbeeld(data.basisGegevens.geboorteDatum)
   const chineesJaar = getChineesJaar(data.basisGegevens.geboorteDatum)
   const birthYear = new Date(data.basisGegevens.geboorteDatum).getFullYear()
-  
-  const berekend = {
+
+  // Memoize berekend to prevent infinite re-renders in useEffect
+  const berekend = useMemo(() => ({
     sterrenbeeld,
     chineesJaar,
     geboortebloem: getGeboortebloem(data.basisGegevens.geboorteDatum),
     geboortesteen: getGeboortesteen(data.basisGegevens.geboorteDatum),
     kleur: getKleur(data.basisGegevens.geboorteDatum),
-  }
+  }), [data.basisGegevens.geboorteDatum, sterrenbeeld, chineesJaar])
 
-  // Save enriched data to localStorage whenever it changes
+  // Save enriched data to localStorage after all critical data is loaded
+  // This useEffect triggers when loading states change from true to false
   useEffect(() => {
     if (!data) return
 
+    // Check if critical data is loaded (not all API calls need to succeed)
+    const allCriticalLoaded = !weatherLoading && !bornLoading && !nameMeaningLoading &&
+                              !namesakesLoading && !top40Loading && !dailyNewsLoading
+
+    if (!allCriticalLoaded) {
+      console.log('[Babykrant] Still loading data, waiting...')
+      return
+    }
+
+    // All critical data loaded, save to localStorage
     const enrichedData = {
       ...data,
       berekend,
@@ -248,7 +260,12 @@ export default function TestResultsPage() {
 
     localStorage.setItem('babykrant_test_data', JSON.stringify(enrichedData))
     console.log('[Babykrant] Enriched data saved to localStorage', Object.keys(enrichedData))
-  }, [data, berekend, weather, dailyNews, waybackNews, monthlyNews, top40, yearChart, tvPrograms, wikipediaTV, nameMeaning, famousNamesakes, bornPersons, movies, topMovies, series])
+  }, [
+    // Only trigger when loading states change or data becomes available
+    weatherLoading, bornLoading, nameMeaningLoading, namesakesLoading, top40Loading, dailyNewsLoading,
+    data, berekend, weather, dailyNews, waybackNews, monthlyNews, top40, yearChart,
+    tvPrograms, wikipediaTV, nameMeaning, famousNamesakes, bornPersons, movies, topMovies, series
+  ])
 
   const sterrenbeeldInfo = getSterrenbeeldBeschrijving(sterrenbeeld)
   const chineesTekenInfo = getChineesTekenBeschrijving(chineesJaar)
