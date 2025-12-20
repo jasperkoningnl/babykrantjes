@@ -8,9 +8,9 @@
 // UPDATE v3.0.0: ExtraVragen uitbreiding - 10 vragen in 5 secties
 'use client'
 
-const PAGE_VERSION = '3.0.0'
+const PAGE_VERSION = '3.1.0'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import VersionFooter from '@/components/VersionFooter'
 import type { BabykrantData } from '@/lib/types'
@@ -43,8 +43,9 @@ export default function TestResultsPage() {
   const [dailyNews, setDailyNews] = useState<DailyNewsResult | null>(null)
   const [monthlyNews, setMonthlyNews] = useState<MonthNewsResult | null>(null)
   const [waybackNews, setWaybackNews] = useState<WaybackNewsResult | null>(null)
-  
+
   const [loading, setLoading] = useState(true)
+  const hasStoredEnrichedData = useRef(false)
   const [weatherLoading, setWeatherLoading] = useState(false)
   const [bornLoading, setBornLoading] = useState(false)
   const [nameMeaningLoading, setNameMeaningLoading] = useState(false)
@@ -225,20 +226,19 @@ export default function TestResultsPage() {
   }), [data.basisGegevens.geboorteDatum, sterrenbeeld, chineesJaar])
 
   // Save enriched data to localStorage after all critical data is loaded
-  // This useEffect triggers when loading states change from true to false
+  // Use ref to prevent infinite re-renders
   useEffect(() => {
-    if (!data) return
+    if (!data || hasStoredEnrichedData.current) return
 
     // Check if critical data is loaded (not all API calls need to succeed)
     const allCriticalLoaded = !weatherLoading && !bornLoading && !nameMeaningLoading &&
                               !namesakesLoading && !top40Loading && !dailyNewsLoading
 
     if (!allCriticalLoaded) {
-      console.log('[Babykrant] Still loading data, waiting...')
-      return
+      return // Still loading, don't save yet
     }
 
-    // All critical data loaded, save to localStorage
+    // All critical data loaded, save to localStorage ONCE
     const enrichedData = {
       ...data,
       berekend,
@@ -259,13 +259,9 @@ export default function TestResultsPage() {
     }
 
     localStorage.setItem('babykrant_test_data', JSON.stringify(enrichedData))
+    hasStoredEnrichedData.current = true
     console.log('[Babykrant] Enriched data saved to localStorage', Object.keys(enrichedData))
-  }, [
-    // Only trigger when loading states change or data becomes available
-    weatherLoading, bornLoading, nameMeaningLoading, namesakesLoading, top40Loading, dailyNewsLoading,
-    data, berekend, weather, dailyNews, waybackNews, monthlyNews, top40, yearChart,
-    tvPrograms, wikipediaTV, nameMeaning, famousNamesakes, bornPersons, movies, topMovies, series
-  ])
+  }, [weatherLoading, bornLoading, nameMeaningLoading, namesakesLoading, top40Loading, dailyNewsLoading])
 
   const sterrenbeeldInfo = getSterrenbeeldBeschrijving(sterrenbeeld)
   const chineesTekenInfo = getChineesTekenBeschrijving(chineesJaar)
