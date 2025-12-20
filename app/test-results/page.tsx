@@ -8,10 +8,11 @@
 // UPDATE v3.0.0: ExtraVragen uitbreiding - 10 vragen in 5 secties
 'use client'
 
-const PAGE_VERSION = '3.1.0'
+const PAGE_VERSION = '3.2.0'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import VersionFooter from '@/components/VersionFooter'
 import type { BabykrantData } from '@/lib/types'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen, getKleur } from '@/lib/calculations'
@@ -28,6 +29,7 @@ import { getWikipediaTVByYear, type WikipediaTVResult } from '@/lib/wikipediaTVA
 import { getDailyNews, getMonthlyNews, getWaybackNews, groupNewsByCategory, formatWaybackTimestamp, type DailyNewsResult, type MonthNewsResult, type WaybackNewsResult, type NewsEvent } from '@/lib/newsAPI'
 
 export default function TestResultsPage() {
+  const router = useRouter()
   const [data, setData] = useState<BabykrantData | null>(null)
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [bornPersons, setBornPersons] = useState<BornPerson[]>([])
@@ -45,7 +47,6 @@ export default function TestResultsPage() {
   const [waybackNews, setWaybackNews] = useState<WaybackNewsResult | null>(null)
 
   const [loading, setLoading] = useState(true)
-  const hasStoredEnrichedData = useRef(false)
   const [weatherLoading, setWeatherLoading] = useState(false)
   const [bornLoading, setBornLoading] = useState(false)
   const [nameMeaningLoading, setNameMeaningLoading] = useState(false)
@@ -216,29 +217,16 @@ export default function TestResultsPage() {
   const chineesJaar = getChineesJaar(data.basisGegevens.geboorteDatum)
   const birthYear = new Date(data.basisGegevens.geboorteDatum).getFullYear()
 
-  // Memoize berekend to prevent infinite re-renders in useEffect
-  const berekend = useMemo(() => ({
+  const berekend = {
     sterrenbeeld,
     chineesJaar,
     geboortebloem: getGeboortebloem(data.basisGegevens.geboorteDatum),
     geboortesteen: getGeboortesteen(data.basisGegevens.geboorteDatum),
     kleur: getKleur(data.basisGegevens.geboorteDatum),
-  }), [data.basisGegevens.geboorteDatum, sterrenbeeld, chineesJaar])
+  }
 
-  // Save enriched data to localStorage after all critical data is loaded
-  // Use ref to prevent infinite re-renders
-  useEffect(() => {
-    if (!data || hasStoredEnrichedData.current) return
-
-    // Check if critical data is loaded (not all API calls need to succeed)
-    const allCriticalLoaded = !weatherLoading && !bornLoading && !nameMeaningLoading &&
-                              !namesakesLoading && !top40Loading && !dailyNewsLoading
-
-    if (!allCriticalLoaded) {
-      return // Still loading, don't save yet
-    }
-
-    // All critical data loaded, save to localStorage ONCE
+  // Function to save all enriched data to localStorage
+  const saveEnrichedData = () => {
     const enrichedData = {
       ...data,
       berekend,
@@ -259,9 +247,14 @@ export default function TestResultsPage() {
     }
 
     localStorage.setItem('babykrant_test_data', JSON.stringify(enrichedData))
-    hasStoredEnrichedData.current = true
-    console.log('[Babykrant] Enriched data saved to localStorage', Object.keys(enrichedData))
-  }, [weatherLoading, bornLoading, nameMeaningLoading, namesakesLoading, top40Loading, dailyNewsLoading])
+    console.log('[Babykrant v3.2] ✅ Enriched data saved to localStorage', Object.keys(enrichedData))
+  }
+
+  // Handler to save data and navigate to generate-articles
+  const handleGenerateArticles = () => {
+    saveEnrichedData()
+    router.push('/generate-articles')
+  }
 
   const sterrenbeeldInfo = getSterrenbeeldBeschrijving(sterrenbeeld)
   const chineesTekenInfo = getChineesTekenBeschrijving(chineesJaar)
@@ -280,6 +273,17 @@ export default function TestResultsPage() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold mb-2">Testresultaten</h1>
             <p className="text-gray-600">Bekijk de berekende gegevens en opgehaalde informatie</p>
+          </div>
+
+          {/* VERSION INDICATOR - v3.2.0 FIX */}
+          <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg p-4 mb-6 shadow-lg">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🎉</span>
+              <div>
+                <p className="font-bold text-lg">✅ NIEUWE VERSIE ACTIEF - v{PAGE_VERSION}</p>
+                <p className="text-sm text-green-100">Infinite re-render bug gefixed! Data wordt nu correct opgeslagen bij navigatie naar artikel generatie.</p>
+              </div>
+            </div>
           </div>
 
           <div className="bg-blue-50 rounded-lg p-6 mb-6">
@@ -896,7 +900,12 @@ export default function TestResultsPage() {
 
           <div className="mt-6 flex gap-4">
             <Link href="/wizard" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold">Nieuwe babykrant maken</Link>
-            <Link href="/generate-articles" className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold">→ AI Artikelen Genereren ✨</Link>
+            <button
+              onClick={handleGenerateArticles}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+            >
+              💾 Opslaan & AI Artikelen Genereren ✨
+            </button>
           </div>
           
           <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 text-right">
