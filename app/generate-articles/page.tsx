@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ARTICLE_SECTIONS, type ArticleSection, type GeneratedArticle, type ArticleGenerationResponse } from '@/lib/articleTypes'
+import VersionFooter from '@/components/VersionFooter'
 
 function getSessionId(): string {
   if (typeof window === 'undefined') return ''
@@ -239,6 +240,7 @@ export default function GenerateArticlesPage() {
           </div>
         </div>
       </div>
+      <VersionFooter />
     </div>
   )
 }
