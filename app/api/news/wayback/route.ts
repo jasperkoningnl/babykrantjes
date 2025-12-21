@@ -1,14 +1,15 @@
 // app/api/news/wayback/route.ts
-// @version 1.3.0
+// @version 1.4.0
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
 // Bronnen: www.nu.nl (primair), www.nos.nl + nos.nl (fallback)
 // UPDATE v1.2.0: Multi-source fallback toegevoegd
 // UPDATE v1.3.0: Fix cache update in error scenarios + stale cache retry logic
+// UPDATE v1.4.0: Cache full headlines for true performance gain
 
 import { NextRequest, NextResponse } from 'next/server'
-import { checkCache, updateCache, isCacheStale } from '@/lib/waybackCache'
+import { checkCache, updateCache, isCacheStale, type WaybackHeadline } from '@/lib/waybackCache'
 
-const API_VERSION = '1.3.0'
+const API_VERSION = '1.4.0'
 
 // News sources to try (in order)
 const NEWS_SOURCES = {
@@ -25,13 +26,8 @@ interface WaybackSnapshot {
   source: string
 }
 
-interface Headline {
-  title: string
-  url: string
-  category: string | null
-  time: string | null
-  source: string
-}
+// Use WaybackHeadline from cache (imported above)
+type Headline = WaybackHeadline
 
 interface WaybackNewsResult {
   date: string
@@ -504,10 +500,22 @@ export async function GET(request: NextRequest) {
           cacheHit: true,
           error: cached.reason || `No archived snapshot found for ${dateParam}`
         } as WaybackNewsResult)
+      } else if (cached.status === 'found' && cached.headlines && cached.headlines.length > 0) {
+        // v2.1.0: Return full headlines from cache!
+        console.log(`[Wayback] ⚡ Returning ${cached.headlines.length} headlines from cache (FAST!)`)
+        return NextResponse.json({
+          date: dateParam,
+          headlines: cached.headlines,
+          totalHeadlines: cached.headlines.length,
+          sources: cached.sources || [],
+          sourceUrl: cached.timestamp ? getWaybackUrl(cached.timestamp, cached.sources?.[0] || 'www.nu.nl') : '',
+          snapshotTimestamp: cached.timestamp || null,
+          apiVersion: API_VERSION,
+          cacheHit: true
+        } as WaybackNewsResult)
       } else if (cached.timestamp) {
-        // Cache hit with found snapshot - we need to re-fetch because we now support multiple sources
-        // In a future version, we could store headlines in cache
-        console.log(`[Wayback] Cache indicates snapshots exist, but re-querying for multi-source support`)
+        // Old cache format (v2.0.0) without headlines - re-fetch
+        console.log(`[Wayback] Cache hit but no headlines stored (old format), re-fetching`)
       }
     }
     
@@ -538,7 +546,9 @@ export async function GET(request: NextRequest) {
             await updateCache(dateParam, {
               status: 'found',
               timestamp: snapshot.timestamp,
-              headlines: headlines.length
+              headlines: headlines,  // v2.1.0: Store full headlines!
+              headlineCount: headlines.length,
+              sources: [source]
             })
             
             return NextResponse.json({
@@ -586,7 +596,9 @@ export async function GET(request: NextRequest) {
       await updateCache(dateParam, {
         status: 'found',
         timestamp: primaryTimestamp || undefined,
-        headlines: allHeadlines.length
+        headlines: allHeadlines,  // v2.1.0: Store full headlines!
+        headlineCount: allHeadlines.length,
+        sources: usedSources
       })
       
       return NextResponse.json({
