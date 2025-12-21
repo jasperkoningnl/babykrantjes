@@ -1,0 +1,57 @@
+name: Cleanup Claude Branches
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete merged claude/* branches
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🧹 Cleaning up merged claude/* branches..."
+
+          # Get all remote claude/* branches
+          git fetch origin
+
+          # Find merged claude/* branches and delete them
+          for branch in $(git branch -r --merged origin/main | grep 'origin/claude/' | sed 's|origin/||'); do
+            echo "Deleting merged branch: $branch"
+            git push origin --delete "$branch" || echo "Failed to delete $branch (might be already deleted)"
+          done
+
+          echo "✅ Cleanup complete!"
+
+      - name: Delete old unmerged claude/* branches
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🧹 Cleaning up old (>30 days) unmerged claude/* branches..."
+
+          # Find branches older than 30 days
+          CUTOFF_DATE=$(date -d '30 days ago' +%s)
+
+          for branch in $(git branch -r | grep 'origin/claude/' | sed 's|origin/||' | tr -d ' '); do
+            BRANCH_DATE=$(git log -1 --format=%ct origin/$branch)
+
+            if [ "$BRANCH_DATE" -lt "$CUTOFF_DATE" ]; then
+              echo "Deleting old branch: $branch ($(date -d @$BRANCH_DATE +'%Y-%m-%d'))"
+              git push origin --delete "$branch" || echo "Failed to delete $branch"
+            fi
+          done
+
+          echo "✅ Old branch cleanup complete!"
