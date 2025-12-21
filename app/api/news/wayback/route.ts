@@ -1,15 +1,16 @@
 // app/api/news/wayback/route.ts
-// @version 1.4.0
+// @version 1.5.0
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
 // Bronnen: www.nu.nl (primair), www.nos.nl + nos.nl (fallback)
 // UPDATE v1.2.0: Multi-source fallback toegevoegd
 // UPDATE v1.3.0: Fix cache update in error scenarios + stale cache retry logic
 // UPDATE v1.4.0: Cache full headlines for true performance gain
+// UPDATE v1.5.0: Simplified - only cache success (prevents overwrite issues)
 
 import { NextRequest, NextResponse } from 'next/server'
-import { checkCache, updateCache, isCacheStale, type WaybackHeadline } from '@/lib/waybackCache'
+import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 
-const API_VERSION = '1.4.0'
+const API_VERSION = '1.5.0'
 
 // News sources to try (in order)
 const NEWS_SOURCES = {
@@ -456,12 +457,7 @@ export async function GET(request: NextRequest) {
   // Nu.nl bestaat sinds 1999, maar goede snapshots vanaf ~2005
   const minDate = new Date('2005-01-01')
   if (requestDate < minDate) {
-    // Update cache voor te oude datums
-    await updateCache(dateParam, {
-      status: 'too_old',
-      reason: 'News archives available from 2005 onwards. Earlier dates may have limited or no snapshots.'
-    })
-    
+    // Don't cache 'too_old' - just return error
     return NextResponse.json({
       date: dateParam,
       headlines: [],
@@ -476,48 +472,22 @@ export async function GET(request: NextRequest) {
   
   try {
     // === CACHE CHECK ===
+    // Simple: only successful results are cached, so if found → return immediately
     const cached = await checkCache(dateParam)
 
-    if (cached) {
-      console.log(`[Wayback] Cache hit for ${dateParam}: ${cached.status}`)
-
-      // Smart staleness check:
-      // - 'found': NEVER stale (permanent cache)
-      // - 'not_found'/'too_old': check staleness (though Redis TTL handles this)
-      const isStale = cached.status !== 'found' && isCacheStale(cached, 7)
-
-      if (isStale) {
-        console.log(`[Wayback] Cache entry is stale (older than 7 days), re-fetching`)
-      } else if (cached.status === 'not_found' || cached.status === 'too_old') {
-        console.log(`[Wayback] Returning cached ${cached.status} result`)
-        return NextResponse.json({
-          date: dateParam,
-          headlines: [],
-          totalHeadlines: 0,
-          sources: [],
-          sourceUrl: '',
-          snapshotTimestamp: null,
-          apiVersion: API_VERSION,
-          cacheHit: true,
-          error: cached.reason || `No archived snapshot found for ${dateParam}`
-        } as WaybackNewsResult)
-      } else if (cached.status === 'found' && cached.headlines && cached.headlines.length > 0) {
-        // v2.1.0: Return full headlines from cache!
-        console.log(`[Wayback] ⚡ Returning ${cached.headlines.length} headlines from cache (FAST!)`)
-        return NextResponse.json({
-          date: dateParam,
-          headlines: cached.headlines,
-          totalHeadlines: cached.headlines.length,
-          sources: cached.sources || [],
-          sourceUrl: cached.timestamp ? getWaybackUrl(cached.timestamp, cached.sources?.[0] || 'www.nu.nl') : '',
-          snapshotTimestamp: cached.timestamp || null,
-          apiVersion: API_VERSION,
-          cacheHit: true
-        } as WaybackNewsResult)
-      } else if (cached.timestamp) {
-        // Old cache format (v2.0.0) without headlines - re-fetch
-        console.log(`[Wayback] Cache hit but no headlines stored (old format), re-fetching`)
-      }
+    if (cached && cached.status === 'found' && cached.headlines && cached.headlines.length > 0) {
+      // Cache hit! Return immediately
+      console.log(`[Wayback] ⚡ Cache hit! Returning ${cached.headlines.length} headlines (instant)`)
+      return NextResponse.json({
+        date: dateParam,
+        headlines: cached.headlines,
+        totalHeadlines: cached.headlines.length,
+        sources: cached.sources || [],
+        sourceUrl: cached.timestamp ? getWaybackUrl(cached.timestamp, cached.sources?.[0] || 'www.nu.nl') : '',
+        snapshotTimestamp: cached.timestamp || null,
+        apiVersion: API_VERSION,
+        cacheHit: true
+      } as WaybackNewsResult)
     }
     
     console.log(`[Wayback] Querying Archive.org for ${dateParam}...`)
@@ -614,12 +584,7 @@ export async function GET(request: NextRequest) {
       } as WaybackNewsResult)
     }
     
-    // Geen enkele bron had resultaten
-    await updateCache(dateParam, {
-      status: 'not_found',
-      reason: `No archived snapshots found for ${dateParam} across all sources (${[...NEWS_SOURCES.primary, ...NEWS_SOURCES.fallback].join(', ')})`
-    })
-    
+    // Geen enkele bron had resultaten - don't cache, let next user retry
     return NextResponse.json({
       date: dateParam,
       headlines: [],
@@ -634,13 +599,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error(`[Wayback News API] Error:`, error)
 
-    // IMPORTANT: Update cache even on error to prevent repeated failed attempts
-    // This avoids hammering the Wayback Machine API with the same failing request
-    await updateCache(dateParam, {
-      status: 'not_found',
-      reason: `Error occurred while fetching: ${error instanceof Error ? error.message : 'Unknown error'}`
-    })
-
+    // Don't cache errors - let next user retry (might be temporary Wayback issue)
     return NextResponse.json({
       date: dateParam,
       headlines: [],

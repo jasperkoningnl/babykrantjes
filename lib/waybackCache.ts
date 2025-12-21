@@ -1,9 +1,10 @@
 // lib/waybackCache.ts
-// @version 2.1.0
+// @version 2.2.0
 // Wayback Machine snapshot cache
 // Stores which dates have available snapshots to avoid redundant Archive.org queries
 // UPDATE v2.0.0: Hybrid storage - Upstash Redis (Vercel) + filesystem fallback (local)
 // UPDATE v2.1.0: Store full headlines in cache for true performance gain
+// UPDATE v2.2.0: Simplified - only cache successful results (no overwrite issues)
 
 import { Redis } from '@upstash/redis'
 
@@ -73,6 +74,14 @@ async function checkCacheRedis(date: string): Promise<WaybackCacheEntry | null> 
 async function updateCacheRedis(date: string, entry: Omit<WaybackCacheEntry, 'lastChecked'>): Promise<void> {
   if (!redis) return
 
+  // SIMPLE STRATEGY: Only cache successful results
+  // - 'found': permanent cache → builds shared database
+  // - 'not_found'/'too_old': DON'T cache → retry next time
+  if (entry.status !== 'found' || !entry.headlines || entry.headlines.length === 0) {
+    console.log(`[WaybackCache] Redis: Skipping cache write for ${date}: ${entry.status} (only success is cached)`)
+    return
+  }
+
   try {
     const key = `${CACHE_KEY_PREFIX}${date}`
     const cacheEntry: WaybackCacheEntry = {
@@ -80,19 +89,9 @@ async function updateCacheRedis(date: string, entry: Omit<WaybackCacheEntry, 'la
       lastChecked: new Date().toISOString()
     }
 
-    // Smart TTL strategy for shared cache benefit:
-    // - 'found': NO TTL (permanent) - historical news doesn't change, share forever!
-    // - 'not_found'/'too_old': 7 days TTL - might be temporary, retry later
-    if (entry.status === 'found') {
-      // Permanent cache - builds shared database over time
-      await redis.set(key, cacheEntry)
-      console.log(`[WaybackCache] Redis: Updated cache for ${date}: ${entry.status} (PERMANENT - shared cache!)`)
-    } else {
-      // Temporary cache for failures - retry after 7 days
-      const ttlSeconds = 7 * 24 * 60 * 60  // 7 days
-      await redis.setex(key, ttlSeconds, cacheEntry)
-      console.log(`[WaybackCache] Redis: Updated cache for ${date}: ${entry.status} (TTL: 7 days)`)
-    }
+    // Permanent cache - historical news doesn't change
+    await redis.set(key, cacheEntry)
+    console.log(`[WaybackCache] Redis: Cached ${entry.headlines.length} headlines for ${date} (PERMANENT - shared benefit!)`)
   } catch (error) {
     console.error('[WaybackCache] Redis write error:', error)
   }
@@ -154,6 +153,12 @@ async function checkCacheFile(date: string): Promise<WaybackCacheEntry | null> {
 }
 
 async function updateCacheFile(date: string, entry: Omit<WaybackCacheEntry, 'lastChecked'>): Promise<void> {
+  // SIMPLE STRATEGY: Only cache successful results (same as Redis)
+  if (entry.status !== 'found' || !entry.headlines || entry.headlines.length === 0) {
+    console.log(`[WaybackCache] File: Skipping cache write for ${date}: ${entry.status} (only success is cached)`)
+    return
+  }
+
   try {
     // Ensure data directory exists
     const dataDir = path.join(process.cwd(), 'data')
@@ -178,7 +183,7 @@ async function updateCacheFile(date: string, entry: Omit<WaybackCacheEntry, 'las
 
     // Write back to file
     await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2))
-    console.log(`[WaybackCache] File: Updated cache for ${date}: ${entry.status}`)
+    console.log(`[WaybackCache] File: Cached ${entry.headlines.length} headlines for ${date}`)
   } catch (error) {
     // Don't fail the request if cache write fails
     console.error('[WaybackCache] File write error:', error)
