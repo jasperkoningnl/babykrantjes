@@ -15,7 +15,7 @@ import { fetchWithRetry } from '@/lib/waybackFetch'
 const API_VERSION = '1.6.0'
 
 // Reliability settings
-const MIN_HEADLINES = 10  // Minimum number of headlines to accept as valid result
+const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
 const CDX_LIMIT = 20  // Number of snapshots to fetch (increased from 5)
 
 // News sources to try (in order)
@@ -541,14 +541,19 @@ export async function GET(request: NextRequest) {
         if (html) {
           const headlines = parseHeadlines(html, source)
 
-          // v1.6.0: Apply minimum threshold to ensure quality results
-          if (headlines.length >= MIN_HEADLINES) {
-            console.log(`[Wayback] ✓ Primary source ${source} yielded ${headlines.length} headlines (threshold: ${MIN_HEADLINES})`)
+          // v1.6.0: Accept any result > 0, but log if below ideal threshold
+          if (headlines.length > 0) {
+            if (headlines.length >= MIN_HEADLINES) {
+              console.log(`[Wayback] ✓ Primary source ${source} yielded ${headlines.length} headlines`)
+            } else {
+              console.log(`[Wayback] ⚠️  Primary source ${source} yielded ${headlines.length} headlines (below ideal ${MIN_HEADLINES}, but accepting)`)
+            }
+
             allHeadlines.push(...headlines)
             usedSources.push(source)
             primaryTimestamp = snapshot.timestamp
 
-            // Als primaire bron voldoende resultaten heeft, stoppen we hier
+            // Als primaire bron resultaten heeft, stoppen we hier
             await updateCache(dateParam, {
               status: 'found',
               timestamp: snapshot.timestamp,
@@ -567,8 +572,6 @@ export async function GET(request: NextRequest) {
               apiVersion: API_VERSION,
               cacheHit: false
             } as WaybackNewsResult)
-          } else if (headlines.length > 0) {
-            console.log(`[Wayback] ⚠️  Primary source ${source} yielded only ${headlines.length} headlines (below threshold ${MIN_HEADLINES}), trying fallback...`)
           }
         }
       }
@@ -601,10 +604,7 @@ export async function GET(request: NextRequest) {
     
     // Als we nu wel headlines hebben, return success
     if (allHeadlines.length > 0) {
-      // v1.6.0: Log if result is below ideal threshold but still returned
-      if (allHeadlines.length < MIN_HEADLINES) {
-        console.log(`[Wayback] ⚠️  Returning ${allHeadlines.length} headlines (below ideal threshold of ${MIN_HEADLINES}, but best available)`)
-      }
+      console.log(`[Wayback] ✓ Fallback sources yielded ${allHeadlines.length} total headlines`)
 
       await updateCache(dateParam, {
         status: 'found',
