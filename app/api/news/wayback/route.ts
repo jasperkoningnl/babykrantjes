@@ -1,13 +1,14 @@
 // app/api/news/wayback/route.ts
-// @version 1.2.0
+// @version 1.3.0
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
 // Bronnen: www.nu.nl (primair), www.nos.nl + nos.nl (fallback)
 // UPDATE v1.2.0: Multi-source fallback toegevoegd
+// UPDATE v1.3.0: Fix cache update in error scenarios + stale cache retry logic
 
 import { NextRequest, NextResponse } from 'next/server'
-import { checkCache, updateCache } from '@/lib/waybackCache'
+import { checkCache, updateCache, isCacheStale } from '@/lib/waybackCache'
 
-const API_VERSION = '1.2.0'
+const API_VERSION = '1.3.0'
 
 // News sources to try (in order)
 const NEWS_SOURCES = {
@@ -480,11 +481,18 @@ export async function GET(request: NextRequest) {
   try {
     // === CACHE CHECK ===
     const cached = await checkCache(dateParam)
-    
+
     if (cached) {
       console.log(`[Wayback] Cache hit for ${dateParam}: ${cached.status}`)
-      
-      if (cached.status === 'not_found' || cached.status === 'too_old') {
+
+      // Check if cache is stale (7 days for not_found, 30 days for others)
+      const maxAge = cached.status === 'not_found' ? 7 : 30
+      const isStale = isCacheStale(cached, maxAge)
+
+      if (isStale) {
+        console.log(`[Wayback] Cache entry is stale (older than ${maxAge} days), re-fetching`)
+      } else if (cached.status === 'not_found' || cached.status === 'too_old') {
+        console.log(`[Wayback] Returning cached ${cached.status} result`)
         return NextResponse.json({
           date: dateParam,
           headlines: [],
@@ -496,11 +504,9 @@ export async function GET(request: NextRequest) {
           cacheHit: true,
           error: cached.reason || `No archived snapshot found for ${dateParam}`
         } as WaybackNewsResult)
-      }
-      
-      // Cache hit with found snapshot - we need to re-fetch because we now support multiple sources
-      // In a future version, we could store headlines in cache
-      if (cached.timestamp) {
+      } else if (cached.timestamp) {
+        // Cache hit with found snapshot - we need to re-fetch because we now support multiple sources
+        // In a future version, we could store headlines in cache
         console.log(`[Wayback] Cache indicates snapshots exist, but re-querying for multi-source support`)
       }
     }
@@ -614,7 +620,14 @@ export async function GET(request: NextRequest) {
     
   } catch (error) {
     console.error(`[Wayback News API] Error:`, error)
-    
+
+    // IMPORTANT: Update cache even on error to prevent repeated failed attempts
+    // This avoids hammering the Wayback Machine API with the same failing request
+    await updateCache(dateParam, {
+      status: 'not_found',
+      reason: `Error occurred while fetching: ${error instanceof Error ? error.message : 'Unknown error'}`
+    })
+
     return NextResponse.json({
       date: dateParam,
       headlines: [],
