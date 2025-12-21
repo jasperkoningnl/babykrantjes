@@ -1,13 +1,12 @@
 // lib/waybackCache.ts
-// @version 1.0.0
+// @version 2.0.0
 // Wayback Machine snapshot cache
 // Stores which dates have available snapshots to avoid redundant Archive.org queries
+// UPDATE v2.0.0: Hybrid storage - Upstash Redis (Vercel) + filesystem fallback (local)
 
-import fs from 'fs/promises'
-import path from 'path'
+import { Redis } from '@upstash/redis'
 
-const CACHE_FILE = path.join(process.cwd(), 'data', 'wayback-cache.json')
-
+// Types
 export interface WaybackCacheEntry {
   status: 'found' | 'not_found' | 'too_old'
   timestamp?: string  // Wayback timestamp if found
@@ -20,10 +19,111 @@ export interface WaybackCache {
   [date: string]: WaybackCacheEntry
 }
 
-/**
- * Check if a date has cached Wayback Machine snapshot info
- */
-export async function checkCache(date: string): Promise<WaybackCacheEntry | null> {
+// =============================================================================
+// Storage Detection & Initialization
+// =============================================================================
+
+const CACHE_KEY_PREFIX = 'wayback:'
+
+// Check if we're running on Vercel with Upstash Redis
+const hasUpstashEnv = () => {
+  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
+}
+
+// Initialize Upstash Redis client (only on Vercel)
+let redis: Redis | null = null
+if (hasUpstashEnv()) {
+  redis = new Redis({
+    url: process.env.KV_REST_API_URL!,
+    token: process.env.KV_REST_API_TOKEN!,
+  })
+  console.log('[WaybackCache] Using Upstash Redis for cache storage')
+} else {
+  console.log('[WaybackCache] Using filesystem for cache storage (local development)')
+}
+
+// =============================================================================
+// Upstash Redis Implementation
+// =============================================================================
+
+async function checkCacheRedis(date: string): Promise<WaybackCacheEntry | null> {
+  if (!redis) return null
+
+  try {
+    const key = `${CACHE_KEY_PREFIX}${date}`
+    const data = await redis.get<WaybackCacheEntry>(key)
+    return data
+  } catch (error) {
+    console.error('[WaybackCache] Redis read error:', error)
+    return null
+  }
+}
+
+async function updateCacheRedis(date: string, entry: Omit<WaybackCacheEntry, 'lastChecked'>): Promise<void> {
+  if (!redis) return
+
+  try {
+    const key = `${CACHE_KEY_PREFIX}${date}`
+    const cacheEntry: WaybackCacheEntry = {
+      ...entry,
+      lastChecked: new Date().toISOString()
+    }
+
+    // Store with TTL: 30 days for found/too_old, 7 days for not_found
+    const ttlSeconds = entry.status === 'not_found' ? 7 * 24 * 60 * 60 : 30 * 24 * 60 * 60
+
+    await redis.setex(key, ttlSeconds, cacheEntry)
+    console.log(`[WaybackCache] Redis: Updated cache for ${date}: ${entry.status} (TTL: ${ttlSeconds}s)`)
+  } catch (error) {
+    console.error('[WaybackCache] Redis write error:', error)
+  }
+}
+
+async function getCacheStatsRedis(): Promise<{
+  total: number
+  found: number
+  notFound: number
+  tooOld: number
+}> {
+  if (!redis) return { total: 0, found: 0, notFound: 0, tooOld: 0 }
+
+  try {
+    // Get all cache keys
+    const keys = await redis.keys(`${CACHE_KEY_PREFIX}*`)
+
+    if (keys.length === 0) {
+      return { total: 0, found: 0, notFound: 0, tooOld: 0 }
+    }
+
+    // Fetch all entries
+    const entries = await Promise.all(
+      keys.map(key => redis!.get<WaybackCacheEntry>(key))
+    )
+
+    const validEntries = entries.filter((e): e is WaybackCacheEntry => e !== null)
+
+    return {
+      total: validEntries.length,
+      found: validEntries.filter(e => e.status === 'found').length,
+      notFound: validEntries.filter(e => e.status === 'not_found').length,
+      tooOld: validEntries.filter(e => e.status === 'too_old').length
+    }
+  } catch (error) {
+    console.error('[WaybackCache] Redis stats error:', error)
+    return { total: 0, found: 0, notFound: 0, tooOld: 0 }
+  }
+}
+
+// =============================================================================
+// Filesystem Implementation (fallback for local development)
+// =============================================================================
+
+import fs from 'fs/promises'
+import path from 'path'
+
+const CACHE_FILE = path.join(process.cwd(), 'data', 'wayback-cache.json')
+
+async function checkCacheFile(date: string): Promise<WaybackCacheEntry | null> {
   try {
     const data = await fs.readFile(CACHE_FILE, 'utf-8')
     const cache: WaybackCache = JSON.parse(data)
@@ -34,10 +134,7 @@ export async function checkCache(date: string): Promise<WaybackCacheEntry | null
   }
 }
 
-/**
- * Update cache with new snapshot information
- */
-export async function updateCache(date: string, entry: Omit<WaybackCacheEntry, 'lastChecked'>): Promise<void> {
+async function updateCacheFile(date: string, entry: Omit<WaybackCacheEntry, 'lastChecked'>): Promise<void> {
   try {
     // Ensure data directory exists
     const dataDir = path.join(process.cwd(), 'data')
@@ -62,17 +159,14 @@ export async function updateCache(date: string, entry: Omit<WaybackCacheEntry, '
 
     // Write back to file
     await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2))
-    console.log(`[WaybackCache] Updated cache for ${date}: ${entry.status}`)
+    console.log(`[WaybackCache] File: Updated cache for ${date}: ${entry.status}`)
   } catch (error) {
     // Don't fail the request if cache write fails
-    console.error('[WaybackCache] Failed to update cache:', error)
+    console.error('[WaybackCache] File write error:', error)
   }
 }
 
-/**
- * Get cache statistics
- */
-export async function getCacheStats(): Promise<{
+async function getCacheStatsFile(): Promise<{
   total: number
   found: number
   notFound: number
@@ -82,7 +176,7 @@ export async function getCacheStats(): Promise<{
     const data = await fs.readFile(CACHE_FILE, 'utf-8')
     const cache: WaybackCache = JSON.parse(data)
     const entries = Object.values(cache)
-    
+
     return {
       total: entries.length,
       found: entries.filter(e => e.status === 'found').length,
@@ -94,8 +188,38 @@ export async function getCacheStats(): Promise<{
   }
 }
 
+// =============================================================================
+// Public API (automatically chooses Redis or File based on environment)
+// =============================================================================
+
 /**
- * Check if cache entry is stale (older than 30 days)
+ * Check if a date has cached Wayback Machine snapshot info
+ */
+export async function checkCache(date: string): Promise<WaybackCacheEntry | null> {
+  return hasUpstashEnv() ? checkCacheRedis(date) : checkCacheFile(date)
+}
+
+/**
+ * Update cache with new snapshot information
+ */
+export async function updateCache(date: string, entry: Omit<WaybackCacheEntry, 'lastChecked'>): Promise<void> {
+  return hasUpstashEnv() ? updateCacheRedis(date, entry) : updateCacheFile(date, entry)
+}
+
+/**
+ * Get cache statistics
+ */
+export async function getCacheStats(): Promise<{
+  total: number
+  found: number
+  notFound: number
+  tooOld: number
+}> {
+  return hasUpstashEnv() ? getCacheStatsRedis() : getCacheStatsFile()
+}
+
+/**
+ * Check if cache entry is stale (older than N days)
  * Wayback Machine can add new snapshots, so we occasionally re-check
  */
 export function isCacheStale(entry: WaybackCacheEntry, maxAgeDays: number = 30): boolean {
