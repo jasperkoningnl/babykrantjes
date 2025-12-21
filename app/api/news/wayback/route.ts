@@ -1,16 +1,22 @@
 // app/api/news/wayback/route.ts
-// @version 1.5.0
+// @version 1.6.0
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
 // Bronnen: www.nu.nl (primair), www.nos.nl + nos.nl (fallback)
 // UPDATE v1.2.0: Multi-source fallback toegevoegd
 // UPDATE v1.3.0: Fix cache update in error scenarios + stale cache retry logic
 // UPDATE v1.4.0: Cache full headlines for true performance gain
 // UPDATE v1.5.0: Simplified - only cache success (prevents overwrite issues)
+// UPDATE v1.6.0: Timeout & retry logic + smart CDX strategy + minimum threshold
 
 import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
+import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.5.0'
+const API_VERSION = '1.6.0'
+
+// Reliability settings
+const MIN_HEADLINES = 10  // Minimum number of headlines to accept as valid result
+const CDX_LIMIT = 20  // Number of snapshots to fetch (increased from 5)
 
 // News sources to try (in order)
 const NEWS_SOURCES = {
@@ -46,48 +52,75 @@ interface WaybackNewsResult {
 type CDXRecord = [string, string, string, string, string, string, string]
 
 /**
- * Zoekt een snapshot van een specifieke bron op een specifieke datum via CDX API
+ * Zoekt de beste snapshot van een specifieke bron op een specifieke datum via CDX API
+ * v1.6.0: Smart strategy - prefer snapshots during peak news hours (12:00-20:00)
  */
 async function findSnapshot(date: string, source: string): Promise<WaybackSnapshot | null> {
   const [year, month, day] = date.split('-')
   const dateStr = `${year}${month}${day}`
-  
-  // CDX API: zoek snapshots van de bron op deze datum
-  const cdxUrl = `https://web.archive.org/cdx/search/cdx?url=${source}&from=${dateStr}&to=${dateStr}&output=json&filter=statuscode:200&filter=mimetype:text/html&limit=5`
-  
+
+  // CDX API: fetch more snapshots for better selection
+  const cdxUrl = `https://web.archive.org/cdx/search/cdx?url=${source}&from=${dateStr}&to=${dateStr}&output=json&filter=statuscode:200&filter=mimetype:text/html&limit=${CDX_LIMIT}`
+
   console.log(`[Wayback] CDX query [${source}]: ${cdxUrl}`)
-  
+
   try {
-    const response = await fetch(cdxUrl, {
+    const response = await fetchWithRetry(cdxUrl, {
       headers: {
         'User-Agent': 'Babykrant/1.0 (educational project)'
       }
     })
-    
+
     if (!response.ok) {
       console.error(`[Wayback] CDX API error [${source}]: ${response.status}`)
       return null
     }
-    
+
     const data = await response.json() as CDXRecord[]
-    
+
     // Eerste rij is header, daarna data
     if (data.length < 2) {
       console.log(`[Wayback] No snapshots found for ${source} on ${date}`)
       return null
     }
-    
-    // Neem de eerste geldige snapshot (skip header rij)
-    const record = data[1]
-    const [urlkey, timestamp, original, mimetype, statuscode, digest, length] = record
-    
-    console.log(`[Wayback] Found snapshot [${source}]: timestamp=${timestamp}, status=${statuscode}`)
-    
+
+    // Smart selection: prefer snapshots during peak news hours
+    const snapshots = data.slice(1).map(record => {
+      const [urlkey, timestamp, original, mimetype, statuscode, digest, length] = record
+      const hour = parseInt(timestamp.substring(8, 10))
+
+      // Score based on time of day
+      // Peak news hours (12:00-20:00): score 10
+      // Morning (08:00-12:00): score 5
+      // Night/early morning: score 1
+      let score = 1
+      if (hour >= 12 && hour <= 20) {
+        score = 10
+      } else if (hour >= 8 && hour < 12) {
+        score = 5
+      }
+
+      return {
+        timestamp,
+        url: original,
+        status: statuscode,
+        mimeType: mimetype,
+        hour,
+        score
+      }
+    })
+
+    // Sort by score (highest first) and pick best
+    snapshots.sort((a, b) => b.score - a.score)
+    const best = snapshots[0]
+
+    console.log(`[Wayback] Selected snapshot at ${best.hour}:${best.timestamp.substring(10, 12)} (score: ${best.score}, ${snapshots.length} total snapshots)`)
+
     return {
-      timestamp,
-      url: original,
-      status: statuscode,
-      mimeType: mimetype,
+      timestamp: best.timestamp,
+      url: best.url,
+      status: best.status,
+      mimeType: best.mimeType,
       source
     }
   } catch (error) {
@@ -98,28 +131,29 @@ async function findSnapshot(date: string, source: string): Promise<WaybackSnapsh
 
 /**
  * Haalt de HTML content van een Wayback snapshot op
+ * v1.6.0: Uses fetchWithRetry for better reliability
  */
 async function fetchSnapshotContent(timestamp: string, source: string): Promise<string | null> {
   // Wayback URL format: https://web.archive.org/web/{timestamp}/https://{source}/
   const protocol = source.startsWith('www.') ? 'https://www.' : 'https://'
   const domain = source.replace(/^www\./, '')
   const waybackUrl = `https://web.archive.org/web/${timestamp}/${protocol}${domain}/`
-  
+
   console.log(`[Wayback] Fetching [${source}]: ${waybackUrl}`)
-  
+
   try {
-    const response = await fetch(waybackUrl, {
+    const response = await fetchWithRetry(waybackUrl, {
       headers: {
         'User-Agent': 'Babykrant/1.0 (educational project)',
         'Accept': 'text/html'
       }
     })
-    
+
     if (!response.ok) {
       console.error(`[Wayback] Fetch error [${source}]: ${response.status}`)
       return null
     }
-    
+
     return await response.text()
   } catch (error) {
     console.error(`[Wayback] Content fetch error [${source}]:`, error)
@@ -500,20 +534,21 @@ export async function GET(request: NextRequest) {
     // STAP 1: Probeer primaire bron (www.nu.nl)
     for (const source of NEWS_SOURCES.primary) {
       const snapshot = await findSnapshot(dateParam, source)
-      
+
       if (snapshot) {
         const html = await fetchSnapshotContent(snapshot.timestamp, source)
-        
+
         if (html) {
           const headlines = parseHeadlines(html, source)
-          
-          if (headlines.length > 0) {
-            console.log(`[Wayback] ✓ Primary source ${source} yielded ${headlines.length} headlines`)
+
+          // v1.6.0: Apply minimum threshold to ensure quality results
+          if (headlines.length >= MIN_HEADLINES) {
+            console.log(`[Wayback] ✓ Primary source ${source} yielded ${headlines.length} headlines (threshold: ${MIN_HEADLINES})`)
             allHeadlines.push(...headlines)
             usedSources.push(source)
             primaryTimestamp = snapshot.timestamp
-            
-            // Als primaire bron resultaten heeft, stoppen we hier
+
+            // Als primaire bron voldoende resultaten heeft, stoppen we hier
             await updateCache(dateParam, {
               status: 'found',
               timestamp: snapshot.timestamp,
@@ -521,7 +556,7 @@ export async function GET(request: NextRequest) {
               headlineCount: headlines.length,
               sources: [source]
             })
-            
+
             return NextResponse.json({
               date: dateParam,
               headlines: allHeadlines,
@@ -532,6 +567,8 @@ export async function GET(request: NextRequest) {
               apiVersion: API_VERSION,
               cacheHit: false
             } as WaybackNewsResult)
+          } else if (headlines.length > 0) {
+            console.log(`[Wayback] ⚠️  Primary source ${source} yielded only ${headlines.length} headlines (below threshold ${MIN_HEADLINES}), trying fallback...`)
           }
         }
       }
@@ -564,6 +601,11 @@ export async function GET(request: NextRequest) {
     
     // Als we nu wel headlines hebben, return success
     if (allHeadlines.length > 0) {
+      // v1.6.0: Log if result is below ideal threshold but still returned
+      if (allHeadlines.length < MIN_HEADLINES) {
+        console.log(`[Wayback] ⚠️  Returning ${allHeadlines.length} headlines (below ideal threshold of ${MIN_HEADLINES}, but best available)`)
+      }
+
       await updateCache(dateParam, {
         status: 'found',
         timestamp: primaryTimestamp || undefined,
@@ -571,7 +613,7 @@ export async function GET(request: NextRequest) {
         headlineCount: allHeadlines.length,
         sources: usedSources
       })
-      
+
       return NextResponse.json({
         date: dateParam,
         headlines: allHeadlines,
