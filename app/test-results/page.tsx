@@ -8,12 +8,11 @@
 // UPDATE v3.0.0: ExtraVragen uitbreiding - 10 vragen in 5 secties
 'use client'
 
-const PAGE_VERSION = '3.2.0'
-
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import VersionFooter from '@/components/VersionFooter'
+import { APP_VERSION } from '@/lib/version'
 import type { BabykrantData } from '@/lib/types'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen, getKleur } from '@/lib/calculations'
 import { getSterrenbeeldBeschrijving, getChineesTekenBeschrijving } from '@/lib/horoscoopData'
@@ -62,7 +61,7 @@ export default function TestResultsPage() {
   const [waybackNewsLoading, setWaybackNewsLoading] = useState(false)
 
   useEffect(() => {
-    console.log(`[Babykrant] test-results page v${PAGE_VERSION}`)
+    console.log(`[Babykrant] test-results page ${APP_VERSION}`)
     
     const stored = localStorage.getItem('babykrant_test_data')
     if (stored) {
@@ -273,17 +272,6 @@ export default function TestResultsPage() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold mb-2">Testresultaten</h1>
             <p className="text-gray-600">Bekijk de berekende gegevens en opgehaalde informatie</p>
-          </div>
-
-          {/* VERSION INDICATOR - v3.2.0 FIX */}
-          <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg p-4 mb-6 shadow-lg">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🎉</span>
-              <div>
-                <p className="font-bold text-lg">✅ NIEUWE VERSIE ACTIEF - v{PAGE_VERSION}</p>
-                <p className="text-sm text-green-100">Infinite re-render bug gefixed! Data wordt nu correct opgeslagen bij navigatie naar artikel generatie.</p>
-              </div>
-            </div>
           </div>
 
           <div className="bg-blue-50 rounded-lg p-6 mb-6">
@@ -909,7 +897,7 @@ export default function TestResultsPage() {
           </div>
           
           <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 text-right">
-            test-results v{PAGE_VERSION}
+            test-results {APP_VERSION}
           </div>
         </div>
       </div>
