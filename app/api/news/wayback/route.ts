@@ -481,12 +481,13 @@ export async function GET(request: NextRequest) {
     if (cached) {
       console.log(`[Wayback] Cache hit for ${dateParam}: ${cached.status}`)
 
-      // Check if cache is stale (7 days for not_found, 30 days for others)
-      const maxAge = cached.status === 'not_found' ? 7 : 30
-      const isStale = isCacheStale(cached, maxAge)
+      // Smart staleness check:
+      // - 'found': NEVER stale (permanent cache)
+      // - 'not_found'/'too_old': check staleness (though Redis TTL handles this)
+      const isStale = cached.status !== 'found' && isCacheStale(cached, 7)
 
       if (isStale) {
-        console.log(`[Wayback] Cache entry is stale (older than ${maxAge} days), re-fetching`)
+        console.log(`[Wayback] Cache entry is stale (older than 7 days), re-fetching`)
       } else if (cached.status === 'not_found' || cached.status === 'too_old') {
         console.log(`[Wayback] Returning cached ${cached.status} result`)
         return NextResponse.json({

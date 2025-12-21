@@ -80,11 +80,19 @@ async function updateCacheRedis(date: string, entry: Omit<WaybackCacheEntry, 'la
       lastChecked: new Date().toISOString()
     }
 
-    // Store with TTL: 30 days for found/too_old, 7 days for not_found
-    const ttlSeconds = entry.status === 'not_found' ? 7 * 24 * 60 * 60 : 30 * 24 * 60 * 60
-
-    await redis.setex(key, ttlSeconds, cacheEntry)
-    console.log(`[WaybackCache] Redis: Updated cache for ${date}: ${entry.status} (TTL: ${ttlSeconds}s)`)
+    // Smart TTL strategy for shared cache benefit:
+    // - 'found': NO TTL (permanent) - historical news doesn't change, share forever!
+    // - 'not_found'/'too_old': 7 days TTL - might be temporary, retry later
+    if (entry.status === 'found') {
+      // Permanent cache - builds shared database over time
+      await redis.set(key, cacheEntry)
+      console.log(`[WaybackCache] Redis: Updated cache for ${date}: ${entry.status} (PERMANENT - shared cache!)`)
+    } else {
+      // Temporary cache for failures - retry after 7 days
+      const ttlSeconds = 7 * 24 * 60 * 60  // 7 days
+      await redis.setex(key, ttlSeconds, cacheEntry)
+      console.log(`[WaybackCache] Redis: Updated cache for ${date}: ${entry.status} (TTL: 7 days)`)
+    }
   } catch (error) {
     console.error('[WaybackCache] Redis write error:', error)
   }
