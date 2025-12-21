@@ -1,12 +1,13 @@
 // app/api/news/monthly/route.ts
-// @version 1.2.0
+// @version 1.2.1
 // Wikipedia NL maandoverzicht scraper voor Nederlands nieuws
 // Bron: https://nl.wikipedia.org/wiki/{Maand}_{jaar}
+// FIX v1.2.1: Support <ul> tags with attributes (id, class, etc.)
 // FIX v1.2.0: Correcte parsing van <h3> datum headers + <ul><li> items
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_VERSION = '1.2.0'
+const API_VERSION = '1.2.1'
 
 const MONTHS_NL = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
@@ -212,8 +213,8 @@ function parseMonthOverviewHtml(html: string, month: number): { items: NewsItem[
       
       const sectionHtml = contentHtml.substring(startIndex, endIndex)
       
-      // Zoek de <ul> in deze sectie
-      const ulMatch = sectionHtml.match(/<ul>([\s\S]*?)<\/ul>/i)
+      // Zoek de <ul> in deze sectie (met mogelijke attributen zoals id="...")
+      const ulMatch = sectionHtml.match(/<ul[^>]*>([\s\S]*?)<\/ul>/i)
       if (!ulMatch) continue
       
       const ulContent = ulMatch[1]
