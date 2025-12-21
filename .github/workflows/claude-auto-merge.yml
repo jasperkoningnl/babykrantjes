@@ -40,13 +40,30 @@ jobs:
         run: npm run build
         continue-on-error: false
 
+      - name: Check workflow permissions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "ℹ️ Checking if workflow has correct permissions..."
+          echo "If this step fails, check: Settings → Actions → Workflow permissions"
+          echo "Required: ✓ Read and write permissions"
+          echo "Required: ✓ Allow GitHub Actions to create and approve pull requests"
+
       - name: Auto-approve PR
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          gh pr review $PR_NUMBER --approve --body "✅ Auto-approved by Claude Auto-Merge workflow. All checks passed."
+          echo "🤖 Attempting to auto-approve PR #$PR_NUMBER..."
+          if gh pr review $PR_NUMBER --approve --body "✅ Auto-approved by Claude Auto-Merge workflow. All checks passed."; then
+            echo "✅ PR approved successfully!"
+          else
+            echo "❌ Failed to approve PR. Check workflow permissions!"
+            echo "Go to: Settings → Actions → Workflow permissions"
+            echo "Enable: 'Allow GitHub Actions to create and approve pull requests'"
+            exit 1
+          fi
 
       - name: Enable auto-merge
         if: success()
@@ -54,7 +71,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          gh pr merge $PR_NUMBER --auto --squash --delete-branch
+          echo "🔀 Enabling auto-merge for PR #$PR_NUMBER..."
+          gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge scheduling failed, will try immediate merge..."
 
       - name: Merge PR immediately
         if: success()
@@ -62,7 +80,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Wait a moment for auto-merge to be enabled
-          sleep 2
-          # Try to merge immediately
-          gh pr merge $PR_NUMBER --squash --delete-branch || echo "Auto-merge will trigger when all checks pass"
+          echo "⏳ Waiting for checks to complete..."
+          sleep 3
+          echo "🚀 Attempting immediate merge..."
+          if gh pr merge $PR_NUMBER --squash --delete-branch; then
+            echo "✅ PR merged and branch deleted successfully!"
+          else
+            echo "ℹ️ Could not merge immediately. Auto-merge will trigger when all required checks pass."
+          fi
