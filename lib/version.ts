@@ -1,15 +1,16 @@
 // lib/version.ts
 // Centraal versiebestand - update dit bij elke release
+// Dit is de single source of truth voor de applicatie versie
 
-export const APP_VERSION = 'v2.0.0'
-export const APP_VERSION_FULL = 'v2.0.0 - Claude Haiku'
-export const RELEASE_DATE = '2025-12-20'
+export const APP_VERSION = 'v3.3.0'
+export const APP_VERSION_FULL = 'v3.3.0 - Consistent Versiebeheer'
+export const RELEASE_DATE = '2025-12-21'
 export const RELEASE_NOTES = {
-  major: 'Claude Haiku 3.5 integratie voor artikel generatie',
+  major: 'Consistent versiebeheer over alle paginas',
   features: [
-    'Migratie van Gemini naar Claude Haiku voor betere Nederlandse teksten',
-    'Verhoogde token limiet (1000 tokens) voor uitgebreidere artikelen',
-    'Verbeterde error handling en logging',
-    'Rate limiting actief (50 requests/dag, $1.00 budget)'
+    'Gecentraliseerd versiebeheer in één bestand',
+    'Verwijderd verwarrende versie meldingen van test-results pagina',
+    'Synchronisatie tussen package.json en app versie',
+    'Automatisch versie-bump script voor consistente updates'
   ]
 }
