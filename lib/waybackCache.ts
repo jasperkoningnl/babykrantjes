@@ -1,16 +1,27 @@
 // lib/waybackCache.ts
-// @version 2.0.0
+// @version 2.1.0
 // Wayback Machine snapshot cache
 // Stores which dates have available snapshots to avoid redundant Archive.org queries
 // UPDATE v2.0.0: Hybrid storage - Upstash Redis (Vercel) + filesystem fallback (local)
+// UPDATE v2.1.0: Store full headlines in cache for true performance gain
 
 import { Redis } from '@upstash/redis'
 
 // Types
+export interface WaybackHeadline {
+  title: string
+  url: string
+  category: string | null
+  time: string | null
+  source: string
+}
+
 export interface WaybackCacheEntry {
   status: 'found' | 'not_found' | 'too_old'
   timestamp?: string  // Wayback timestamp if found
-  headlines?: number  // Number of headlines if found
+  headlines?: WaybackHeadline[]  // Full headlines array (v2.1.0+)
+  headlineCount?: number  // Number of headlines (legacy, for backwards compat)
+  sources?: string[]  // Sources used
   reason?: string     // Reason if not found
   lastChecked: string // ISO date when last checked
 }
