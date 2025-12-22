@@ -255,6 +255,292 @@ export default function TestResultsPage() {
     router.push('/generate-articles')
   }
 
+  // Helper function to build prompts (same logic as backend)
+  const buildPromptForSection = (section: string, enrichedData: any): string => {
+    const { basisGegevens, extraVragen } = enrichedData
+    const naam = basisGegevens?.volledigeNaam || 'de baby'
+    const roepnaam = naam.split(' ')[0]
+    const datum = basisGegevens?.geboorteDatum || ''
+    const plaats = basisGegevens?.geboorteplaats || ''
+
+    switch(section) {
+      case 'hoofdartikel': {
+        const tijd = basisGegevens?.geboorteTijd || '00:00'
+        const gewicht = basisGegevens?.gewicht || 0
+        const lengte = basisGegevens?.lengte || 0
+        const ouder1 = basisGegevens?.ouder1Naam || 'de ouders'
+        const ouder2 = basisGegevens?.ouder2Naam
+        const alleenstaand = basisGegevens?.alleenstaand || false
+
+        const locatie = extraVragen?.geboorteLocatie || 'ziekenhuis'
+        const locatieNaam = extraVragen?.geboorteLocatieNaam || ''
+        const bevalling = extraVragen?.bevallingVerloop || ''
+        const broertjesZusjes = extraVragen?.broertjesZusjes || []
+        const voornaamReden = extraVragen?.voornaamReden || ''
+        const achternaamReden = extraVragen?.achternaamReden || ''
+
+        const datumObj = new Date(datum)
+        const dagNaam = datumObj.toLocaleDateString('nl-NL', { weekday: 'long' })
+        const volledigeDatum = datumObj.toLocaleDateString('nl-NL', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+
+        return `Schrijf een hoofdartikel voor een babykrant over de geboorte van ${naam}.
+
+FEITEN:
+- Plaats: ${plaats}${locatieNaam ? ` (${locatieNaam})` : ''}
+- Locatie type: ${locatie}
+- Datum: ${dagNaam} ${volledigeDatum}
+- Tijd: ${tijd} uur
+- Ouders: ${alleenstaand ? ouder1 : `${ouder1} en ${ouder2}`}
+- Gewicht: ${gewicht} gram
+- Lengte: ${lengte} cm
+${bevalling ? `- Bevalling: ${bevalling}` : ''}
+${broertjesZusjes.length > 0 ? `- Broertjes/zusjes: ${broertjesZusjes.map((s: any) => `${s.naam} (${s.leeftijd || '?'} jaar)`).join(', ')}` : ''}
+${voornaamReden ? `- Waarom voornaam: ${voornaamReden}` : ''}
+${achternaamReden ? `- Waarom achternaam: ${achternaamReden}` : ''}
+
+STRUCTUUR:
+1. Opening in krantstijl: "${plaats.toUpperCase()} - Op ${dagNaam} ${volledigeDatum} werden [ouders] de trotse ouders van ${naam}..."
+2. Beschrijf de bevalling en geboorte${bevalling ? ` (${bevalling})` : ''}
+3. Eerste momenten (gewicht, lengte, eerste indrukken)
+${broertjesZusjes.length > 0 ? '4. Reactie broertjes/zusjes' : ''}
+${voornaamReden || achternaamReden ? `${broertjesZusjes.length > 0 ? '5' : '4'}. Verhaal achter de naam` : ''}
+${broertjesZusjes.length > 0 || voornaamReden || achternaamReden ? `${5 + (broertjesZusjes.length > 0 ? 1 : 0) + ((voornaamReden || achternaamReden) ? 1 : 0)}. Afsluiting met toekomstblik` : '4. Afsluiting met toekomstblik'}
+
+LENGTE: 200-250 woorden
+TONE: Warm, persoonlijk, verhalend zoals in een nieuwsartikel
+
+Schrijf de tekst:`
+      }
+
+      case 'sterrenbeeld': {
+        const sterrenbeeld = enrichedData.berekend?.sterrenbeeld || 'onbekend'
+        const chineesJaar = enrichedData.berekend?.chineesJaar || 'onbekend'
+
+        return `Schrijf een tekst over het sterrenbeeld en Chinese teken voor ${naam}.
+
+GEGEVENS:
+- Naam: ${roepnaam}
+- Sterrenbeeld: ${sterrenbeeld}
+- Chinees teken: ${chineesJaar}
+
+STRUCTUUR:
+1. Paragraaf 1: Algemene info sterrenbeeld (datums, element waar bekend)
+2. Paragraaf 2-3: Karaktereigenschappen sterrenbeeld (balans positief + nuances)
+3. Paragraaf 4: Chinees teken eigenschappen
+4. Paragraaf 5: Koppeling aan ${roepnaam}
+
+VOORBEELDEN STIJL:
+"Mensen geboren tussen 21 april en 21 mei horen bij het sterrenbeeld Stier. De stier is het toonbeeld van doelgerichtheid en heeft een extreme belangstelling en sterke wilskracht. De stier is een liefde. Stabiel, evenwichtig, en graag bezig..."
+
+LENGTE: 150-180 woorden
+TONE: Informatief, beschrijvend, gebruik derde persoon ("De stier is...")
+
+Schrijf de tekst:`
+      }
+
+      case 'nieuws': {
+        const dailyNews = enrichedData.dailyNews?.events || []
+        const waybackNews = enrichedData.waybackNews?.headlines || []
+        const monthNews = enrichedData.monthlyNews?.items || []
+
+        const topDaily = dailyNews.slice(0, 8).map((e: any) => `[${e.category}] ${e.text}`).join('\n')
+        const topWayback = waybackNews.slice(0, 5).map((h: any) => `${h.title}`).join('\n')
+        const topMonth = monthNews.slice(0, 5).map((m: any) => `${m.day}: ${m.text}`).join('\n')
+
+        const datumVolledig = new Date(datum).toLocaleDateString('nl-NL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+
+        return `Schrijf een nieuwsoverzicht voor de babykrant over wat er gebeurde op ${datumVolledig}.
+
+BESCHIKBAAR NIEUWS:
+
+Internationaal (Wikipedia):
+${topDaily || 'Geen data'}
+
+Nederlands (NOS/NU.nl):
+${topWayback || 'Geen data'}
+
+Maand context:
+${topMonth || 'Geen data'}
+
+STRUCTUUR:
+1. Intro: "De geboorte van ${roepnaam} was het grote nieuws van ${datumVolledig}, maar er gebeurde meer..."
+2. Selecteer 3-5 belangrijkste nieuwsitems
+3. Mix: Nederlands + internationaal
+4. Mix: politiek, sport, cultuur, wetenschap
+5. Feitelijk, zakelijk, journalistieke toon
+
+LENGTE: 120-150 woorden
+TONE: Journalistiek, geen mening
+
+Schrijf de tekst:`
+      }
+
+      case 'weer': {
+        const weather = enrichedData.weather
+        if (!weather) {
+          return `Schrijf een kort weerbericht voor de geboortedag van ${roepnaam} op ${datum} in ${plaats}. Helaas is er geen data beschikbaar, schrijf een algemene tekst over het seizoen. LENGTE: 60-80 woorden.`
+        }
+
+        const datumWeer = new Date(weather.date).toLocaleDateString('nl-NL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+
+        return `Schrijf een weerbericht voor de babykrant.
+
+GEGEVENS:
+- Locatie: ${weather.city}
+- Datum: ${datumWeer}
+- Max temperatuur: ${weather.temperature_max}°C
+- Min temperatuur: ${weather.temperature_min}°C
+- Neerslag: ${weather.precipitation}mm
+- Zonneschijn: ${weather.sunshine_duration} uur
+
+STRUCTUUR:
+1. Beschrijf het weer op de geboortedag
+2. Context: normaal voor het seizoen?
+3. Luchtige observatie ("perfect weer voor..." of "typisch Nederlands weer...")
+
+LENGTE: 60-100 woorden
+TONE: Beschrijvend, luchtig, toegankelijk
+
+Schrijf de tekst:`
+      }
+
+      case 'cultuur': {
+        const top40 = enrichedData.top40
+        const yearChart = enrichedData.yearChart
+        const tvPrograms = enrichedData.tvPrograms?.programs || []
+        const wikipediaTV = enrichedData.wikipediaTV
+
+        const nummer1 = top40?.numberOne ? `${top40.numberOne.artist} - ${top40.numberOne.title}` : null
+        const topYear = yearChart?.entries?.slice(0, 5) || []
+        const tvToday = tvPrograms.slice(0, 6).map((p: any) => `${p.title}${p.channel ? ` (${p.channel})` : ''}`).join('\n')
+        const tvEvents = wikipediaTV?.events?.slice(0, 3) || []
+
+        return `Schrijf een overzicht van muziek en televisie voor de babykrant.
+
+MUZIEK:
+${nummer1 ? `#1 Hit: ${nummer1}` : 'Geen Top 40 data'}
+${topYear.length > 0 ? `\nTop hits van het jaar:\n${topYear.map((e: any) => `${e.position}. ${e.artist} - ${e.title}`).join('\n')}` : ''}
+
+TELEVISIE:
+${tvToday ? `Op TV die dag:\n${tvToday}` : 'Geen TV data'}
+${tvEvents.length > 0 ? `\nTV momenten dat jaar:\n${tvEvents.map((e: any) => e.description).join('\n')}` : ''}
+
+STRUCTUUR:
+1. Start met #1 hit (prominent)
+2. Noem 2-3 andere populaire hits
+3. Highlight 3-4 TV programma's
+4. Energieke, informatieve toon
+
+LENGTE: 100-140 woorden
+TONE: Energiek, enthousiast maar niet overdreven
+
+Schrijf de tekst:`
+      }
+
+      case 'naam_betekenis': {
+        const nameMeaning = enrichedData.nameMeaning
+        if (!nameMeaning) {
+          return `Schrijf over de betekenis van de naam ${naam}. Helaas is er geen data beschikbaar. Schrijf op basis van algemene kennis over Nederlandse namen. LENGTE: 120-150 woorden, educatief en interessant.`
+        }
+
+        return `Schrijf over de betekenis van de naam ${naam}.
+
+GEGEVENS:
+- Naam: ${naam}
+- Betekenis: ${nameMeaning.meaning || 'onbekend'}
+- Oorsprong: ${nameMeaning.origin || 'onbekend'}
+- Gender: ${nameMeaning.gender || 'onbekend'}
+
+STRUCTUUR:
+1. Etymologie (oorsprong, betekenis)
+2. Historische context of figuren met deze naam
+3. Populariteit (indien bekend, anders algemeen)
+4. Culturele referenties of varianten
+
+VOORBEELDEN STIJL:
+"Anne is meestal een meisjesnaam maar komt in Nederland ook als jongennaam voor. Anne als meisjessnaam is afgeleid van de Hebreeuwse naam Hanna wat 'lieflijke, genade, begunstigde' betekent..."
+
+LENGTE: 120-180 woorden
+TONE: Educatief, historisch, interessant maar toegankelijk
+
+Schrijf de tekst:`
+      }
+
+      case 'beroemde_namen': {
+        const famousNamesakes = enrichedData.famousNamesakes
+        if (!famousNamesakes || !famousNamesakes.persons || famousNamesakes.persons.length === 0) {
+          return `Schrijf over beroemde mensen die ${roepnaam} heten. Helaas is er geen data beschikbaar. Gebruik algemene kennis. LENGTE: 80-100 woorden, levendig en anekdotisch.`
+        }
+
+        const famousPersonsList = famousNamesakes.persons.slice(0, 6).map((p: any) =>
+          `${p.name}: ${p.description}`
+        ).join('\n')
+
+        return `Schrijf over beroemde mensen die ${roepnaam} heten.
+
+BEKENDE PERSONEN:
+${famousPersonsList}
+
+STRUCTUUR:
+1. Intro: "Beroemde mensen met de naam ${roepnaam}..."
+2. Beschrijf 4-6 personen kort (1 zin per persoon)
+3. Mix: Nederlands + internationaal
+4. Verschillende domeinen (politiek, kunst, sport, wetenschap)
+
+LENGTE: 80-120 woorden
+TONE: Levendig, anekdotisch, korte krachtige beschrijvingen
+
+Schrijf de tekst:`
+      }
+
+      case 'geboren_op_dag': {
+        const bornPersons = enrichedData.bornPersons || []
+        const datumDag = new Date(datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
+
+        if (bornPersons.length === 0) {
+          return `Schrijf over bekende mensen geboren op ${datumDag}. Helaas is er geen data beschikbaar. Gebruik algemene kennis. LENGTE: 80-100 woorden.`
+        }
+
+        const bornPersonsList = bornPersons.slice(0, 6).map((p: any) =>
+          `${p.name} (${p.year}): ${p.description}`
+        ).join('\n')
+
+        return `Schrijf over bekende mensen geboren op ${datumDag}.
+
+PERSONEN:
+${bornPersonsList}
+
+STRUCTUUR:
+1. Intro: "${roepnaam} deelt zijn/haar verjaardag met..."
+2. Beschrijf 3-5 interessantste personen
+3. Mix historisch en recent
+4. Mix Nederlands en internationaal
+
+LENGTE: 80-120 woorden
+TONE: Interessant, trivia-achtig
+
+Schrijf de tekst:`
+      }
+
+      default:
+        return `Schrijf een tekst voor sectie "${section}" van een babykrant voor ${naam}. LENGTE: 100-150 woorden.`
+    }
+  }
+
   // Handler to export data for Workbench testing
   const handleExportForWorkbench = () => {
     const enrichedData = {
@@ -276,16 +562,38 @@ export default function TestResultsPage() {
       series: series || undefined,
     }
 
+    // Build all prompts with actual data
+    const sections = ['hoofdartikel', 'sterrenbeeld', 'nieuws', 'weer', 'cultuur', 'naam_betekenis', 'beroemde_namen', 'geboren_op_dag']
+    const builtPrompts: Record<string, { prompt: string, expectedLength: string }> = {}
+
+    sections.forEach(section => {
+      const prompt = buildPromptForSection(section, enrichedData)
+      const lengthMap: Record<string, string> = {
+        'hoofdartikel': '200-250 woorden',
+        'sterrenbeeld': '150-180 woorden',
+        'nieuws': '120-150 woorden',
+        'weer': '60-100 woorden',
+        'cultuur': '100-140 woorden',
+        'naam_betekenis': '120-180 woorden',
+        'beroemde_namen': '80-120 woorden',
+        'geboren_op_dag': '80-120 woorden'
+      }
+
+      builtPrompts[section] = {
+        prompt,
+        expectedLength: lengthMap[section] || '100-150 woorden'
+      }
+    })
+
     const exportData = {
       metadata: {
         exportDate: new Date().toISOString(),
         appVersion: APP_VERSION,
         profileName: data.basisGegevens.volledigeNaam,
-        purpose: 'Workbench prompt testing voor babykrant artikelen'
+        purpose: 'Workbench prompt testing - READY TO USE prompts',
+        instructions: 'Kopieer systemPrompt + een sectie prompt naar Workbench en test!'
       },
-      wizardData: enrichedData,
-      prompts: {
-        systemPrompt: `Je bent een professionele journalist die babykranten schrijft voor Nederlandse ouders.
+      systemPrompt: `Je bent een professionele journalist die babykranten schrijft voor Nederlandse ouders.
 
 TONE-OF-VOICE REGELS:
 - Warm maar niet overdreven sentimenteel
@@ -312,33 +620,19 @@ VERBODEN:
 - Te lang doordraven over 1 onderwerp
 
 Je schrijft ALLEEN de gevraagde tekst, zonder preamble, uitleg of meta-commentaar.`,
-        sections: {
-          hoofdartikel: 'Hoofdartikel (200-250 woorden) - Opening in krantstijl, beschrijving bevalling, eerste momenten, broertjes/zusjes reacties, naam verhaal, toekomstblik',
-          sterrenbeeld: 'Sterrenbeeld & Chinees teken (150-180 woorden) - Algemene info sterrenbeeld, karaktereigenschappen, Chinees teken, koppeling aan baby',
-          nieuws: 'Nieuws op geboortedag (120-150 woorden) - Mix Nederlands + internationaal nieuws, verschillende categorieën, journalistieke toon',
-          weer: 'Weerbericht (60-100 woorden) - Weer beschrijving, seizoen context, luchtige observatie',
-          cultuur: 'Muziek & TV (100-140 woorden) - #1 hit prominent, top hits jaar, TV programmas, energieke toon',
-          naam_betekenis: 'Naam betekenis (120-180 woorden) - Etymologie, historische context, populariteit, culturele referenties',
-          beroemde_namen: 'Beroemde naamdragers (80-120 woorden) - 4-6 bekende personen, mix NL + internationaal, verschillende domeinen',
-          geboren_op_dag: 'Geboren op deze dag (80-120 woorden) - 3-5 bekende personen, mix historisch + recent'
-        }
-      },
-      workbenchInstructions: {
+      prompts: builtPrompts,
+      howToUse: {
         step1: 'Ga naar console.anthropic.com en log in',
-        step2: 'Klik "Create New Prompt" of "New Chat"',
+        step2: 'Klik "Create New Prompt" of open een nieuwe chat',
         step3: 'Selecteer model: Claude 3.5 Haiku',
-        step4: 'Kopieer het systemPrompt naar het "System" veld',
-        step5: 'Kies een sectie uit "sections" en bouw je prompt',
-        step6: 'Voeg de relevante data uit wizardData toe aan je prompt',
-        step7: 'Test en itereer tot je tevreden bent',
-        step8: 'Deel je verbeterde prompts terug voor implementatie',
-        tips: [
-          'Gebruik GEEN Tools of Templatize - gewoon platte tekst',
-          'Instrueer expliciet: "Gebruik ALLEEN deze data"',
-          'Gebruik Compare functie om versies te vergelijken',
-          'Test met alle 3 de profielen voor consistentie'
-        ]
-      }
+        step4: 'Kopieer de "systemPrompt" (hierboven) naar het "System" veld in Workbench',
+        step5: 'Kies een sectie uit "prompts" (bijv. hoofdartikel)',
+        step6: 'Kopieer de volledige "prompt" tekst naar het message veld',
+        step7: 'Klik "Run" - klaar! De prompt is al compleet met alle data',
+        step8: 'Pas de prompt aan, test opnieuw, itereer',
+        step9: 'Deel je verbeterde prompts terug voor implementatie'
+      },
+      wizardDataReference: enrichedData
     }
 
     // Download as JSON file
