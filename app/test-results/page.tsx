@@ -255,6 +255,105 @@ export default function TestResultsPage() {
     router.push('/generate-articles')
   }
 
+  // Handler to export data for Workbench testing
+  const handleExportForWorkbench = () => {
+    const enrichedData = {
+      ...data,
+      berekend,
+      weather: weather || undefined,
+      dailyNews: dailyNews || undefined,
+      waybackNews: waybackNews || undefined,
+      monthlyNews: monthlyNews || undefined,
+      top40: top40 || undefined,
+      yearChart: yearChart || undefined,
+      tvPrograms: tvPrograms || undefined,
+      wikipediaTV: wikipediaTV || undefined,
+      nameMeaning: nameMeaning || undefined,
+      famousNamesakes: famousNamesakes || undefined,
+      bornPersons: bornPersons.length > 0 ? bornPersons : undefined,
+      movies: movies || undefined,
+      topMovies: topMovies || undefined,
+      series: series || undefined,
+    }
+
+    const exportData = {
+      metadata: {
+        exportDate: new Date().toISOString(),
+        appVersion: APP_VERSION,
+        profileName: data.basisGegevens.volledigeNaam,
+        purpose: 'Workbench prompt testing voor babykrant artikelen'
+      },
+      wizardData: enrichedData,
+      prompts: {
+        systemPrompt: `Je bent een professionele journalist die babykranten schrijft voor Nederlandse ouders.
+
+TONE-OF-VOICE REGELS:
+- Warm maar niet overdreven sentimenteel
+- Informatief zonder saai te zijn
+- Persoonlijk maar professioneel
+- Balans tussen positief en realistisch
+- Concrete feiten, geen vage taal
+- Nederlandse context en taalgebruik
+
+SCHRIJFSTIJL:
+- Gebruik derde persoon tenzij anders gevraagd
+- Wissel af tussen algemeen en specifiek
+- Voeg nuances toe (niet alleen positief)
+- Eindig met persoonlijke koppeling waar relevant
+- Gebruik correcte Nederlandse spelling en grammatica
+- Geen Markdown formatting (geen **, ##, etc.)
+
+VERBODEN:
+- Overdreven lyrisch of poëtisch
+- Te abstract of filosofisch
+- Alleen maar superlatieven
+- Amerikaanse "zo bijzonder!" taal
+- Saaie opsommingen zonder context
+- Te lang doordraven over 1 onderwerp
+
+Je schrijft ALLEEN de gevraagde tekst, zonder preamble, uitleg of meta-commentaar.`,
+        sections: {
+          hoofdartikel: 'Hoofdartikel (200-250 woorden) - Opening in krantstijl, beschrijving bevalling, eerste momenten, broertjes/zusjes reacties, naam verhaal, toekomstblik',
+          sterrenbeeld: 'Sterrenbeeld & Chinees teken (150-180 woorden) - Algemene info sterrenbeeld, karaktereigenschappen, Chinees teken, koppeling aan baby',
+          nieuws: 'Nieuws op geboortedag (120-150 woorden) - Mix Nederlands + internationaal nieuws, verschillende categorieën, journalistieke toon',
+          weer: 'Weerbericht (60-100 woorden) - Weer beschrijving, seizoen context, luchtige observatie',
+          cultuur: 'Muziek & TV (100-140 woorden) - #1 hit prominent, top hits jaar, TV programmas, energieke toon',
+          naam_betekenis: 'Naam betekenis (120-180 woorden) - Etymologie, historische context, populariteit, culturele referenties',
+          beroemde_namen: 'Beroemde naamdragers (80-120 woorden) - 4-6 bekende personen, mix NL + internationaal, verschillende domeinen',
+          geboren_op_dag: 'Geboren op deze dag (80-120 woorden) - 3-5 bekende personen, mix historisch + recent'
+        }
+      },
+      workbenchInstructions: {
+        step1: 'Ga naar console.anthropic.com en log in',
+        step2: 'Klik "Create New Prompt" of "New Chat"',
+        step3: 'Selecteer model: Claude 3.5 Haiku',
+        step4: 'Kopieer het systemPrompt naar het "System" veld',
+        step5: 'Kies een sectie uit "sections" en bouw je prompt',
+        step6: 'Voeg de relevante data uit wizardData toe aan je prompt',
+        step7: 'Test en itereer tot je tevreden bent',
+        step8: 'Deel je verbeterde prompts terug voor implementatie',
+        tips: [
+          'Gebruik GEEN Tools of Templatize - gewoon platte tekst',
+          'Instrueer expliciet: "Gebruik ALLEEN deze data"',
+          'Gebruik Compare functie om versies te vergelijken',
+          'Test met alle 3 de profielen voor consistentie'
+        ]
+      }
+    }
+
+    // Download as JSON file
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const filename = `babykrant-workbench-${data.basisGegevens.volledigeNaam.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+
+    console.log('[Babykrant] ✅ Workbench export downloaded:', filename)
+  }
+
   const sterrenbeeldInfo = getSterrenbeeldBeschrijving(sterrenbeeld)
   const chineesTekenInfo = getChineesTekenBeschrijving(chineesJaar)
   const firstName = nameMeaning?.firstName || famousNamesakes?.firstName || '...'
@@ -886,13 +985,19 @@ export default function TestResultsPage() {
             </details>
           </div>
 
-          <div className="mt-6 flex gap-4">
+          <div className="mt-6 flex flex-wrap gap-4">
             <Link href="/wizard" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold">Nieuwe babykrant maken</Link>
             <button
               onClick={handleGenerateArticles}
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
             >
               💾 Opslaan & AI Artikelen Genereren ✨
+            </button>
+            <button
+              onClick={handleExportForWorkbench}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+            >
+              📥 Exporteer voor Workbench
             </button>
           </div>
           
