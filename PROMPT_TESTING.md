@@ -22,7 +22,7 @@ Deze handleiding legt uit hoe je de geëxporteerde babykrant data gebruikt om pr
 
 ## 📦 Wat zit er in de Export?
 
-Het geëxporteerde JSON bestand bevat:
+Het geëxporteerde JSON bestand bevat **READY-TO-USE prompts**:
 
 ```json
 {
@@ -30,34 +30,32 @@ Het geëxporteerde JSON bestand bevat:
     "exportDate": "2024-...",
     "appVersion": "3.x.x",
     "profileName": "Emma de Vries",
-    "purpose": "Workbench prompt testing..."
+    "purpose": "Workbench prompt testing - READY TO USE prompts",
+    "instructions": "Kopieer systemPrompt + een sectie prompt naar Workbench en test!"
   },
-  "wizardData": {
-    "basisGegevens": { ... },
-    "extraVragen": { ... },
-    "berekend": { sterrenbeeld, chineesJaar, ... },
-    "weather": { ... },
-    "dailyNews": { ... },
-    "waybackNews": { ... },
-    "monthlyNews": { ... },
-    "top40": { ... },
-    "yearChart": { ... },
-    "tvPrograms": { ... },
-    "wikipediaTV": { ... },
-    "nameMeaning": { ... },
-    "famousNamesakes": { ... },
-    "bornPersons": [ ... ],
-    "movies": { ... },
-    "topMovies": { ... },
-    "series": { ... }
-  },
+  "systemPrompt": "Je bent een professionele journalist...",
   "prompts": {
-    "systemPrompt": "...",
-    "sections": { ... }
+    "hoofdartikel": {
+      "prompt": "Schrijf een hoofdartikel voor een babykrant...\n\nFEITEN:\n- Plaats: Amsterdam (Amsterdam UMC)\n- Datum: vrijdag 15 maart 2024\n...[ALLE DATA AL INGEVULD]",
+      "expectedLength": "200-250 woorden"
+    },
+    "sterrenbeeld": {
+      "prompt": "Schrijf een tekst over het sterrenbeeld...\n\nGEGEVENS:\n- Naam: Emma\n- Sterrenbeeld: Vissen\n...[ALLE DATA AL INGEVULD]",
+      "expectedLength": "150-180 woorden"
+    },
+    // ... 8 secties in totaal, allemaal compleet
   },
-  "workbenchInstructions": { ... }
+  "howToUse": {
+    "step1": "Ga naar console.anthropic.com...",
+    // ... stap-voor-stap instructies
+  },
+  "wizardDataReference": {
+    // Volledige data als referentie (alleen voor debugging)
+  }
 }
 ```
+
+**Let op**: Je hoeft **GEEN** data meer te kopiëren! Alle prompts zijn al compleet.
 
 ---
 
@@ -91,39 +89,38 @@ Waar?
 └─────────────────────────────────┘
 ```
 
-### **Stap 5: Bouw je Prompt**
+### **Stap 5: Kopieer de Ready-to-Use Prompt**
 
-Kies een sectie om te testen (bijv. `hoofdartikel`) en bouw een prompt:
+Kies een sectie om te testen (bijv. `hoofdartikel`):
 
-**VOORBEELD - Hoofdartikel Prompt:**
+1. Open je JSON bestand
+2. Ga naar: `"prompts"` → `"hoofdartikel"` → `"prompt"`
+3. **Kopieer de volledige prompt** (alles staat er al in!)
+4. Plak in het message veld van Workbench
+
+**Voorbeeld van wat je kopieert:**
 
 ```
 Schrijf een hoofdartikel voor een babykrant over de geboorte van Emma de Vries.
 
-GEBRUIK ALLEEN DEZE DATA (geen algemene kennis):
-
-BASISGEGEVENS:
-- Naam: Emma de Vries
+FEITEN:
+- Plaats: Amsterdam (Amsterdam UMC)
+- Locatie type: ziekenhuis
 - Datum: vrijdag 15 maart 2024
 - Tijd: 14:23 uur
-- Plaats: Amsterdam (Amsterdam UMC)
+- Ouders: Sophie de Vries en Jan Bakker
 - Gewicht: 3450 gram
 - Lengte: 51 cm
-- Ouders: Sophie de Vries en Jan Bakker
-- Locatie: ziekenhuis (Amsterdam UMC)
 - Bevalling: snel
-
-EXTRA INFO:
 - Broertjes/zusjes: Liam (3 jaar), Mia (5 jaar)
-- Voornaam gekozen omdat: genoemd naar oma Emma
-- Zwangerschap: ging voorspoedig, laatste weken wel veel zwangerschapsklachten
+- Waarom voornaam: genoemd naar oma Emma
 
 STRUCTUUR:
-1. Opening in krantstijl: "AMSTERDAM - Op vrijdag 15 maart 2024 werden Sophie de Vries en Jan Bakker de trotse ouders van Emma..."
-2. Beschrijf de bevalling (snel)
+1. Opening in krantstijl: "AMSTERDAM - Op vrijdag 15 maart 2024 werden..."
+2. Beschrijf de bevalling en geboorte (snel)
 3. Eerste momenten (gewicht, lengte, eerste indrukken)
-4. Reactie broertjes/zusjes Liam en Mia
-5. Verhaal achter de naam (oma Emma)
+4. Reactie broertjes/zusjes
+5. Verhaal achter de naam
 6. Afsluiting met toekomstblik
 
 LENGTE: 200-250 woorden
@@ -132,7 +129,7 @@ TONE: Warm, persoonlijk, verhalend zoals in een nieuwsartikel
 Schrijf de tekst:
 ```
 
-**💡 TIP**: Kopieer de relevante data uit `wizardData` in je JSON en plak rechtstreeks in je prompt.
+**💡 Super simpel**: Alles staat er al in, je hoeft **GEEN** data te kopiëren/plakken!
 
 ### **Stap 6: Run en Itereer**
 1. Klik **"Run"** → bekijk output
@@ -173,11 +170,18 @@ Schrijf de tekst:
 
 ## ❓ Veelgestelde Vragen
 
+### **Q: Moet ik data uit de JSON kopiëren en in de prompt plakken?**
+**A: NEE!** De prompts zijn al compleet:
+- ✅ Alle data is **al ingevuld** in elke prompt
+- ✅ Je kopieert gewoon de **volledige prompt** uit het JSON bestand
+- ✅ Plak direct in Workbench en klik "Run"
+- ❌ **Geen** handmatig data kopiëren/plakken nodig
+
 ### **Q: Moet ik Tools of Templatize gebruiken in Workbench?**
 **A: NEE!** Voor jouw use case:
 - ❌ **GEEN Tools** (dat is voor function calling)
 - ❌ **GEEN Templatize** (dat is voor variabelen zoals `{{naam}}`)
-- ✅ **Gewoon platte tekst** met instructies + data
+- ✅ **Gewoon platte tekst** - de prompts zijn ready-to-use
 
 ### **Q: Kan Claude in Workbench zich beperken tot alleen mijn data?**
 **A: Ja, met instructies.** Claude heeft altijd toegang tot algemene kennis, maar:
