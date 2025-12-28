@@ -4,6 +4,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
+// Force dynamic rendering - don't try to pre-render during build
+export const dynamic = 'force-dynamic'
+export const maxDuration = 300 // 5 minutes max
+
 // Test verschillende jaren om HTML evolutie te zien
 const TEST_YEARS = [
   { year: 2010, month: '06', day: '15' },
