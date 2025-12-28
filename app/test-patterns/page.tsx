@@ -10,7 +10,7 @@ const TEST_DATES = [
   { date: '2022-03-28', label: '2022 (Lena)' }
 ]
 
-const SOURCES = ['www.nu.nl', 'www.nos.nl']
+const SOURCES = ['www.nu.nl', 'www.nos.nl', 'nos.nl']
 
 export default function PatternTestPage() {
   const [results, setResults] = useState<Record<string, any>>({})
@@ -193,7 +193,7 @@ export default function PatternTestPage() {
       }}>
         <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem' }}>📝 Instructies</h3>
         <ol style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.9rem' }}>
-          <li>Test elk jaar met beide bronnen (NU.nl en NOS.nl)</li>
+          <li>Test elk jaar met alle bronnen (NU.nl, NOS.nl met/zonder www)</li>
           <li>Voor elk resultaat: klik "Kopieer JSON"</li>
           <li>Deel de JSON outputs met Claude</li>
           <li>Claude analyseert de patterns en bouwt de juiste parser</li>
