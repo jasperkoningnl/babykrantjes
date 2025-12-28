@@ -3,11 +3,11 @@
 import { useState } from 'react'
 
 const TEST_DATES = [
-  { date: '2012-06-15', label: '2012 (vroeg)' },
-  { date: '2014-03-10', label: '2014 (mid)' },
-  { date: '2016-05-18', label: '2016 (Anne)' },
-  { date: '2020-05-18', label: '2020 (recent)' },
-  { date: '2022-03-28', label: '2022 (Lena)' }
+  { date: '2011-09-12', label: '2011 (vroeg test)' },
+  { date: '2015-01-15', label: '2015 (mid test)' },
+  { date: '2017-07-20', label: '2017 (legacy test)' },
+  { date: '2019-03-25', label: '2019 (modern test)' },
+  { date: '2023-06-10', label: '2023 (recent test)' }
 ]
 
 export default function PatternTestPage() {
@@ -60,9 +60,9 @@ export default function PatternTestPage() {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem', fontFamily: 'system-ui' }}>
-      <h1>Wayback Parser Tester (v1.7.0)</h1>
+      <h1>Wayback Parser Tester (v1.7.1)</h1>
       <p style={{ color: '#666', marginBottom: '2rem' }}>
-        Test de nieuwe multi-year parser. Test systematisch verschillende jaren om te zien of de parser correct werkt.
+        Test de nieuwe multi-year parser met noise filtering en duplicate prevention.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -252,8 +252,8 @@ export default function PatternTestPage() {
       }}>
         <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem' }}>📝 Instructies</h3>
         <ol style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.9rem' }}>
-          <li>Test elk jaar met de knop (gebruikt echte v1.7.0 multi-year parser)</li>
-          <li>Check of &quot;Total Headlines&quot; &gt; 0 voor elk jaar</li>
+          <li>Test elk jaar met de knop (gebruikt v1.7.1 parser met noise filtering)</li>
+          <li>Check of &quot;Total Headlines&quot; &gt; 0 en minder duplicaten/ruis</li>
           <li>Bekijk welke bronnen gebruikt werden (NU.nl of NOS.nl fallback)</li>
           <li>Kopieer JSON om te delen of debuggen</li>
           <li>Clear Cache om opnieuw te testen zonder cache</li>
