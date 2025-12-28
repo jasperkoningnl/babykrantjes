@@ -1,5 +1,5 @@
 // app/api/news/wayback/route.ts
-// @version 1.8.1
+// @version 1.8.2
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
 // Bronnen: www.nos.nl (primair), www.nu.nl + nos.nl (fallback)
 // UPDATE v1.2.0: Multi-source fallback toegevoegd
@@ -11,12 +11,13 @@
 // UPDATE v1.7.1: Noise filtering + HTML entities fix + duplicate prevention
 // UPDATE v1.8.0: NOS.nl as primary source (no ads), NU.nl as fallback
 // UPDATE v1.8.1: Fixed missing topstories (h1.topstory_mainarticle_title, h3.topstory__title) + "laatste" section
+// UPDATE v1.8.2: Fix 2019 topstory nested spans + combine sources for pre-2013 dates
 
 import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.8.1'
+const API_VERSION = '1.8.2'
 
 // Reliability settings
 const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
