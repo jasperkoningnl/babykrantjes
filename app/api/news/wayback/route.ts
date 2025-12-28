@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.8.3'
+const API_VERSION = '1.8.4'
 
 // Reliability settings
 const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
@@ -463,7 +463,8 @@ function parseNosNlHeadlines(html: string, source: string): Headline[] {
   }
 
   // Pattern 9: Strong binnen link (vroege NOS structuur)
-  const fallbackStrongLink = /<a[^>]*href="([^"]*)"[^>]*>\s*<strong>([^<]+)<\/strong>\s*<\/a>/gi
+  // Updated to handle <span class="time"> before strong and text after strong
+  const fallbackStrongLink = /<a[^>]*href="([^"]*)"[^>]*>[\s\S]*?<strong>([^<]+)<\/strong>/gi
   while ((match = fallbackStrongLink.exec(html)) !== null) {
     addHeadline(match[2], match[1], extractCategory(match[1]))
   }
@@ -524,7 +525,8 @@ function isNoiseHeadline(title: string): boolean {
     'lezersfoto\'s', 'tip de redactie', 'lezersbijdragen', 'uitgelichte video\'s',
     'van onze adverteerders', 'nieuws in 60 seconden', 'het nieuws in 60 seconden',
     'ruimteballon', 'varende brug', 'als een vis...', 'komeetlandschap',
-    'drijvend hotel', 'helpende hand' // Video titles without context
+    'drijvend hotel', 'helpende hand', // Video titles without context
+    'nos headlines', 'alexa crawls', 'video\'s en audio' // 2010 navigation elements
   ]
 
   if (exactNoisePatterns.includes(lowerTitle)) {
