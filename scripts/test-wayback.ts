@@ -10,8 +10,11 @@ const TEST_DATES = [
   { date: '2022-03-28', label: 'Lena (28 maart 2022)' },
   { date: '2012-05-19', label: 'Anne (19 mei 2012)' },
   { date: '2020-05-18', label: 'Known good (18 mei 2020)' },
+  { date: '2019-03-25', label: 'Brexit period (25 mrt 2019)' },
   { date: '2015-01-15', label: 'Mid-range (15 jan 2015)' },
-  { date: '2024-12-21', label: 'Recent (21 dec 2024)' },
+  { date: '2023-10-15', label: 'Recent (15 okt 2023)' },
+  { date: '2024-12-21', label: 'Very recent (21 dec 2024)' },
+  { date: '2025-01-15', label: 'Current (15 jan 2025)' },
   { date: '2010-06-20', label: 'Older (20 jun 2010)' },
 ]
 

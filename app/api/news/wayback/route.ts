@@ -369,9 +369,14 @@ function parseNosNlHeadlines(html: string, source: string): Headline[] {
   }
 
   // Pattern 1b: Topstory title (2019+)
-  const topstoryH3Pattern = /<h3[^>]*class="[^"]*topstory__title[^"]*"[^>]*>([^<]+)<\/h3>/gi
+  // Updated to handle nested spans/badges within h3
+  const topstoryH3Pattern = /<h3[^>]*class="[^"]*topstory__title[^"]*"[^>]*>([\s\S]*?)<\/h3>/gi
   while ((match = topstoryH3Pattern.exec(html)) !== null) {
-    addHeadline(match[1], '', 'Top Story')
+    // Strip all HTML tags and get clean text
+    const cleanText = match[1].replace(/<[^>]+>/g, '').trim()
+    if (cleanText) {
+      addHeadline(cleanText, '', 'Top Story')
+    }
   }
 
   // Pattern 1c: Top story (fallback for other structures)
@@ -658,11 +663,18 @@ export async function GET(request: NextRequest) {
     }
     
     console.log(`[Wayback] Querying Archive.org for ${dateParam}...`)
-    
+
     // === MULTI-SOURCE STRATEGY ===
     const allHeadlines: Headline[] = []
     const usedSources: string[] = []
     let primaryTimestamp: string | null = null
+
+    // Check if this is an older date that needs combined sources (< 2013)
+    const requestYear = parseInt(dateParam.split('-')[0])
+    const shouldCombineSources = requestYear < 2013
+    if (shouldCombineSources) {
+      console.log(`[Wayback] Date is before 2013 - will combine NOS.nl and NU.nl results`)
+    }
 
     // STAP 1: Probeer primaire bron (www.nos.nl)
     for (const source of NEWS_SOURCES.primary) {
@@ -686,37 +698,47 @@ export async function GET(request: NextRequest) {
             usedSources.push(source)
             primaryTimestamp = snapshot.timestamp
 
-            // Als primaire bron resultaten heeft, stoppen we hier
-            await updateCache(dateParam, {
-              status: 'found',
-              timestamp: snapshot.timestamp,
-              headlines: headlines,  // v2.1.0: Store full headlines!
-              headlineCount: headlines.length,
-              sources: [source]
-            })
+            // Als primaire bron resultaten heeft en we geen combinatie nodig hebben, stoppen we hier
+            if (!shouldCombineSources) {
+              await updateCache(dateParam, {
+                status: 'found',
+                timestamp: snapshot.timestamp,
+                headlines: headlines,  // v2.1.0: Store full headlines!
+                headlineCount: headlines.length,
+                sources: [source]
+              })
 
-            return NextResponse.json({
-              date: dateParam,
-              headlines: allHeadlines,
-              totalHeadlines: allHeadlines.length,
-              sources: usedSources,
-              sourceUrl: getWaybackUrl(snapshot.timestamp, source),
-              snapshotTimestamp: snapshot.timestamp,
-              apiVersion: API_VERSION,
-              cacheHit: false
-            } as WaybackNewsResult)
+              return NextResponse.json({
+                date: dateParam,
+                headlines: allHeadlines,
+                totalHeadlines: allHeadlines.length,
+                sources: usedSources,
+                sourceUrl: getWaybackUrl(snapshot.timestamp, source),
+                snapshotTimestamp: snapshot.timestamp,
+                apiVersion: API_VERSION,
+                cacheHit: false
+              } as WaybackNewsResult)
+            } else {
+              console.log(`[Wayback] Primary source yielded ${headlines.length} headlines, continuing to combine with NU.nl...`)
+              break  // Exit primary sources loop, continue to fallback (which becomes combination for old dates)
+            }
           }
         }
       }
     }
     
-    console.log(`[Wayback] Primary sources yielded no results, trying fallback sources...`)
+    if (shouldCombineSources && allHeadlines.length > 0) {
+      console.log(`[Wayback] Combining with fallback sources for better coverage...`)
+    } else {
+      console.log(`[Wayback] Primary sources yielded no results, trying fallback sources...`)
+    }
 
     // STAP 2: Als primaire bron niks heeft, probeer fallback bronnen
+    // VOOR < 2013: Combineer met primaire bron voor betere coverage
     for (const source of NEWS_SOURCES.fallback) {
       // Skip www.nu.nl if www.nos.nl already gave results (primary succeeded)
-      // v1.8.0: With NOS primary, we skip NU.nl if NOS succeeded (never reached if primary returns)
-      if (source === 'www.nu.nl' && usedSources.includes('www.nos.nl')) {
+      // UNLESS we're combining sources for old dates (< 2013)
+      if (source === 'www.nu.nl' && usedSources.includes('www.nos.nl') && !shouldCombineSources) {
         console.log(`[Wayback] Skipping ${source} - www.nos.nl already provided results`)
         continue
       }
