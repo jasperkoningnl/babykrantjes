@@ -1,7 +1,7 @@
 // app/api/news/wayback/route.ts
-// @version 1.7.1
+// @version 1.8.0
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
-// Bronnen: www.nu.nl (primair), www.nos.nl + nos.nl (fallback)
+// Bronnen: www.nos.nl (primair), www.nu.nl + nos.nl (fallback)
 // UPDATE v1.2.0: Multi-source fallback toegevoegd
 // UPDATE v1.3.0: Fix cache update in error scenarios + stale cache retry logic
 // UPDATE v1.4.0: Cache full headlines for true performance gain
@@ -9,21 +9,23 @@
 // UPDATE v1.6.0: Timeout & retry logic + smart CDX strategy + minimum threshold
 // UPDATE v1.7.0: Multi-year HTML parser - supports patterns from 2005-2024
 // UPDATE v1.7.1: Noise filtering + HTML entities fix + duplicate prevention
+// UPDATE v1.8.0: NOS.nl as primary source (no ads), NU.nl as fallback
 
 import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.7.1'
+const API_VERSION = '1.8.0'
 
 // Reliability settings
 const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
 const CDX_LIMIT = 20  // Number of snapshots to fetch (increased from 5)
 
 // News sources to try (in order)
+// v1.8.0: NOS.nl primary (no ads/commercial content), NU.nl fallback
 const NEWS_SOURCES = {
-  primary: ['www.nu.nl'],
-  fallback: ['www.nos.nl', 'nos.nl']
+  primary: ['www.nos.nl'],
+  fallback: ['www.nu.nl', 'nos.nl']
 }
 
 // Types
@@ -642,8 +644,8 @@ export async function GET(request: NextRequest) {
     const allHeadlines: Headline[] = []
     const usedSources: string[] = []
     let primaryTimestamp: string | null = null
-    
-    // STAP 1: Probeer primaire bron (www.nu.nl)
+
+    // STAP 1: Probeer primaire bron (www.nos.nl)
     for (const source of NEWS_SOURCES.primary) {
       const snapshot = await findSnapshot(dateParam, source)
 
@@ -693,7 +695,14 @@ export async function GET(request: NextRequest) {
 
     // STAP 2: Als primaire bron niks heeft, probeer fallback bronnen
     for (const source of NEWS_SOURCES.fallback) {
-      // Skip nos.nl if www.nos.nl already gave results (prevents duplicates)
+      // Skip www.nu.nl if www.nos.nl already gave results (primary succeeded)
+      // v1.8.0: With NOS primary, we skip NU.nl if NOS succeeded (never reached if primary returns)
+      if (source === 'www.nu.nl' && usedSources.includes('www.nos.nl')) {
+        console.log(`[Wayback] Skipping ${source} - www.nos.nl already provided results`)
+        continue
+      }
+
+      // Skip nos.nl if www.nos.nl gave results in fallback (prevents duplicates)
       if (source === 'nos.nl' && usedSources.includes('www.nos.nl')) {
         console.log(`[Wayback] Skipping ${source} - www.nos.nl already provided results`)
         continue
@@ -714,11 +723,6 @@ export async function GET(request: NextRequest) {
 
             if (!primaryTimestamp) {
               primaryTimestamp = snapshot.timestamp
-            }
-
-            // If www.nos.nl gave results, skip nos.nl (same content)
-            if (source === 'www.nos.nl') {
-              console.log(`[Wayback] www.nos.nl successful - will skip nos.nl to avoid duplicates`)
             }
           }
         }

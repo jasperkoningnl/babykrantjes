@@ -60,9 +60,9 @@ export default function PatternTestPage() {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem', fontFamily: 'system-ui' }}>
-      <h1>Wayback Parser Tester (v1.7.1)</h1>
+      <h1>Wayback Parser Tester (v1.8.0)</h1>
       <p style={{ color: '#666', marginBottom: '2rem' }}>
-        Test de nieuwe multi-year parser met noise filtering en duplicate prevention.
+        Test de multi-year parser met NOS.nl als primaire bron (geen advertenties) en NU.nl als fallback.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
