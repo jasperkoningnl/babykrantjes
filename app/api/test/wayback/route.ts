@@ -4,6 +4,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
+// Force dynamic rendering - don't try to pre-render during build
+export const dynamic = 'force-dynamic'
+export const maxDuration = 300 // 5 minutes max
+
 interface TestRun {
   runNumber: number
   success: boolean

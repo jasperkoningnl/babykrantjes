@@ -4,6 +4,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
+// Force dynamic rendering - don't try to pre-render during build
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const date = searchParams.get('date')
