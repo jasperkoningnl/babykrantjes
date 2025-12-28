@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.8.5'
+const API_VERSION = '1.8.6'
 
 // Reliability settings
 const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
@@ -405,6 +405,16 @@ function parseNosNlHeadlines(html: string, source: string): Headline[] {
   // Pattern 1e: Large top stories with data-testid="card-content-inside" (2023+)
   const cardContentPattern = /<a[^>]*class="[^"]*"[^>]*data-testid="card-content-inside"[^>]*href="([^"]*)"[^>]*>[\s\S]*?<h2[^>]*class="[^"]*"[^>]*>([\s\S]*?)<\/h2>/gi
   while ((match = cardContentPattern.exec(html)) !== null) {
+    const cleanText = match[2].replace(/<[^>]+>/g, '').trim()
+    if (cleanText) {
+      addHeadline(cleanText, match[1], 'Top Story')
+    }
+  }
+
+  // Pattern 1f: Highlighted card top stories (2024+)
+  // data-testid="highlightedcard" with h2 headline
+  const highlightedCardPattern = /<a[^>]*data-testid="highlightedcard"[^>]*href="([^"]*)"[^>]*>[\s\S]*?<h2[^>]*class="[^"]*"[^>]*>([\s\S]*?)<\/h2>/gi
+  while ((match = highlightedCardPattern.exec(html)) !== null) {
     const cleanText = match[2].replace(/<[^>]+>/g, '').trim()
     if (cleanText) {
       addHeadline(cleanText, match[1], 'Top Story')
