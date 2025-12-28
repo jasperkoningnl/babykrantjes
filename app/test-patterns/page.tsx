@@ -3,11 +3,11 @@
 import { useState } from 'react'
 
 const TEST_DATES = [
-  { date: '2012-06-15', label: '2012 (vroeg)' },
-  { date: '2014-03-10', label: '2014 (mid)' },
-  { date: '2016-05-18', label: '2016 (Anne)' },
-  { date: '2020-05-18', label: '2020 (recent)' },
-  { date: '2022-03-28', label: '2022 (Lena)' }
+  { date: '2011-09-12', label: '2011 (vroeg test)' },
+  { date: '2015-01-15', label: '2015 (mid test)' },
+  { date: '2017-07-20', label: '2017 (legacy test)' },
+  { date: '2019-03-25', label: '2019 (modern test)' },
+  { date: '2023-06-10', label: '2023 (recent test)' }
 ]
 
 export default function PatternTestPage() {
