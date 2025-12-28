@@ -253,7 +253,7 @@ export default function PatternTestPage() {
         <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem' }}>📝 Instructies</h3>
         <ol style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.9rem' }}>
           <li>Test elk jaar met de knop (gebruikt echte v1.7.0 multi-year parser)</li>
-          <li>Check of "Total Headlines" > 0 voor elk jaar</li>
+          <li>Check of &quot;Total Headlines&quot; &gt; 0 voor elk jaar</li>
           <li>Bekijk welke bronnen gebruikt werden (NU.nl of NOS.nl fallback)</li>
           <li>Kopieer JSON om te delen of debuggen</li>
           <li>Clear Cache om opnieuw te testen zonder cache</li>
