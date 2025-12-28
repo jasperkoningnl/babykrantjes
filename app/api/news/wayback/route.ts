@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.6.0'
+const API_VERSION = '1.6.1'
 
 // Reliability settings
 const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
@@ -54,13 +54,16 @@ type CDXRecord = [string, string, string, string, string, string, string]
 /**
  * Zoekt de beste snapshot van een specifieke bron op een specifieke datum via CDX API
  * v1.6.0: Smart strategy - prefer snapshots during peak news hours (12:00-20:00)
+ * v1.6.1: Wildcard match to find both HTTP and HTTPS snapshots
  */
 async function findSnapshot(date: string, source: string): Promise<WaybackSnapshot | null> {
   const [year, month, day] = date.split('-')
   const dateStr = `${year}${month}${day}`
 
-  // CDX API: fetch more snapshots for better selection
-  const cdxUrl = `https://web.archive.org/cdx/search/cdx?url=${source}&from=${dateStr}&to=${dateStr}&output=json&filter=statuscode:200&filter=mimetype:text/html&limit=${CDX_LIMIT}`
+  // CDX API: Use wildcard to match both http:// and https://
+  // Pattern: *.nu.nl/* matches http://www.nu.nl/, https://www.nu.nl/, etc.
+  const urlPattern = source.startsWith('www.') ? `*.${source.substring(4)}/*` : `*.${source}/*`
+  const cdxUrl = `https://web.archive.org/cdx/search/cdx?url=${urlPattern}&from=${dateStr}&to=${dateStr}&output=json&filter=statuscode:200&filter=mimetype:text/html&limit=${CDX_LIMIT}`
 
   console.log(`[Wayback] CDX query [${source}]: ${cdxUrl}`)
 
@@ -132,33 +135,41 @@ async function findSnapshot(date: string, source: string): Promise<WaybackSnapsh
 /**
  * Haalt de HTML content van een Wayback snapshot op
  * v1.6.0: Uses fetchWithRetry for better reliability
+ * v1.6.1: HTTP/HTTPS fallback for older snapshots (pre-2018)
  */
 async function fetchSnapshotContent(timestamp: string, source: string): Promise<string | null> {
-  // Wayback URL format: https://web.archive.org/web/{timestamp}/https://{source}/
-  const protocol = source.startsWith('www.') ? 'https://www.' : 'https://'
   const domain = source.replace(/^www\./, '')
-  const waybackUrl = `https://web.archive.org/web/${timestamp}/${protocol}${domain}/`
 
-  console.log(`[Wayback] Fetching [${source}]: ${waybackUrl}`)
+  // Try both HTTPS and HTTP (older snapshots are often HTTP-only)
+  const protocols = ['https', 'http']
 
-  try {
-    const response = await fetchWithRetry(waybackUrl, {
-      headers: {
-        'User-Agent': 'Babykrant/1.0 (educational project)',
-        'Accept': 'text/html'
+  for (const protocol of protocols) {
+    const prefix = source.startsWith('www.') ? `${protocol}://www.` : `${protocol}://`
+    const waybackUrl = `https://web.archive.org/web/${timestamp}/${prefix}${domain}/`
+
+    console.log(`[Wayback] Fetching [${source}] via ${protocol.toUpperCase()}: ${waybackUrl}`)
+
+    try {
+      const response = await fetchWithRetry(waybackUrl, {
+        headers: {
+          'User-Agent': 'Babykrant/1.0 (educational project)',
+          'Accept': 'text/html'
+        }
+      })
+
+      if (response.ok) {
+        console.log(`[Wayback] ✓ Success with ${protocol.toUpperCase()}`)
+        return await response.text()
       }
-    })
 
-    if (!response.ok) {
-      console.error(`[Wayback] Fetch error [${source}]: ${response.status}`)
-      return null
+      console.log(`[Wayback] ${protocol.toUpperCase()} failed with status ${response.status}, trying next...`)
+    } catch (error: any) {
+      console.log(`[Wayback] ${protocol.toUpperCase()} failed: ${error.message}, trying next...`)
     }
-
-    return await response.text()
-  } catch (error) {
-    console.error(`[Wayback] Content fetch error [${source}]:`, error)
-    return null
   }
+
+  console.error(`[Wayback] All protocols failed for [${source}]`)
+  return null
 }
 
 /**
