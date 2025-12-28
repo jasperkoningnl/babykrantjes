@@ -1,5 +1,5 @@
 // app/api/news/wayback/route.ts
-// @version 1.7.0
+// @version 1.7.1
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
 // Bronnen: www.nu.nl (primair), www.nos.nl + nos.nl (fallback)
 // UPDATE v1.2.0: Multi-source fallback toegevoegd
@@ -8,12 +8,13 @@
 // UPDATE v1.5.0: Simplified - only cache success (prevents overwrite issues)
 // UPDATE v1.6.0: Timeout & retry logic + smart CDX strategy + minimum threshold
 // UPDATE v1.7.0: Multi-year HTML parser - supports patterns from 2005-2024
+// UPDATE v1.7.1: Noise filtering + HTML entities fix + duplicate prevention
 
 import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.7.0'
+const API_VERSION = '1.7.1'
 
 // Reliability settings
 const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
@@ -214,30 +215,33 @@ function parseNuNlHeadlines(html: string, source: string): Headline[] {
     return null
   }
 
-  // Helper to add headline with deduplication
+  // Helper to add headline with deduplication and noise filtering
   const addHeadline = (title: string, url: string = '', category: string | null = null, time: string | null = null) => {
     const cleanTitle = decodeHtmlEntities(title.trim())
       .replace(/^(Video|Podcast|Liveblog[^:]*:?)\s*/i, '')
       .trim()
 
-    if (cleanTitle && cleanTitle.length > 10 && !seen.has(cleanTitle.toLowerCase())) {
-      seen.add(cleanTitle.toLowerCase())
-
-      // Clean Wayback URL if present
-      let cleanUrl = url
-      if (url) {
-        const originalUrlMatch = url.match(/\/web\/\d+\/(.+)/)
-        cleanUrl = originalUrlMatch ? 'https://' + originalUrlMatch[1].replace(/^https?:\/\//, '') : url
-      }
-
-      headlines.push({
-        title: cleanTitle,
-        url: cleanUrl,
-        category,
-        time,
-        source
-      })
+    // Skip if too short, duplicate, or noise
+    if (!cleanTitle || cleanTitle.length <= 10 || seen.has(cleanTitle.toLowerCase()) || isNoiseHeadline(cleanTitle)) {
+      return
     }
+
+    seen.add(cleanTitle.toLowerCase())
+
+    // Clean Wayback URL if present
+    let cleanUrl = url
+    if (url) {
+      const originalUrlMatch = url.match(/\/web\/\d+\/(.+)/)
+      cleanUrl = originalUrlMatch ? 'https://' + originalUrlMatch[1].replace(/^https?:\/\//, '') : url
+    }
+
+    headlines.push({
+      title: cleanTitle,
+      url: cleanUrl,
+      category,
+      time,
+      source
+    })
   }
 
   // === MODERN PATTERNS (2018-2024) ===
@@ -333,19 +337,23 @@ function parseNosNlHeadlines(html: string, source: string): Headline[] {
     return url
   }
 
-  // Helper to add headline with deduplication
+  // Helper to add headline with deduplication and noise filtering
   const addHeadline = (title: string, url: string = '', category: string | null = null, time: string | null = null) => {
     const cleanTitle = decodeHtmlEntities(title.trim())
-    if (cleanTitle && cleanTitle.length > 10 && !seen.has(cleanTitle.toLowerCase())) {
-      seen.add(cleanTitle.toLowerCase())
-      headlines.push({
-        title: cleanTitle,
-        url: url ? cleanWaybackUrl(url) : '',
-        category,
-        time,
-        source
-      })
+
+    // Skip if too short, duplicate, or noise
+    if (!cleanTitle || cleanTitle.length <= 10 || seen.has(cleanTitle.toLowerCase()) || isNoiseHeadline(cleanTitle)) {
+      return
     }
+
+    seen.add(cleanTitle.toLowerCase())
+    headlines.push({
+      title: cleanTitle,
+      url: url ? cleanWaybackUrl(url) : '',
+      category,
+      time,
+      source
+    })
   }
 
   let match
@@ -436,7 +444,57 @@ function parseHeadlines(html: string, source: string): Headline[] {
 }
 
 /**
+ * Filters out navigation/UI elements that are not actual news headlines
+ * v1.7.1: Noise filtering to improve headline quality
+ */
+function isNoiseHeadline(title: string): boolean {
+  const lowerTitle = title.toLowerCase()
+
+  // Exact matches for common UI elements
+  const exactNoisePatterns = [
+    'live kanalen', 'archive team', 'category_news', 'category_sport',
+    'mobiele apps', 'volg de nos', 'laatste nieuws', 'laatste journaal',
+    'laatste achtuurjournaal', 'nos jeugdjournaal', 'meest bekeken video\'s',
+    'tip van de redactie', 'uitgelicht nieuws', 'wetenschapsagenda',
+    'media uploaden', 'uit en thuis', 'nieuwsvideo\'s', 'media en cultuur',
+    'praat mee op nujij', 'meest gelezen', 'voor jou geselecteerd',
+    'lezersfoto\'s', 'tip de redactie', 'lezersbijdragen', 'uitgelichte video\'s',
+    'van onze adverteerders', 'nieuws in 60 seconden', 'het nieuws in 60 seconden',
+    'ruimteballon', 'varende brug', 'als een vis...', 'komeetlandschap',
+    'drijvend hotel', 'helpende hand' // Video titles without context
+  ]
+
+  if (exactNoisePatterns.includes(lowerTitle)) {
+    return true
+  }
+
+  // Pattern-based filtering
+  // Commercial/advertorial patterns
+  if (lowerTitle.match(/^bestel|^ontvang|^stel in \d+ stappen|^bekijk hier de folder|^profiteer nu|^alleen deze week|^nu minimaal|^speel mee met/)) {
+    return true
+  }
+
+  // Price patterns (deals/offers)
+  if (lowerTitle.match(/van \d+[,.]?\d* (euro )?voor \d+[,.]?\d* euro/)) {
+    return true
+  }
+
+  // Section headers (too generic)
+  if (exactNoisePatterns.includes(lowerTitle) || lowerTitle.match(/^(coronavirus|nushop|uitzendingen?)$/)) {
+    return true
+  }
+
+  // Archive Team patterns
+  if (lowerTitle.includes('archive team') && lowerTitle.includes('snapshots')) {
+    return true
+  }
+
+  return false
+}
+
+/**
  * Decodeert HTML entities
+ * v1.7.1: Added common named entities (iuml, euml, etc.)
  */
 function decodeHtmlEntities(text: string): string {
   return text
@@ -447,7 +505,32 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
     .replace(/&#x27;/g, "'")
+    // Common accented characters
+    .replace(/&iuml;/g, 'ï')
+    .replace(/&euml;/g, 'ë')
+    .replace(/&uuml;/g, 'ü')
+    .replace(/&ouml;/g, 'ö')
+    .replace(/&auml;/g, 'ä')
+    .replace(/&Iuml;/g, 'Ï')
+    .replace(/&Euml;/g, 'Ë')
+    .replace(/&Uuml;/g, 'Ü')
+    .replace(/&Ouml;/g, 'Ö')
+    .replace(/&Auml;/g, 'Ä')
+    // Other common entities
+    .replace(/&eacute;/g, 'é')
+    .replace(/&egrave;/g, 'è')
+    .replace(/&ecirc;/g, 'ê')
+    .replace(/&agrave;/g, 'à')
+    .replace(/&acirc;/g, 'â')
+    .replace(/&ntilde;/g, 'ñ')
+    .replace(/&ccedil;/g, 'ç')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–')
+    .replace(/&hellip;/g, '...')
+    // Numeric entities (catch-all)
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
 }
 
 /**
@@ -607,24 +690,35 @@ export async function GET(request: NextRequest) {
     }
     
     console.log(`[Wayback] Primary sources yielded no results, trying fallback sources...`)
-    
+
     // STAP 2: Als primaire bron niks heeft, probeer fallback bronnen
     for (const source of NEWS_SOURCES.fallback) {
+      // Skip nos.nl if www.nos.nl already gave results (prevents duplicates)
+      if (source === 'nos.nl' && usedSources.includes('www.nos.nl')) {
+        console.log(`[Wayback] Skipping ${source} - www.nos.nl already provided results`)
+        continue
+      }
+
       const snapshot = await findSnapshot(dateParam, source)
-      
+
       if (snapshot) {
         const html = await fetchSnapshotContent(snapshot.timestamp, source)
-        
+
         if (html) {
           const headlines = parseHeadlines(html, source)
-          
+
           if (headlines.length > 0) {
             console.log(`[Wayback] ✓ Fallback source ${source} yielded ${headlines.length} headlines`)
             allHeadlines.push(...headlines)
             usedSources.push(source)
-            
+
             if (!primaryTimestamp) {
               primaryTimestamp = snapshot.timestamp
+            }
+
+            // If www.nos.nl gave results, skip nos.nl (same content)
+            if (source === 'www.nos.nl') {
+              console.log(`[Wayback] www.nos.nl successful - will skip nos.nl to avoid duplicates`)
             }
           }
         }
