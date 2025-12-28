@@ -1,5 +1,5 @@
 // app/api/news/wayback/route.ts
-// @version 1.8.2
+// @version 1.8.3
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
 // Bronnen: www.nos.nl (primair), www.nu.nl + nos.nl (fallback)
 // UPDATE v1.2.0: Multi-source fallback toegevoegd
@@ -12,12 +12,13 @@
 // UPDATE v1.8.0: NOS.nl as primary source (no ads), NU.nl as fallback
 // UPDATE v1.8.1: Fixed missing topstories (h1.topstory_mainarticle_title, h3.topstory__title) + "laatste" section
 // UPDATE v1.8.2: Fix 2019 topstory nested spans + combine sources for pre-2013 dates
+// UPDATE v1.8.3: Add styled-components support for 2023+ (data-testid patterns + generic h2)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.8.2'
+const API_VERSION = '1.8.3'
 
 // Reliability settings
 const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
@@ -386,6 +387,30 @@ function parseNosNlHeadlines(html: string, source: string): Headline[] {
     addHeadline(match[2], match[1], 'Top Story')
   }
 
+  // Pattern 1d: Styled-components sub-topstories (2023+)
+  // Uses data-testid="sub-topstories" with h2 headlines
+  const subtopstoriesPattern = /<ul[^>]*data-testid="sub-topstories"[^>]*>([\s\S]*?)<\/ul>/gi
+  while ((match = subtopstoriesPattern.exec(html)) !== null) {
+    const section = match[1]
+    const h2Pattern = /<h2[^>]*class="[^"]*"[^>]*>([\s\S]*?)<\/h2>/gi
+    let h2Match
+    while ((h2Match = h2Pattern.exec(section)) !== null) {
+      const cleanText = h2Match[1].replace(/<[^>]+>/g, '').trim()
+      if (cleanText) {
+        addHeadline(cleanText, '', 'Top Story')
+      }
+    }
+  }
+
+  // Pattern 1e: Large top stories with data-testid="card-content-inside" (2023+)
+  const cardContentPattern = /<a[^>]*class="[^"]*"[^>]*data-testid="card-content-inside"[^>]*href="([^"]*)"[^>]*>[\s\S]*?<h2[^>]*class="[^"]*"[^>]*>([\s\S]*?)<\/h2>/gi
+  while ((match = cardContentPattern.exec(html)) !== null) {
+    const cleanText = match[2].replace(/<[^>]+>/g, '').trim()
+    if (cleanText) {
+      addHeadline(cleanText, match[1], 'Top Story')
+    }
+  }
+
   // Pattern 2: Featured headlines
   const featuredPattern = /<li[^>]*class="[^"]*big[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>/gi
   while ((match = featuredPattern.exec(html)) !== null) {
@@ -447,6 +472,17 @@ function parseNosNlHeadlines(html: string, source: string): Headline[] {
   const fallbackNosLink = /<a[^>]*href="([^"]*nos\.nl\/artikel\/[^"]*)"[^>]*>([^<]+)<\/a>/gi
   while ((match = fallbackNosLink.exec(html)) !== null) {
     addHeadline(match[2], match[1], extractCategory(match[1]))
+  }
+
+  // === STYLED-COMPONENTS FALLBACK (2023+) ===
+  // Pattern 11: Generic h2 headlines in article links (for styled-components era)
+  // This catches all h2 headlines that weren't caught by more specific patterns
+  const genericH2LinkPattern = /<a[^>]*href="([^"]*\/(?:artikel|video|liveblog)\/[^"]*)"[^>]*>[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/gi
+  while ((match = genericH2LinkPattern.exec(html)) !== null) {
+    const cleanText = match[2].replace(/<[^>]+>/g, '').trim()
+    if (cleanText) {
+      addHeadline(cleanText, match[1], extractCategory(match[1]))
+    }
   }
 
   console.log(`[Wayback] Parsed ${headlines.length} unique headlines from ${source} (multi-year parser)`)
