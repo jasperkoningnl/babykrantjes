@@ -1,11 +1,10 @@
 // app/api/top40/route.ts
-// @version 1.3.0
+// @version 1.4.0
 // Server-side scraper voor Top40.nl
 // FIXED: Parsing voor zowel raw HTML als markdown-converted response
-// FIXED: SSL certificate verification issues met custom agent en retry logica
+// FIXED: SSL certificate verification issues with NODE_TLS_REJECT_UNAUTHORIZED
 
 import { NextRequest, NextResponse } from 'next/server'
-import https from 'https'
 
 interface ChartEntry {
   position: number
@@ -24,13 +23,9 @@ interface Top40Result {
   sourceUrl: string
 }
 
-// Custom HTTPS agent om SSL verificatie problemen te omzeilen
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: false, // Nodig voor sites met incomplete certificate chains
-})
-
 /**
  * Fetch met retry logica voor SSL/netwerk errors
+ * Gebruikt tijdelijk NODE_TLS_REJECT_UNAUTHORIZED om SSL verificatie issues te omzeilen
  */
 async function fetchWithRetry(
   url: string,
@@ -43,13 +38,23 @@ async function fetchWithRetry(
     try {
       console.log(`[Top40] Fetch attempt ${attempt}/${maxRetries}: ${url}`)
 
-      const response = await fetch(url, {
-        ...options,
-        // @ts-ignore - Node.js agent niet officieel ondersteund in types maar werkt wel
-        agent: httpsAgent,
-      })
+      // Bewaar originele waarde en schakel SSL verificatie tijdelijk uit
+      const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED
 
-      return response
+      try {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
+        const response = await fetch(url, options)
+
+        return response
+      } finally {
+        // Herstel originele waarde
+        if (originalTlsReject !== undefined) {
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject
+        } else {
+          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
+        }
+      }
     } catch (error) {
       lastError = error as Error
       console.error(`[Top40] Attempt ${attempt} failed:`, error)
