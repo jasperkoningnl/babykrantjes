@@ -54,81 +54,100 @@ type CDXRecord = [string, string, string, string, string, string, string]
 /**
  * Zoekt de beste snapshot van een specifieke bron op een specifieke datum via CDX API
  * v1.6.0: Smart strategy - prefer snapshots during peak news hours (12:00-20:00)
- * v1.6.1: Wildcard match to find both HTTP and HTTPS snapshots
+ * v1.6.1: Try both HTTP and HTTPS explicitly for older snapshots
  */
 async function findSnapshot(date: string, source: string): Promise<WaybackSnapshot | null> {
   const [year, month, day] = date.split('-')
   const dateStr = `${year}${month}${day}`
 
-  // CDX API: Use wildcard to match both http:// and https://
-  // Pattern: *.nu.nl/* matches http://www.nu.nl/, https://www.nu.nl/, etc.
-  const urlPattern = source.startsWith('www.') ? `*.${source.substring(4)}/*` : `*.${source}/*`
-  const cdxUrl = `https://web.archive.org/cdx/search/cdx?url=${urlPattern}&from=${dateStr}&to=${dateStr}&output=json&filter=statuscode:200&filter=mimetype:text/html&limit=${CDX_LIMIT}`
+  // Try both HTTP and HTTPS (older snapshots are HTTP, newer are HTTPS)
+  const protocols = ['http', 'https']
+  let allSnapshots: Array<{
+    timestamp: string
+    url: string
+    status: string
+    mimeType: string
+    hour: number
+    score: number
+  }> = []
 
-  console.log(`[Wayback] CDX query [${source}]: ${cdxUrl}`)
+  for (const protocol of protocols) {
+    const prefix = source.startsWith('www.') ? `${protocol}://www.` : `${protocol}://`
+    const domain = source.replace(/^www\./, '')
+    const fullUrl = `${prefix}${domain}/`
+    const cdxUrl = `https://web.archive.org/cdx/search/cdx?url=${fullUrl}&from=${dateStr}&to=${dateStr}&output=json&filter=statuscode:200&filter=mimetype:text/html&limit=${CDX_LIMIT}`
 
-  try {
-    const response = await fetchWithRetry(cdxUrl, {
-      headers: {
-        'User-Agent': 'Babykrant/1.0 (educational project)'
-      }
-    })
+    console.log(`[Wayback] CDX query [${source}] via ${protocol.toUpperCase()}: ${cdxUrl}`)
 
-    if (!response.ok) {
-      console.error(`[Wayback] CDX API error [${source}]: ${response.status}`)
-      return null
-    }
+    try {
+      const response = await fetchWithRetry(cdxUrl, {
+        headers: {
+          'User-Agent': 'Babykrant/1.0 (educational project)'
+        }
+      })
 
-    const data = await response.json() as CDXRecord[]
-
-    // Eerste rij is header, daarna data
-    if (data.length < 2) {
-      console.log(`[Wayback] No snapshots found for ${source} on ${date}`)
-      return null
-    }
-
-    // Smart selection: prefer snapshots during peak news hours
-    const snapshots = data.slice(1).map(record => {
-      const [urlkey, timestamp, original, mimetype, statuscode, digest, length] = record
-      const hour = parseInt(timestamp.substring(8, 10))
-
-      // Score based on time of day
-      // Peak news hours (12:00-20:00): score 10
-      // Morning (08:00-12:00): score 5
-      // Night/early morning: score 1
-      let score = 1
-      if (hour >= 12 && hour <= 20) {
-        score = 10
-      } else if (hour >= 8 && hour < 12) {
-        score = 5
+      if (!response.ok) {
+        console.log(`[Wayback] CDX ${protocol.toUpperCase()} error: ${response.status}`)
+        continue
       }
 
-      return {
-        timestamp,
-        url: original,
-        status: statuscode,
-        mimeType: mimetype,
-        hour,
-        score
+      const data = await response.json() as CDXRecord[]
+
+      // Eerste rij is header, daarna data
+      if (data.length < 2) {
+        console.log(`[Wayback] No ${protocol.toUpperCase()} snapshots found for ${source} on ${date}`)
+        continue
       }
-    })
 
-    // Sort by score (highest first) and pick best
-    snapshots.sort((a, b) => b.score - a.score)
-    const best = snapshots[0]
+      // Parse snapshots from this protocol
+      const snapshots = data.slice(1).map(record => {
+        const [urlkey, timestamp, original, mimetype, statuscode, digest, length] = record
+        const hour = parseInt(timestamp.substring(8, 10))
 
-    console.log(`[Wayback] Selected snapshot at ${best.hour}:${best.timestamp.substring(10, 12)} (score: ${best.score}, ${snapshots.length} total snapshots)`)
+        // Score based on time of day
+        let score = 1
+        if (hour >= 12 && hour <= 20) {
+          score = 10
+        } else if (hour >= 8 && hour < 12) {
+          score = 5
+        }
 
-    return {
-      timestamp: best.timestamp,
-      url: best.url,
-      status: best.status,
-      mimeType: best.mimeType,
-      source
+        return {
+          timestamp,
+          url: original,
+          status: statuscode,
+          mimeType: mimetype,
+          hour,
+          score
+        }
+      })
+
+      allSnapshots.push(...snapshots)
+      console.log(`[Wayback] Found ${snapshots.length} ${protocol.toUpperCase()} snapshots`)
+
+    } catch (error) {
+      console.log(`[Wayback] CDX ${protocol.toUpperCase()} fetch error:`, error)
+      continue
     }
-  } catch (error) {
-    console.error(`[Wayback] CDX fetch error [${source}]:`, error)
+  }
+
+  if (allSnapshots.length === 0) {
+    console.log(`[Wayback] No snapshots found for ${source} on ${date} (tried both HTTP and HTTPS)`)
     return null
+  }
+
+  // Sort all snapshots by score and pick best
+  allSnapshots.sort((a, b) => b.score - a.score)
+  const best = allSnapshots[0]
+
+  console.log(`[Wayback] Selected snapshot at ${best.hour}:${best.timestamp.substring(10, 12)} (score: ${best.score}, ${allSnapshots.length} total snapshots from both protocols)`)
+
+  return {
+    timestamp: best.timestamp,
+    url: best.url,
+    status: best.status,
+    mimeType: best.mimeType,
+    source
   }
 }
 
