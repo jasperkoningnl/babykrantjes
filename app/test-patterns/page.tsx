@@ -64,9 +64,9 @@ export default function PatternTestPage() {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem', fontFamily: 'system-ui' }}>
-      <h1>Wayback Parser Tester (v1.8.4)</h1>
+      <h1>Wayback Parser Tester (v1.8.5)</h1>
       <p style={{ color: '#666', marginBottom: '2rem' }}>
-        Test de multi-year parser met: NOS.nl primair, pre-2013 source combining, 2010 strong tag fix, 2019 nested spans fix, en 2023+ styled-components support.
+        Test de multi-year parser met: NOS.nl primair, pre-2013 source combining, 2010 strong tag fix, 2019 nested spans fix, 2023+ styled-components support, en verbeterde noise filtering.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -256,12 +256,13 @@ export default function PatternTestPage() {
       }}>
         <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem' }}>📝 Instructies</h3>
         <ol style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.9rem' }}>
-          <li>Test elk jaar met de knop (gebruikt v1.8.4 parser)</li>
+          <li>Test elk jaar met de knop (gebruikt v1.8.5 parser)</li>
           <li>Check of &quot;Total Headlines&quot; &gt; 0 en inclusief topstories</li>
           <li>Voor 2010: Verbeterde strong tag parser voor vroege NOS.nl structuur</li>
           <li>Voor &lt;2013: NOS.nl + NU.nl gecombineerd voor betere coverage</li>
           <li>Voor 2019: Nested spans in topstory titles worden correct geparsed</li>
           <li>Voor 2023+: Styled-components met data-testid patterns</li>
+          <li>Voor 2024+: Verbeterde noise filtering (dossiers, navigatie, gallerijen)</li>
           <li>Kopieer JSON om te delen of debuggen</li>
           <li>Clear Cache om opnieuw te testen zonder cache</li>
         </ol>
