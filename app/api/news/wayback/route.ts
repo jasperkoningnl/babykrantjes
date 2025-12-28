@@ -1,5 +1,5 @@
 // app/api/news/wayback/route.ts
-// @version 1.8.0
+// @version 1.8.1
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
 // Bronnen: www.nos.nl (primair), www.nu.nl + nos.nl (fallback)
 // UPDATE v1.2.0: Multi-source fallback toegevoegd
@@ -10,12 +10,13 @@
 // UPDATE v1.7.0: Multi-year HTML parser - supports patterns from 2005-2024
 // UPDATE v1.7.1: Noise filtering + HTML entities fix + duplicate prevention
 // UPDATE v1.8.0: NOS.nl as primary source (no ads), NU.nl as fallback
+// UPDATE v1.8.1: Fixed missing topstories (h1.topstory_mainarticle_title, h3.topstory__title) + "laatste" section
 
 import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.8.0'
+const API_VERSION = '1.8.1'
 
 // Reliability settings
 const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
@@ -361,7 +362,19 @@ function parseNosNlHeadlines(html: string, source: string): Headline[] {
   let match
 
   // === MODERN PATTERNS (2015-2024) ===
-  // Pattern 1: Top story
+  // Pattern 1a: Topstory main article (2015-2017)
+  const topstoryH1Pattern = /<h1[^>]*class="[^"]*topstory_mainarticle_title[^"]*"[^>]*>([^<]+)<\/h1>/gi
+  while ((match = topstoryH1Pattern.exec(html)) !== null) {
+    addHeadline(match[1], '', 'Top Story')
+  }
+
+  // Pattern 1b: Topstory title (2019+)
+  const topstoryH3Pattern = /<h3[^>]*class="[^"]*topstory__title[^"]*"[^>]*>([^<]+)<\/h3>/gi
+  while ((match = topstoryH3Pattern.exec(html)) !== null) {
+    addHeadline(match[1], '', 'Top Story')
+  }
+
+  // Pattern 1c: Top story (fallback for other structures)
   const topStoryPattern = /<div[^>]*class="[^"]*top-story[^"]*"[^>]*>[\s\S]*?<strong>\s*<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>\s*<\/strong>/gi
   while ((match = topStoryPattern.exec(html)) !== null) {
     addHeadline(match[2], match[1], 'Top Story')
@@ -384,6 +397,12 @@ function parseNosNlHeadlines(html: string, source: string): Headline[] {
   while ((match = latestPattern.exec(html)) !== null) {
     const title = match[4] || match[2]
     addHeadline(title, match[1], extractCategory(match[1]), match[3])
+  }
+
+  // Pattern 4b: "Laatste" section with link-hover spans
+  const laatstePattern = /<li[^>]*class="[^"]*list-latest__item[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>[\s\S]*?<span[^>]*class="[^"]*link-hover[^"]*"[^>]*>([^<]+)<\/span>/gi
+  while ((match = laatstePattern.exec(html)) !== null) {
+    addHeadline(match[2], match[1], extractCategory(match[1]))
   }
 
   // === LEGACY PATTERNS (2010-2015) ===
