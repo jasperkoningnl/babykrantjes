@@ -1,5 +1,5 @@
 // app/api/news/wayback/route.ts
-// @version 1.6.0
+// @version 1.7.0
 // Haalt Nederlandse nieuwsheadlines op via Wayback Machine (Internet Archive)
 // Bronnen: www.nu.nl (primair), www.nos.nl + nos.nl (fallback)
 // UPDATE v1.2.0: Multi-source fallback toegevoegd
@@ -7,12 +7,13 @@
 // UPDATE v1.4.0: Cache full headlines for true performance gain
 // UPDATE v1.5.0: Simplified - only cache success (prevents overwrite issues)
 // UPDATE v1.6.0: Timeout & retry logic + smart CDX strategy + minimum threshold
+// UPDATE v1.7.0: Multi-year HTML parser - supports patterns from 2005-2024
 
 import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.6.1'
+const API_VERSION = '1.7.0'
 
 // Reliability settings
 const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
@@ -193,24 +194,13 @@ async function fetchSnapshotContent(timestamp: string, source: string): Promise<
 
 /**
  * Parseert headlines uit nu.nl HTML content
- * Headlines zitten in <span class="item-title__title"> tags
+ * v1.7.0: Multi-year parser - probeert verschillende patterns voor verschillende tijdsperiodes
+ * Patterns gebaseerd op HTML evolutie van nu.nl (2005-2024)
  */
 function parseNuNlHeadlines(html: string, source: string): Headline[] {
   const headlines: Headline[] = []
   const seen = new Set<string>()
-  
-  // Patroon 1: item-title__title spans met title attribuut
-  // <span title="RIVM meldt opnieuw zeer klein aantal doden" class="item-title__title">
-  const titleAttrPattern = /<span[^>]*title="([^"]+)"[^>]*class="[^"]*item-title__title[^"]*"[^>]*>/gi
-  
-  // Patroon 2: item-title__title spans met content erin
-  // <span class="item-title__title"><!----> Headline text </span>
-  const spanContentPattern = /<span[^>]*class="[^"]*item-title__title[^"]*"[^>]*>(?:<!--.*?-->)?\s*([^<]+)\s*<\/span>/gi
-  
-  // Patroon 3: Links met href en title
-  // <a href="/web/20200518.../artikel.html" ... title="Headline">
-  const linkPattern = /<a[^>]*href="([^"]*\/nu\.nl\/[^"]+\.html)"[^>]*>[\s\S]*?<span[^>]*class="[^"]*item-title__title[^"]*"[^>]*>(?:<!--.*?-->)?\s*([^<]+)/gi
-  
+
   // Extract categorie uit URL: /binnenland/, /buitenland/, /economie/, etc.
   const extractCategory = (url: string): string | null => {
     const match = url.match(/nu\.nl\/([a-z-]+)\//)
@@ -223,113 +213,116 @@ function parseNuNlHeadlines(html: string, source: string): Headline[] {
     }
     return null
   }
-  
-  // Extract tijd uit de HTML context (item-datetime)
-  const extractTime = (context: string): string | null => {
-    const timeMatch = context.match(/<time[^>]*class="item-datetime"[^>]*>(\d{1,2}:\d{2})<\/time>/i)
-    return timeMatch ? timeMatch[1] : null
+
+  // Helper to add headline with deduplication
+  const addHeadline = (title: string, url: string = '', category: string | null = null, time: string | null = null) => {
+    const cleanTitle = decodeHtmlEntities(title.trim())
+      .replace(/^(Video|Podcast|Liveblog[^:]*:?)\s*/i, '')
+      .trim()
+
+    if (cleanTitle && cleanTitle.length > 10 && !seen.has(cleanTitle.toLowerCase())) {
+      seen.add(cleanTitle.toLowerCase())
+
+      // Clean Wayback URL if present
+      let cleanUrl = url
+      if (url) {
+        const originalUrlMatch = url.match(/\/web\/\d+\/(.+)/)
+        cleanUrl = originalUrlMatch ? 'https://' + originalUrlMatch[1].replace(/^https?:\/\//, '') : url
+      }
+
+      headlines.push({
+        title: cleanTitle,
+        url: cleanUrl,
+        category,
+        time,
+        source
+      })
+    }
   }
-  
-  // Methode 1: Zoek title attributes
+
+  // === MODERN PATTERNS (2018-2024) ===
+  // Pattern 1: item-title__title spans met title attribuut
+  const modernTitleAttr = /<span[^>]*title="([^"]+)"[^>]*class="[^"]*item-title__title[^"]*"[^>]*>/gi
   let match
-  while ((match = titleAttrPattern.exec(html)) !== null) {
-    const title = decodeHtmlEntities(match[1].trim())
-    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
-      seen.add(title.toLowerCase())
-      headlines.push({
-        title,
-        url: '',
-        category: null,
-        time: null,
-        source
-      })
-    }
+  while ((match = modernTitleAttr.exec(html)) !== null) {
+    addHeadline(match[1])
   }
-  
-  // Methode 2: Zoek links met headlines
-  while ((match = linkPattern.exec(html)) !== null) {
-    const url = match[1]
-    let title = decodeHtmlEntities(match[2].trim())
-    
-    // Clean up title
-    title = title.replace(/^(Video|Podcast|Liveblog[^:]*:?)\s*/i, '').trim()
-    
-    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
-      seen.add(title.toLowerCase())
-      
-      // Extract original URL from wayback URL
-      const originalUrlMatch = url.match(/\/web\/\d+\/(.+)/)
-      const originalUrl = originalUrlMatch ? 'https://' + originalUrlMatch[1].replace(/^https?:\/\//, '') : url
-      
-      headlines.push({
-        title,
-        url: originalUrl,
-        category: extractCategory(url),
-        time: null,
-        source
-      })
-    }
+
+  // Pattern 2: item-title__title spans met content
+  const modernSpanContent = /<span[^>]*class="[^"]*item-title__title[^"]*"[^>]*>(?:<!--.*?-->)?\s*([^<]+)\s*<\/span>/gi
+  while ((match = modernSpanContent.exec(html)) !== null) {
+    addHeadline(match[1])
   }
-  
-  // Methode 3: Span content (fallback)
-  while ((match = spanContentPattern.exec(html)) !== null) {
-    let title = decodeHtmlEntities(match[1].trim())
-    title = title.replace(/^(Video|Podcast|Liveblog[^:]*:?)\s*/i, '').trim()
-    
-    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
-      seen.add(title.toLowerCase())
-      headlines.push({
-        title,
-        url: '',
-        category: null,
-        time: null,
-        source
-      })
-    }
+
+  // Pattern 3: Modern links met item-title__title
+  const modernLink = /<a[^>]*href="([^"]*\/nu\.nl\/[^"]+\.html)"[^>]*>[\s\S]*?<span[^>]*class="[^"]*item-title__title[^"]*"[^>]*>(?:<!--.*?-->)?\s*([^<]+)/gi
+  while ((match = modernLink.exec(html)) !== null) {
+    addHeadline(match[2], match[1], extractCategory(match[1]))
   }
-  
-  console.log(`[Wayback] Parsed ${headlines.length} unique headlines from ${source}`)
-  
+
+  // === LEGACY PATTERNS (2012-2018) ===
+  // Pattern 4: span class="title" (gebruikt in 2014-2017 periode)
+  const legacySpanTitle = /<span[^>]*class="title"[^>]*>([^<]+)<\/span>/gi
+  while ((match = legacySpanTitle.exec(html)) !== null) {
+    addHeadline(match[1])
+  }
+
+  // Pattern 5: h3 met links (gebruikt in 2010-2016 periode)
+  // <h3><a href="...">Headline</a></h3>
+  const legacyH3Link = /<h3[^>]*>\s*<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>\s*<\/h3>/gi
+  while ((match = legacyH3Link.exec(html)) !== null) {
+    addHeadline(match[2], match[1], extractCategory(match[1]))
+  }
+
+  // Pattern 6: h3 zonder link maar met content
+  const legacyH3Content = /<h3[^>]*>([^<]+)<\/h3>/gi
+  while ((match = legacyH3Content.exec(html)) !== null) {
+    addHeadline(match[1])
+  }
+
+  // === FALLBACK PATTERNS (2005-2012) ===
+  // Pattern 7: h2 headers (vroege nu.nl versies)
+  const fallbackH2 = /<h2[^>]*>\s*(?:<a[^>]*>)?([^<]+)(?:<\/a>)?\s*<\/h2>/gi
+  while ((match = fallbackH2.exec(html)) !== null) {
+    addHeadline(match[1])
+  }
+
+  // Pattern 8: artikel links met class
+  const fallbackArticleLink = /<a[^>]*class="[^"]*article[^"]*"[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>/gi
+  while ((match = fallbackArticleLink.exec(html)) !== null) {
+    addHeadline(match[2], match[1], extractCategory(match[1]))
+  }
+
+  // Pattern 9: div class title (zeer oude versies)
+  const fallbackDivTitle = /<div[^>]*class="[^"]*title[^"]*"[^>]*>([^<]+)<\/div>/gi
+  while ((match = fallbackDivTitle.exec(html)) !== null) {
+    addHeadline(match[1])
+  }
+
+  console.log(`[Wayback] Parsed ${headlines.length} unique headlines from ${source} (multi-year parser)`)
+
   return headlines
 }
 
 /**
  * Parseert headlines uit nos.nl HTML content
- * NOS.nl gebruikt een andere HTML structuur dan NU.nl
+ * v1.7.0: Multi-year parser voor NOS.nl - verschillende patterns voor verschillende periodes
  */
 function parseNosNlHeadlines(html: string, source: string): Headline[] {
   const headlines: Headline[] = []
   const seen = new Set<string>()
-  
-  // Patroon 1: Top story
-  // <div class="top-story item click"> ... <strong><a href="...">HEADLINE</a></strong>
-  const topStoryPattern = /<div[^>]*class="[^"]*top-story[^"]*"[^>]*>[\s\S]*?<strong>\s*<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>\s*<\/strong>/gi
-  
-  // Patroon 2: Headlines in featured section (img-list)
-  // <a href="...">HEADLINE</a> binnen <li class="big">
-  const featuredPattern = /<li[^>]*class="[^"]*big[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>/gi
-  
-  // Patroon 3: Category headlines
-  // <a href="..." title="HEADLINE">HEADLINE</a> binnen <li class="click">
-  const categoryPattern = /<li[^>]*class="[^"]*click[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*title="([^"]*)"[^>]*>/gi
-  
-  // Patroon 4: Laatste nieuws lijst
-  // <span class="time">HH:MM</span> <strong>HEADLINE</strong> binnen <a href="...">
-  const latestPattern = /<a[^>]*href="([^"]*)"[^>]*title="([^"]*)"[^>]*>[\s\S]*?<span[^>]*class="time"[^>]*>(\d{1,2}:\d{2})<\/span>[\s\S]*?<strong>([^<]+)<\/strong>/gi
-  
+
   // Extract categorie uit URL: /nieuws/binnenland/, /sport/, etc.
   const extractCategory = (url: string): string | null => {
     const match = url.match(/nos\.nl\/(nieuws\/)?([a-z-]+)\//)
     if (match && match[2]) {
       const cat = match[2]
-      // Filter non-news categories
       if (['artikel', 'video', 'audio', 'uitzending'].includes(cat)) return null
-      // Capitalize
       return cat.charAt(0).toUpperCase() + cat.slice(1)
     }
     return null
   }
-  
+
   // Extract original URL from Wayback URL
   const cleanWaybackUrl = (url: string): string => {
     const match = url.match(/\/web\/\d+\/(.+)/)
@@ -339,84 +332,90 @@ function parseNosNlHeadlines(html: string, source: string): Headline[] {
     }
     return url
   }
-  
-  let match
-  
-  // Extract top story
-  while ((match = topStoryPattern.exec(html)) !== null) {
-    const url = match[1]
-    const title = decodeHtmlEntities(match[2].trim())
-    
-    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
-      seen.add(title.toLowerCase())
+
+  // Helper to add headline with deduplication
+  const addHeadline = (title: string, url: string = '', category: string | null = null, time: string | null = null) => {
+    const cleanTitle = decodeHtmlEntities(title.trim())
+    if (cleanTitle && cleanTitle.length > 10 && !seen.has(cleanTitle.toLowerCase())) {
+      seen.add(cleanTitle.toLowerCase())
       headlines.push({
-        title,
-        url: cleanWaybackUrl(url),
-        category: 'Top Story',
-        time: null,
-        source
-      })
-    }
-  }
-  
-  // Extract featured headlines
-  while ((match = featuredPattern.exec(html)) !== null) {
-    const url = match[1]
-    const title = decodeHtmlEntities(match[2].trim())
-    
-    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
-      seen.add(title.toLowerCase())
-      headlines.push({
-        title,
-        url: cleanWaybackUrl(url),
-        category: extractCategory(url),
-        time: null,
-        source
-      })
-    }
-  }
-  
-  // Extract category headlines
-  while ((match = categoryPattern.exec(html)) !== null) {
-    const url = match[1]
-    const title = decodeHtmlEntities(match[2].trim())
-    
-    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
-      seen.add(title.toLowerCase())
-      headlines.push({
-        title,
-        url: cleanWaybackUrl(url),
-        category: extractCategory(url),
-        time: null,
-        source
-      })
-    }
-  }
-  
-  // Extract latest news with timestamps
-  while ((match = latestPattern.exec(html)) !== null) {
-    const url = match[1]
-    const titleAttr = match[2]
-    const time = match[3]
-    const titleStrong = match[4]
-    
-    // Prefer title from strong tag, fallback to title attribute
-    const title = decodeHtmlEntities((titleStrong || titleAttr).trim())
-    
-    if (title && title.length > 10 && !seen.has(title.toLowerCase())) {
-      seen.add(title.toLowerCase())
-      headlines.push({
-        title,
-        url: cleanWaybackUrl(url),
-        category: extractCategory(url),
+        title: cleanTitle,
+        url: url ? cleanWaybackUrl(url) : '',
+        category,
         time,
         source
       })
     }
   }
-  
-  console.log(`[Wayback] Parsed ${headlines.length} unique headlines from ${source}`)
-  
+
+  let match
+
+  // === MODERN PATTERNS (2015-2024) ===
+  // Pattern 1: Top story
+  const topStoryPattern = /<div[^>]*class="[^"]*top-story[^"]*"[^>]*>[\s\S]*?<strong>\s*<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>\s*<\/strong>/gi
+  while ((match = topStoryPattern.exec(html)) !== null) {
+    addHeadline(match[2], match[1], 'Top Story')
+  }
+
+  // Pattern 2: Featured headlines
+  const featuredPattern = /<li[^>]*class="[^"]*big[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>/gi
+  while ((match = featuredPattern.exec(html)) !== null) {
+    addHeadline(match[2], match[1], extractCategory(match[1]))
+  }
+
+  // Pattern 3: Category headlines
+  const categoryPattern = /<li[^>]*class="[^"]*click[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*title="([^"]*)"[^>]*>/gi
+  while ((match = categoryPattern.exec(html)) !== null) {
+    addHeadline(match[2], match[1], extractCategory(match[1]))
+  }
+
+  // Pattern 4: Latest news with timestamps
+  const latestPattern = /<a[^>]*href="([^"]*)"[^>]*title="([^"]*)"[^>]*>[\s\S]*?<span[^>]*class="time"[^>]*>(\d{1,2}:\d{2})<\/span>[\s\S]*?<strong>([^<]+)<\/strong>/gi
+  while ((match = latestPattern.exec(html)) !== null) {
+    const title = match[4] || match[2]
+    addHeadline(title, match[1], extractCategory(match[1]), match[3])
+  }
+
+  // === LEGACY PATTERNS (2010-2015) ===
+  // Pattern 5: h3 headlines met links
+  const legacyH3Link = /<h3[^>]*>\s*<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>\s*<\/h3>/gi
+  while ((match = legacyH3Link.exec(html)) !== null) {
+    addHeadline(match[2], match[1], extractCategory(match[1]))
+  }
+
+  // Pattern 6: h3 zonder link
+  const legacyH3Content = /<h3[^>]*>([^<]+)<\/h3>/gi
+  while ((match = legacyH3Content.exec(html)) !== null) {
+    addHeadline(match[1])
+  }
+
+  // Pattern 7: h2 headlines
+  const legacyH2 = /<h2[^>]*>\s*(?:<a[^>]*href="([^"]*)"[^>]*>)?([^<]+)(?:<\/a>)?\s*<\/h2>/gi
+  while ((match = legacyH2.exec(html)) !== null) {
+    addHeadline(match[2], match[1] || '', extractCategory(match[1] || ''))
+  }
+
+  // === FALLBACK PATTERNS (2005-2010) ===
+  // Pattern 8: div/span met class title
+  const fallbackTitle = /<(?:div|span)[^>]*class="[^"]*title[^"]*"[^>]*>([^<]+)<\/(?:div|span)>/gi
+  while ((match = fallbackTitle.exec(html)) !== null) {
+    addHeadline(match[1])
+  }
+
+  // Pattern 9: Strong binnen link (vroege NOS structuur)
+  const fallbackStrongLink = /<a[^>]*href="([^"]*)"[^>]*>\s*<strong>([^<]+)<\/strong>\s*<\/a>/gi
+  while ((match = fallbackStrongLink.exec(html)) !== null) {
+    addHeadline(match[2], match[1], extractCategory(match[1]))
+  }
+
+  // Pattern 10: artikel links met NOS.nl URL
+  const fallbackNosLink = /<a[^>]*href="([^"]*nos\.nl\/artikel\/[^"]*)"[^>]*>([^<]+)<\/a>/gi
+  while ((match = fallbackNosLink.exec(html)) !== null) {
+    addHeadline(match[2], match[1], extractCategory(match[1]))
+  }
+
+  console.log(`[Wayback] Parsed ${headlines.length} unique headlines from ${source} (multi-year parser)`)
+
   return headlines
 }
 
