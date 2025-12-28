@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache, type WaybackHeadline } from '@/lib/waybackCache'
 import { fetchWithRetry } from '@/lib/waybackFetch'
 
-const API_VERSION = '1.8.3'
+const API_VERSION = '1.8.5'
 
 // Reliability settings
 const MIN_HEADLINES = 5  // Minimum number of headlines to accept as valid result (lowered from 10 for better coverage)
@@ -463,7 +463,8 @@ function parseNosNlHeadlines(html: string, source: string): Headline[] {
   }
 
   // Pattern 9: Strong binnen link (vroege NOS structuur)
-  const fallbackStrongLink = /<a[^>]*href="([^"]*)"[^>]*>\s*<strong>([^<]+)<\/strong>\s*<\/a>/gi
+  // Updated to handle <span class="time"> before strong and text after strong
+  const fallbackStrongLink = /<a[^>]*href="([^"]*)"[^>]*>[\s\S]*?<strong>([^<]+)<\/strong>/gi
   while ((match = fallbackStrongLink.exec(html)) !== null) {
     addHeadline(match[2], match[1], extractCategory(match[1]))
   }
@@ -524,7 +525,14 @@ function isNoiseHeadline(title: string): boolean {
     'lezersfoto\'s', 'tip de redactie', 'lezersbijdragen', 'uitgelichte video\'s',
     'van onze adverteerders', 'nieuws in 60 seconden', 'het nieuws in 60 seconden',
     'ruimteballon', 'varende brug', 'als een vis...', 'komeetlandschap',
-    'drijvend hotel', 'helpende hand' // Video titles without context
+    'drijvend hotel', 'helpende hand', // Video titles without context
+    'nos headlines', 'alexa crawls', 'video\'s en audio', // 2010 navigation
+    'nos informatie', 'live bij de nos', 'je hoeft niks te missen', // Modern navigation
+    'internet archive', 'live web proxy crawls', 'palestine web', 'archive team: urls', // Archive.org
+    // Dossier/topic navigation (2024+)
+    'val regime-assad', 'geweld midden-oosten', 'stikstofcrisis', 'van biden naar trump',
+    'het klimaat verandert', 'oorlog in oekraïne', 'oorlog in gaza', 'gronings gas',
+    'kabinet-schoof beëdigd', 'verkiezingscampagne vs'
   ]
 
   if (exactNoisePatterns.includes(lowerTitle)) {
@@ -552,12 +560,18 @@ function isNoiseHeadline(title: string): boolean {
     return true
   }
 
+  // Gallery/photo collection indicators (malformed headlines)
+  if (lowerTitle.match(/\d+\s*(foto'?s|fotos|beeld)/)) {
+    return true
+  }
+
   return false
 }
 
 /**
  * Decodeert HTML entities
  * v1.7.1: Added common named entities (iuml, euml, etc.)
+ * v1.8.4: Added newline/whitespace normalization
  */
 function decodeHtmlEntities(text: string): string {
   return text
@@ -594,6 +608,10 @@ function decodeHtmlEntities(text: string): string {
     // Numeric entities (catch-all)
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
     .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    // Normalize newlines and excessive whitespace
+    .replace(/\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /**
