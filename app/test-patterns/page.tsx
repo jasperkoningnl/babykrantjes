@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 const TEST_DATES = [
-  { date: '2010-06-20', label: '2010 (Older - combined sources)' },
+  { date: '2010-08-20', label: '2010 (Older - combined sources)' },
   { date: '2012-05-19', label: '2012 (Pre-2013 - combined sources)' },
   { date: '2015-01-15', label: '2015 (Mid-range)' },
   { date: '2019-03-25', label: '2019 (Brexit - nested span fix)' },
