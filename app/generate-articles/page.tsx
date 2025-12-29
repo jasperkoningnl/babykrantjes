@@ -114,9 +114,10 @@ Schrijf de tekst:`
       const waybackNews = data.waybackNews?.headlines || []
       const monthNews = data.monthlyNews?.items || []
 
-      const topDaily = dailyNews.slice(0, 10).map((e: any) => `[${e.category}] ${e.text}`).join('\n')
-      const topWayback = waybackNews.slice(0, 10).map((h: any) => `${h.title}`).join('\n')
-      const topMonth = monthNews.slice(0, 8).map((m: any) => `${m.day}: ${m.text}`).join('\n')
+      // Geen limiet meer - toon ALLE beschikbare headlines zodat AI een goede selectie kan maken
+      const topDaily = dailyNews.map((e: any) => `[${e.category}] ${e.text}`).join('\n')
+      const topWayback = waybackNews.map((h: any) => `${h.title}`).join('\n')
+      const topMonth = monthNews.map((m: any) => `${m.day}: ${m.text}`).join('\n')
 
       const datumVolledig = new Date(datum).toLocaleDateString('nl-NL', {
         weekday: 'long',
