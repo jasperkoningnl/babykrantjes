@@ -152,6 +152,7 @@ VERPLICHTE STRUCTUUR:
 
 SELECTIECRITERIA:
 - Prioriteer "top stories" (koppen/belangrijke events)
+- Als een onderwerp MEERDERE KEREN voorkomt in verschillende bronnen (bijv. Oekraïne in zowel daily als monthly), is dat een signaal dat het belangrijk is - geef prioriteit aan specifieke ontwikkelingen op die dag
 - Kies interessante cultuur/media items ook als ze minder prominent zijn
 - Varieer categorieën (niet 3x politiek)
 - Houd het toegankelijk en interessant
