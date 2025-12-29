@@ -378,7 +378,7 @@ VERPLICHTE STRUCTUUR:
    - Focus op Nederlands nieuws (Wayback) als primaire bron
    - 1-2 items politiek/economie (Nederlandse politiek bij voorkeur)
    - 1 item sport/wetenschap/sociaal (als beschikbaar)
-   - ALTIJD 1 item cultuur/media/entertainment (zoek in alle bronnen)
+   - VERPLICHT minimaal 1 item uit categorie: cultuur/entertainment/media/sport (bijv. Oscar uitreiking, BN'er nieuws, sportprestatie, film/muziek release)
    - Mix NL + internationaal (minimaal 50% Nederlands als beschikbaar)
 4. Gebruik maand context alleen voor grote gebeurtenissen (oorlog, ramp, pandemie)
 
@@ -387,8 +387,13 @@ SELECTIECRITERIA:
 - Kies interessante cultuur/media items ook als ze minder prominent zijn
 - Varieer categorieën (niet 3x politiek)
 - Houd het toegankelijk en interessant
+- Mag een kleiner/grappig nieuwtje bevatten voor afwisseling
+- VERMIJD: saai administratief nieuws, buitenlandse bureaucratie (bijv. ferry crisis UK)
 
-TONE:
+SCHRIJFSTIJL:
+- Zorg dat nieuwsfeiten begrijpelijk zijn voor gemiddelde lezer
+- Geef kort context waar nodig (bijv. wat is MH17, welk team speelt Virgil van Dijk)
+- Maak logische overgangen tussen nieuwsfeiten (groepeer gerelateerde items, vermijd abrupte sprongen)
 - Journalistiek en neutraal
 - NIET droog - toegankelijk en leesbaar
 - Zakelijk maar met afwisseling
