@@ -209,7 +209,8 @@ SELECTIE:
 
 SCHRIJFSTIJL:
 - Begrijpelijk voor gemiddelde lezer, geef context waar nodig
-- Logische overgangen, groepeer gerelateerde items
+- Logische overgangen met verbindende zinnen (bijv. "Op een ander vlak...", "Ondertussen...")
+- Behandel tragedies respectvol (niet "nieuwtje", wel "incident")
 - Zakelijk maar toegankelijk, korte beschrijvingen (1-2 zinnen per item)
 
 BESCHIKBAAR NIEUWS:
