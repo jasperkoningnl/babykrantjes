@@ -347,9 +347,9 @@ Schrijf de tekst:`
         const waybackNews = enrichedData.waybackNews?.headlines || []
         const monthNews = enrichedData.monthlyNews?.items || []
 
-        const topDaily = dailyNews.slice(0, 8).map((e: any) => `[${e.category}] ${e.text}`).join('\n')
-        const topWayback = waybackNews.slice(0, 5).map((h: any) => `${h.title}`).join('\n')
-        const topMonth = monthNews.slice(0, 5).map((m: any) => `${m.day}: ${m.text}`).join('\n')
+        const topDaily = dailyNews.slice(0, 10).map((e: any) => `[${e.category}] ${e.text}`).join('\n')
+        const topWayback = waybackNews.slice(0, 10).map((h: any) => `${h.title}`).join('\n')
+        const topMonth = monthNews.slice(0, 8).map((m: any) => `${m.day}: ${m.text}`).join('\n')
 
         const datumVolledig = new Date(datum).toLocaleDateString('nl-NL', {
           weekday: 'long',
@@ -362,24 +362,40 @@ Schrijf de tekst:`
 
 BESCHIKBAAR NIEUWS:
 
+Nederlands (NOS/NU.nl via Wayback) - PRIORITEIT:
+${topWayback || 'Geen data'}
+
 Internationaal (Wikipedia):
 ${topDaily || 'Geen data'}
 
-Nederlands (NOS/NU.nl):
-${topWayback || 'Geen data'}
-
-Maand context:
+Maand context (gebruik voor grote gebeurtenissen zoals oorlog, pandemie, verkiezingen):
 ${topMonth || 'Geen data'}
 
-STRUCTUUR:
-1. Intro: "De geboorte van ${roepnaam} was het grote nieuws van ${datumVolledig}, maar er gebeurde meer..."
-2. Selecteer 3-5 belangrijkste nieuwsitems
-3. Mix: Nederlands + internationaal
-4. Mix: politiek, sport, cultuur, wetenschap
-5. Feitelijk, zakelijk, journalistieke toon
+VERPLICHTE STRUCTUUR:
+1. Intro: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag."
+2. Selecteer 3-5 nieuwsitems uit bovenstaande bronnen
+3. VERPLICHTE MIX:
+   - Focus op Nederlands nieuws (Wayback) als primaire bron
+   - 1-2 items politiek/economie (Nederlandse politiek bij voorkeur)
+   - 1 item sport/wetenschap/sociaal (als beschikbaar)
+   - ALTIJD 1 item cultuur/media/entertainment (zoek in alle bronnen)
+   - Mix NL + internationaal (minimaal 50% Nederlands als beschikbaar)
+4. Gebruik maand context alleen voor grote gebeurtenissen (oorlog, ramp, pandemie)
+
+SELECTIECRITERIA:
+- Prioriteer "top stories" (koppen/belangrijke events)
+- Kies interessante cultuur/media items ook als ze minder prominent zijn
+- Varieer categorieën (niet 3x politiek)
+- Houd het toegankelijk en interessant
+
+TONE:
+- Journalistiek en neutraal
+- NIET droog - toegankelijk en leesbaar
+- Zakelijk maar met afwisseling
+- Geen mening of speculatie
+- Korte, heldere beschrijvingen (1-2 zinnen per item)
 
 LENGTE: 120-150 woorden
-TONE: Journalistiek, geen mening
 
 Schrijf de tekst:`
       }
@@ -512,26 +528,49 @@ Schrijf de tekst:`
         const datumDag = new Date(datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
 
         if (bornPersons.length === 0) {
-          return `Schrijf over bekende mensen geboren op ${datumDag}. Helaas is er geen data beschikbaar. Gebruik algemene kennis. LENGTE: 80-100 woorden.`
+          return `Schrijf over bekende mensen geboren op ${datumDag}. Helaas is er geen data beschikbaar. LENGTE: 80-100 woorden, feitelijk en educatief.`
         }
 
-        const bornPersonsList = bornPersons.slice(0, 6).map((p: any) =>
+        const bornPersonsList = bornPersons.map((p: any) =>
           `${p.name} (${p.year}): ${p.description}`
         ).join('\n')
 
         return `Schrijf over bekende mensen geboren op ${datumDag}.
 
-PERSONEN:
+BESCHIKBARE PERSONEN (selecteer hieruit):
 ${bornPersonsList}
 
+SELECTIECRITERIA - Kies 3-5 personen die:
+- ALLEEN uit bovenstaande lijst komen (GEEN andere personen toevoegen)
+- Mix bevatten: minimaal 1 historische figuur (voor 1950) + 1 recente bekende (na 1950)
+- Mix bevatten: minimaal 1 Nederlandse + 1 internationale persoon
+- "Grote namen" zijn: algemeen bekend OF zeer bekend in hun vakgebied
+- Verschillende domeinen vertegenwoordigen (politiek, kunst, sport, wetenschap, etc.)
+- Interessante verhalen/achievements hebben
+
 STRUCTUUR:
-1. Intro: "${roepnaam} deelt zijn/haar verjaardag met..."
-2. Beschrijf 3-5 interessantste personen
-3. Mix historisch en recent
-4. Mix Nederlands en internationaal
+1. Intro: "Ook geboren op ${datumDag}" (GEEN trivia-stijl zoals "wist je dat...")
+2. Beschrijf elke persoon in 1-2 zinnen:
+   - Naam (geboortejaar-sterfjaar indien van toepassing)
+   - Beroep/bekendheid
+   - Belangrijkste achievement of bekendheid
+3. Volgorde: wissel af tussen NL/internationaal, oud/recent, verschillende domeinen
+
+VOORBEELDEN STIJL:
+"Ook geboren op 19 mei: Wouter Bos (1963), Nederlands politicus en voormalig minister van Financiën. Thomas Vinterberg (1969), Deens filmregisseur bekend van Festen en The Hunt. Malcolm X (1925-1965), Amerikaans mensenrechtenactivist en prominent figuur in de burgerrechtenbeweging."
+
+TONE:
+- Feitelijk en educatief (NIET trivia-achtig)
+- Toegankelijk maar respectvol
+- Korte, krachtige beschrijvingen
+- Geen overdreven superlatieven
+
+STRIKT VERBODEN:
+- Personen toevoegen die NIET in de lijst staan
+- Speculatie over waarom ze beroemd zijn
+- Controversiële details (focus op achievements)
 
 LENGTE: 80-120 woorden
-TONE: Interessant, trivia-achtig
 
 Schrijf de tekst:`
       }
