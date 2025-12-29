@@ -126,50 +126,41 @@ Schrijf de tekst:`
         day: 'numeric'
       })
 
-      return `Schrijf een nieuwsoverzicht voor de babykrant over wat er gebeurde op ${datumVolledig}.
+      return `Schrijf een nieuwsoverzicht (120-150 woorden) voor een babykrant over ${datumVolledig}.
+
+STRUCTUUR:
+1. Intro: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag."
+2. Selecteer 3-5 nieuwsitems (Nederlands nieuws prioriteit)
+3. Mix: 1-2 politiek/economie + 1 cultuur/entertainment + max 1 sport/wetenschap
+
+REDACTIONELE AANPAK:
+- Herken patronen: Als Oekraïne 10x voorkomt → schrijf inleidende zin ("De oorlog in Oekraïne speelt grote rol in het nieuws") + specifieke ontwikkeling van die dag
+- Snap culturele momenten: Will Smith Oscars = groot nieuws, CODA wint = verrassend, gebruik dat
+- Contextualiseer: Leg uit wat dingen zijn (CODA = wat voor film, welke prijs? Virgil van Dijk = welk team?)
+- Kies slim: Geen quotes van coaches als opening. Kies echte gebeurtenissen boven meningen.
+
+SELECTIE:
+- VERPLICHT: minimaal 1 cultuur/entertainment item (Oscar, BN'er, film, muziek)
+- Prioriteer: Nederlandse headlines + grote internationale gebeurtenissen
+- Als onderwerp meerdere bronnen → belangrijk, kies beste ontwikkeling van die dag
+- Max 1 sportitem (tenzij écht groot nieuws zoals WK finale)
+- Vermijd: administratief nieuws, coaches die praten, buitenlandse bureaucratie
+
+SCHRIJFSTIJL:
+- Begrijpelijk voor gemiddelde lezer, geef context waar nodig
+- Logische overgangen, groepeer gerelateerde items
+- Zakelijk maar toegankelijk, korte beschrijvingen (1-2 zinnen per item)
 
 BESCHIKBAAR NIEUWS:
 
-Nederlands (NOS/NU.nl via Wayback) - PRIORITEIT:
+Nederlands (NOS/NU.nl) - PRIORITEIT:
 ${topWayback || 'Geen data'}
 
 Internationaal (Wikipedia):
 ${topDaily || 'Geen data'}
 
-Maand context (gebruik voor grote gebeurtenissen zoals oorlog, pandemie, verkiezingen):
+Maandcontext (alleen voor grote gebeurtenissen):
 ${topMonth || 'Geen data'}
-
-VERPLICHTE STRUCTUUR:
-1. Intro: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag."
-2. Selecteer 3-5 nieuwsitems uit bovenstaande bronnen
-3. VERPLICHTE MIX:
-   - Focus op Nederlands nieuws (Wayback) als primaire bron
-   - 1-2 items politiek/economie (Nederlandse politiek bij voorkeur)
-   - 1 item sport/wetenschap/sociaal (als beschikbaar)
-   - VERPLICHT minimaal 1 item uit categorie: cultuur/entertainment/media/sport (bijv. Oscar uitreiking, BN'er nieuws, sportprestatie, film/muziek release)
-   - Mix NL + internationaal (minimaal 50% Nederlands als beschikbaar)
-4. Gebruik maand context alleen voor grote gebeurtenissen (oorlog, ramp, pandemie)
-
-SELECTIECRITERIA:
-- Prioriteer "top stories" (koppen/belangrijke events)
-- Als een onderwerp MEERDERE KEREN voorkomt in verschillende bronnen (bijv. Oekraïne in zowel daily als monthly), is dat een signaal dat het belangrijk is - geef prioriteit aan specifieke ontwikkelingen op die dag
-- Kies interessante cultuur/media items ook als ze minder prominent zijn
-- Varieer categorieën (niet 3x politiek)
-- Houd het toegankelijk en interessant
-- Mag een kleiner/grappig nieuwtje bevatten voor afwisseling
-- VERMIJD: saai administratief nieuws, buitenlandse bureaucratie (bijv. ferry crisis UK)
-
-SCHRIJFSTIJL:
-- Zorg dat nieuwsfeiten begrijpelijk zijn voor gemiddelde lezer
-- Geef kort context waar nodig (bijv. wat is MH17, welk team speelt Virgil van Dijk)
-- Maak logische overgangen tussen nieuwsfeiten (groepeer gerelateerde items, vermijd abrupte sprongen)
-- Journalistiek en neutraal
-- NIET droog - toegankelijk en leesbaar
-- Zakelijk maar met afwisseling
-- Geen mening of speculatie
-- Korte, heldere beschrijvingen (1-2 zinnen per item)
-
-LENGTE: 120-150 woorden
 
 Schrijf de tekst:`
 
