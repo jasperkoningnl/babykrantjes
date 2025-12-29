@@ -166,21 +166,23 @@ Schrijf de tekst:`
 
 STRUCTUUR:
 1. Intro: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag."
-2. Selecteer 3-5 nieuwsitems (Nederlands nieuws prioriteit)
-3. Mix: 1-2 politiek/economie + 1 cultuur/entertainment + max 1 sport/wetenschap
+2. Selecteer 4-5 nieuwsitems:
+   - 2 politiek/economie (1 binnenland + 1 buitenland)
+   - 1 cultuur/entertainment
+   - 1 sport/wetenschap
+   - Optioneel: 1 grappig/opmerkelijk nieuwtje
 
 REDACTIONELE AANPAK:
-- Herken patronen: Als een onderwerp vaak terugkomt in verschillende bronnen → schrijf inleidende zin over dat onderwerp + specifieke ontwikkeling van die dag
-- Snap culturele momenten: Prijsuitreikingen, schandalen, primeurs zijn interessant nieuws
-- Contextualiseer: Leg altijd uit wat dingen zijn (welke film? welk team? welke prijs? wat is het?)
-- Kies slim: Kies echte gebeurtenissen boven quotes/meningen. Feiten voor opinies.
+- Herken patronen: Als onderwerp vaak terugkomt → inleidende zin + specifieke ontwikkeling
+- Contextualiseer: Leg altijd uit wat dingen zijn (welke film? welk team? wat is het?)
+- Interpreteer: Gebruik redactionele kennis om te bepalen wat in de krant hoort
+- Balanceer: Mix zwaar nieuws (oorlog, ziekte) met luchtig (cultuur, sport, opmerkelijk)
 
 SELECTIE:
-- VERPLICHT: minimaal 1 cultuur/entertainment item (Oscar, BN'er, film, muziek)
 - Prioriteer: Nederlandse headlines + grote internationale gebeurtenissen
-- Als onderwerp meerdere bronnen → belangrijk, kies beste ontwikkeling van die dag
-- Max 1 sportitem (tenzij écht groot nieuws zoals WK finale)
-- Vermijd: administratief nieuws, coaches die praten, buitenlandse bureaucratie
+- Terugkerend in meerdere bronnen = belangrijk (gebruik maandoverzicht voor context)
+- Vermijd: saai bureaucratisch nieuws, 2 items uit dezelfde categorie
+- Zorg voor balans: binnenland én buitenland, zwaar én licht
 
 SCHRIJFSTIJL:
 - Begrijpelijk voor gemiddelde lezer, geef context waar nodig
