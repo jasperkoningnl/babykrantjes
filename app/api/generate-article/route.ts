@@ -50,6 +50,13 @@ TONE-OF-VOICE REGELS:
 - Concrete feiten, geen vage taal
 - Nederlandse context en taalgebruik
 
+REDACTIONEEL:
+- Kies onderwerpen/personen die herkenbaar zijn voor Nederlands publiek
+- Geef korte uitleg waar nodig (wie/wat is dit?) zodat iedereen het begrijpt
+- Varieer in onderwerpen, toon en perspectief (niet steeds hetzelfde patroon)
+- Gebruik culturele context bij keuzes (wat past bij Nederlandse lezers?)
+- Schrijf vloeiende verhalen met logische overgangen tussen zinnen en alinea's
+
 SCHRIJFSTIJL:
 - Gebruik derde persoon tenzij anders gevraagd
 - Wissel af tussen algemeen en specifiek
