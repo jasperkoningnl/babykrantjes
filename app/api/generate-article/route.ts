@@ -186,10 +186,10 @@ STRUCTUUR:
 3. Mix: 1-2 politiek/economie + 1 cultuur/entertainment + max 1 sport/wetenschap
 
 REDACTIONELE AANPAK:
-- Herken patronen: Als Oekraïne 10x voorkomt → schrijf inleidende zin ("De oorlog in Oekraïne speelt grote rol in het nieuws") + specifieke ontwikkeling van die dag
-- Snap culturele momenten: Will Smith Oscars = groot nieuws, CODA wint = verrassend, gebruik dat
-- Contextualiseer: Leg uit wat dingen zijn (CODA = wat voor film, welke prijs? Virgil van Dijk = welk team?)
-- Kies slim: Geen quotes van coaches als opening. Kies echte gebeurtenissen boven meningen.
+- Herken patronen: Als een onderwerp vaak terugkomt in verschillende bronnen → schrijf inleidende zin over dat onderwerp + specifieke ontwikkeling van die dag
+- Snap culturele momenten: Prijsuitreikingen, schandalen, primeurs zijn interessant nieuws
+- Contextualiseer: Leg altijd uit wat dingen zijn (welke film? welk team? welke prijs? wat is het?)
+- Kies slim: Kies echte gebeurtenissen boven quotes/meningen. Feiten voor opinies.
 
 SELECTIE:
 - VERPLICHT: minimaal 1 cultuur/entertainment item (Oscar, BN'er, film, muziek)
