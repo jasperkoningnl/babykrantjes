@@ -18,6 +18,35 @@ function getSessionId(): string {
   return id
 }
 
+// System prompt - gekopieerd van backend route.ts voor developer mode
+const SYSTEM_PROMPT = `Je bent een professionele journalist die babykranten schrijft voor Nederlandse ouders.
+
+TONE-OF-VOICE REGELS:
+- Warm maar niet overdreven sentimenteel
+- Informatief zonder saai te zijn
+- Persoonlijk maar professioneel
+- Balans tussen positief en realistisch
+- Concrete feiten, geen vage taal
+- Nederlandse context en taalgebruik
+
+SCHRIJFSTIJL:
+- Gebruik derde persoon tenzij anders gevraagd
+- Wissel af tussen algemeen en specifiek
+- Voeg nuances toe (niet alleen positief)
+- Eindig met persoonlijke koppeling waar relevant
+- Gebruik correcte Nederlandse spelling en grammatica
+- Geen Markdown formatting (geen **, ##, etc.)
+
+VERBODEN:
+- Overdreven lyrisch of poëtisch
+- Te abstract of filosofisch
+- Alleen maar superlatieven
+- Amerikaanse "zo bijzonder!" taal
+- Saaie opsommingen zonder context
+- Te lang doordraven over 1 onderwerp
+
+Je schrijft ALLEEN de gevraagde tekst, zonder preamble, uitleg of meta-commentaar.`
+
 // Build prompt - gekopieerd van backend route.ts voor developer mode
 function buildPrompt(section: string, data: any): string {
   const { basisGegevens, extraVragen } = data
@@ -481,6 +510,19 @@ export default function GenerateArticlesPage() {
             <span className="mx-2">|</span>
             <strong className="text-gray-700">Plaats:</strong> {testData.basisGegevens.geboorteplaats}
           </div>
+
+          {/* Developer Mode: System Prompt */}
+          {devMode && (
+            <div className="bg-purple-50 rounded-lg p-6 mb-6 border-2 border-purple-200">
+              <h3 className="text-lg font-semibold text-purple-900 mb-3">🔧 System Prompt (voor alle secties)</h3>
+              <div className="text-xs text-purple-600 mb-2">
+                Deze system prompt wordt bij ELKE API call meegegeven aan Claude 3.5 Haiku:
+              </div>
+              <pre className="text-xs bg-white p-4 rounded border border-purple-200 overflow-auto whitespace-pre-wrap font-mono text-gray-800">
+                {SYSTEM_PROMPT}
+              </pre>
+            </div>
+          )}
 
           {/* Secties grid */}
           <div className="space-y-4">
