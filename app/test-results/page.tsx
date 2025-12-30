@@ -265,16 +265,31 @@ export default function TestResultsPage() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-pink-50 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
-          <Link href="/wizard" className="text-blue-600">← Terug naar wizard</Link>
+          <Link href="/generate-articles" className="text-blue-600">← Terug naar artikelen genereren</Link>
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="mb-6">
             <h1 className="text-3xl font-bold mb-2">Testresultaten</h1>
-            <p className="text-gray-600">Bekijk de berekende gegevens en opgehaalde informatie</p>
+            <p className="text-gray-600">Bekijk de verzamelde gegevens en opgehaalde informatie</p>
           </div>
 
-          <div className="bg-blue-50 rounded-lg p-6 mb-6">
+          {/* Categorie: Ingevulde gegevens */}
+          <details open className="mb-6 group">
+            <summary className="cursor-pointer list-none mb-4">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-blue-600 transition-transform group-open:rotate-90"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <h2 className="text-2xl font-semibold text-blue-600">Ingevulde gegevens</h2>
+              </div>
+            </summary>
+          <div className="bg-blue-50 rounded-lg p-6 mb-4">
             <h2 className="text-xl font-semibold mb-4">✅ Berekende Gegevens</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
@@ -317,7 +332,7 @@ export default function TestResultsPage() {
           )}
 
           {chineesTekenInfo && (
-            <div className="bg-red-50 rounded-lg p-6 mb-6">
+            <div className="bg-red-50 rounded-lg p-4">
               <h2 className="text-xl font-semibold mb-4">🐉 Chinees teken: {chineesTekenInfo.naam}</h2>
               <div className="mb-3 text-sm text-red-600">
                 <span className="font-medium">Jaren: </span>
@@ -331,8 +346,209 @@ export default function TestResultsPage() {
               </p>
             </div>
           )}
+          </details>
 
-          <div className="bg-sky-50 rounded-lg p-6 mb-6">
+          {/* Categorie: Weerbericht */}
+          <details open className="mb-6 group">
+            <summary className="cursor-pointer list-none mb-4">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-gray-600 transition-transform group-open:rotate-90"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <h2 className="text-2xl font-semibold text-gray-700">Weerbericht</h2>
+              </div>
+            </summary>
+
+          <div className="bg-gray-50 rounded-lg p-6 mb-4">
+            <h2 className="text-xl font-semibold mb-4">🌤️ Weerbericht</h2>
+            {weatherLoading && <p className="text-gray-500 italic">Weerbericht wordt opgehaald...</p>}
+            {!weatherLoading && weather && (
+              <div className="space-y-3">
+                <div>
+                  <span className="font-medium text-gray-600">
+                    Weer in {weather.city} op {new Date(weather.date).toLocaleDateString('nl-NL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}:
+                  </span>
+                  <p className="text-gray-900 mt-2">{formatWeatherReport(weather)}</p>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Max temperatuur</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.temperature_max}°C</div>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Min temperatuur</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.temperature_min}°C</div>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Neerslag</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.precipitation}mm</div>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <div className="text-gray-600 text-xs">Zonneschijn</div>
+                    <div className="text-xl font-semibold text-blue-600">{weather.sunshine_duration}u</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {!weatherLoading && !weather && <p className="text-red-500">Weerbericht kon niet worden opgehaald</p>}
+          </div>
+          </details>
+
+          {/* Categorie: Betekenis naam */}
+          <details open className="mb-6 group">
+            <summary className="cursor-pointer list-none mb-4">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-purple-600 transition-transform group-open:rotate-90"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <h2 className="text-2xl font-semibold text-purple-700">Betekenis naam</h2>
+              </div>
+            </summary>
+
+          <div className="bg-purple-50 rounded-lg p-6 mb-4">
+            <h2 className="text-xl font-semibold mb-4">📛 Betekenis naam {firstName}</h2>
+            {nameMeaningLoading && <p className="text-gray-500 italic">Naambetekenis wordt opgehaald...</p>}
+            {!nameMeaningLoading && nameMeaning && (
+              <div className="space-y-4">
+                {nameMeaning.meaning ? (
+                  <div>
+                    <span className="font-medium text-gray-600">Betekenis:</span>
+                    <p className="text-gray-900 mt-1">{nameMeaning.meaning}</p>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 italic">Geen betekenis gevonden</p>
+                )}
+                {nameMeaning.origin && (
+                  <div>
+                    <span className="font-medium text-gray-600">Oorsprong:</span>
+                    <p className="text-gray-900 mt-1">{nameMeaning.origin}</p>
+                  </div>
+                )}
+                {nameMeaning.gender && (
+                  <div>
+                    <span className="font-medium text-gray-600">Geslacht:</span>
+                    <p className="text-gray-900 mt-1">{nameMeaning.gender}</p>
+                  </div>
+                )}
+                <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-purple-200">
+                  <span className="font-medium">Bron: </span>
+                  {nameMeaning.source ? (
+                    <a href={nameMeaning.source} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
+                      {nameMeaning.source.includes('naamdokter') ? 'Naamdokter.nl' : nameMeaning.source.includes('betekenisnamen') ? 'Betekenisnamen.nl' : 'Bron'}
+                    </a>
+                  ) : (
+                    <span>Geen bron gevonden</span>
+                  )}
+                </div>
+              </div>
+            )}
+            {!nameMeaningLoading && !nameMeaning && <p className="text-red-500">Naambetekenis kon niet worden opgehaald</p>}
+          </div>
+          </details>
+
+          {/* Categorie: Personen */}
+          <details open className="mb-6 group">
+            <summary className="cursor-pointer list-none mb-4">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-pink-600 transition-transform group-open:rotate-90"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <h2 className="text-2xl font-semibold text-pink-700">Personen</h2>
+              </div>
+            </summary>
+
+          <div className="bg-pink-50 rounded-lg p-6 mb-4">
+            <h2 className="text-xl font-semibold mb-4">⭐ Bekende mensen die {firstName} heten</h2>
+            {namesakesLoading && <p className="text-gray-500 italic">Bekende naamdragers worden opgehaald...</p>}
+            {!namesakesLoading && famousNamesakes && famousNamesakes.persons.length > 0 && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3">
+                  {famousNamesakes.persons.map((person, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border border-pink-200">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          {person.wikipediaUrl ? (
+                            <a href={person.wikipediaUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-pink-700 hover:underline">{person.name}</a>
+                          ) : (
+                            <span className="font-semibold text-gray-900">{person.name}</span>
+                          )}
+                          <span className="text-xs text-gray-400 ml-2">({person.source.toUpperCase()})</span>
+                        </div>
+                      </div>
+                      {person.description && <p className="text-sm text-gray-600 mt-1">{person.description}</p>}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-3">Totaal {famousNamesakes.persons.length} bekende naamdragers gevonden</p>
+                <div className="text-xs text-gray-500 pt-3 border-t border-pink-200">
+                  <span className="font-medium">Bronnen: </span>
+                  {famousNamesakes.sources.nl && <a href={famousNamesakes.sources.nl} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline mr-3">Wikipedia NL</a>}
+                  {famousNamesakes.sources.en && <a href={famousNamesakes.sources.en} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline">Wikipedia EN</a>}
+                </div>
+              </div>
+            )}
+            {!namesakesLoading && famousNamesakes && famousNamesakes.persons.length === 0 && <p className="text-gray-500 italic">Geen bekende naamdragers gevonden</p>}
+            {!namesakesLoading && !famousNamesakes && <p className="text-gray-500 italic">Kon geen gegevens ophalen</p>}
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-6 mb-4">
+            <h2 className="text-xl font-semibold mb-4">🎂 Ook geboren op deze dag</h2>
+            {bornLoading && <p className="text-gray-500 italic">Bekende personen worden opgehaald...</p>}
+            {!bornLoading && bornPersons.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 mb-3">Ook geboren op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}:</p>
+                <div className="grid grid-cols-1 gap-3">
+                  {bornPersons.map((person, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-semibold text-gray-900">{person.name}</span>
+                          <span className="text-gray-500 ml-2">({person.year})</span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{person.description}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-3">Totaal {bornPersons.length} bekende personen gevonden</p>
+              </div>
+            )}
+            {!bornLoading && bornPersons.length === 0 && <p className="text-gray-500 italic">Geen bekende personen gevonden voor deze datum</p>}
+          </div>
+          </details>
+
+          {/* Categorie: Nieuws */}
+          <details open className="mb-6 group">
+            <summary className="cursor-pointer list-none mb-4">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-sky-600 transition-transform group-open:rotate-90"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <h2 className="text-2xl font-semibold text-sky-700">Nieuws</h2>
+              </div>
+            </summary>
+
+          <div className="bg-sky-50 rounded-lg p-6 mb-4">
             <h2 className="text-xl font-semibold mb-4">📰 Nieuws op de geboortedag (Internationaal)</h2>
             {dailyNewsLoading && <p className="text-gray-500 italic">Internationaal nieuws wordt opgehaald...</p>}
             {!dailyNewsLoading && dailyNews && dailyNews.events.length > 0 && (
@@ -428,6 +644,7 @@ export default function TestResultsPage() {
             {!waybackNewsLoading && !waybackNews?.error && waybackNews?.headlines.length === 0 && <p className="text-gray-500 italic">Geen Nederlandse headlines gevonden</p>}
             {!waybackNewsLoading && !waybackNews && <p className="text-gray-500 italic text-sm">Nederlandse headlines zijn beschikbaar vanaf 2005 (via Internet Archive)</p>}
           </div>
+          </details>
 
           <div className="bg-green-50 rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">🎵 #1 Hit op geboortedatum</h2>
@@ -622,138 +839,215 @@ export default function TestResultsPage() {
             {!wikipediaTVLoading && (!wikipediaTV || (wikipediaTV.events.length === 0 && wikipediaTV.runningShows.length === 0)) && <p className="text-gray-500 italic">Geen Wikipedia TV data gevonden voor dit jaar</p>}
           </div>
 
-          <div className="bg-purple-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">📛 Betekenis naam {firstName}</h2>
-            {nameMeaningLoading && <p className="text-gray-500 italic">Naambetekenis wordt opgehaald...</p>}
-            {!nameMeaningLoading && nameMeaning && (
+          {/* Categorie: Cultuur */}
+          <details open className="mb-6 group">
+            <summary className="cursor-pointer list-none mb-4">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-amber-600 transition-transform group-open:rotate-90"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <h2 className="text-2xl font-semibold text-amber-700">Cultuur</h2>
+              </div>
+            </summary>
+
+          <div className="bg-green-50 rounded-lg p-6 mb-4">
+            <h2 className="text-xl font-semibold mb-4">🎵 #1 Hit op geboortedatum</h2>
+            {top40Loading && <p className="text-gray-500 italic">Hitlijst wordt opgehaald...</p>}
+            {!top40Loading && top40?.numberOne && (
+              <div className="space-y-3">
+                <div className="bg-white p-4 rounded-lg border-2 border-green-300">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl font-bold text-green-600">#1</span>
+                    <div>
+                      <p className="text-xl font-semibold text-gray-900">{top40.numberOne.title}</p>
+                      <p className="text-lg text-gray-600">{top40.numberOne.artist}</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500">Top 40 week {top40.weekNumber}, {top40.year}</p>
+                {top40.sourceUrl && <a href={top40.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline">Bron: Top40.nl →</a>}
+              </div>
+            )}
+            {!top40Loading && !top40?.numberOne && <p className="text-gray-500 italic">Geen hitlijst gevonden voor deze datum</p>}
+          </div>
+
+          <div className="bg-emerald-50 rounded-lg p-6 mb-4">
+            <h2 className="text-xl font-semibold mb-4">🎤 Populaire hits in {birthYear}</h2>
+            {yearChartLoading && <p className="text-gray-500 italic">Jaaroverzicht wordt opgehaald...</p>}
+            {!yearChartLoading && yearChart && yearChart.entries.length > 0 && (
+              <div className="space-y-2">
+                {yearChart.entries.slice(0, 5).map((entry, idx) => (
+                  <div key={idx} className="flex items-center gap-3 bg-white p-2 rounded border">
+                    <span className="text-lg font-bold text-emerald-600 w-8">{entry.position}.</span>
+                    <div className="flex-1">
+                      <span className="font-medium">{entry.artist}</span>
+                      <span className="text-gray-500"> - </span>
+                      <span className="text-gray-700">{entry.title}</span>
+                    </div>
+                  </div>
+                ))}
+                {yearChart.sourceUrl && <a href={yearChart.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline block mt-2">Bron: DutchCharts.nl →</a>}
+              </div>
+            )}
+            {!yearChartLoading && (!yearChart || yearChart.entries.length === 0) && <p className="text-gray-500 italic">Geen jaaroverzicht gevonden</p>}
+          </div>
+
+          <div className="bg-amber-50 rounded-lg p-6 mb-4">
+            <h2 className="text-xl font-semibold mb-4">🎬 Films in de bioscoop</h2>
+            {moviesLoading && <p className="text-gray-500 italic">Films worden opgehaald...</p>}
+            {!moviesLoading && movies && movies.movies.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 mb-3">Films in Nederland rond {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL')}:</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {movies.movies.slice(0, 6).map((movie) => (
+                    <div key={movie.id} className="bg-white p-3 rounded border flex gap-3">
+                      {movie.posterPath && <img src={getPosterUrl(movie.posterPath, 'w92') || ''} alt={movie.title} className="w-12 h-18 object-cover rounded" />}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{movie.title}</p>
+                        <p className="text-xs text-gray-500">{formatGenres(movie.genreIds).slice(0, 2).join(', ')}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-yellow-500">★</span>
+                          <span className="text-sm text-gray-600">{movie.voteAverage.toFixed(1)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Bron: TMDB • Totaal {movies.totalResults} films gevonden</p>
+              </div>
+            )}
+            {!moviesLoading && (!movies || movies.movies.length === 0) && <p className="text-gray-500 italic">Geen films gevonden voor deze periode</p>}
+          </div>
+
+          {topMovies && topMovies.movies.length > 0 && (
+            <div className="bg-orange-50 rounded-lg p-6 mb-4">
+              <h2 className="text-xl font-semibold mb-4">🏆 Populairste films van {birthYear}</h2>
+              <div className="space-y-2">
+                {topMovies.movies.map((movie, idx) => (
+                  <div key={movie.id} className="flex items-center gap-3 bg-white p-2 rounded border">
+                    <span className="text-lg font-bold text-orange-600 w-8">{idx + 1}.</span>
+                    <div className="flex-1">
+                      <span className="font-medium">{movie.title}</span>
+                      <span className="text-gray-500 text-sm ml-2">★ {movie.voteAverage.toFixed(1)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-indigo-50 rounded-lg p-6 mb-4">
+            <h2 className="text-xl font-semibold mb-4">📺 Populaire series in {birthYear}</h2>
+            {seriesLoading && <p className="text-gray-500 italic">Series worden opgehaald...</p>}
+            {!seriesLoading && series && series.movies.length > 0 && (
+              <div className="space-y-2">
+                {series.movies.map((show, idx) => (
+                  <div key={show.id} className="flex items-center gap-3 bg-white p-2 rounded border">
+                    <span className="text-lg font-bold text-indigo-600 w-8">{idx + 1}.</span>
+                    {show.posterPath && <img src={getPosterUrl(show.posterPath, 'w92') || ''} alt={show.title} className="w-10 h-14 object-cover rounded" />}
+                    <div className="flex-1">
+                      <span className="font-medium">{show.title}</span>
+                      <span className="text-gray-500 text-sm ml-2">★ {show.voteAverage.toFixed(1)}</span>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-gray-500 mt-2">Bron: TMDB</p>
+              </div>
+            )}
+            {!seriesLoading && (!series || series.movies.length === 0) && <p className="text-gray-500 italic">Geen series gevonden voor dit jaar</p>}
+          </div>
+
+          <div className="bg-violet-50 rounded-lg p-6 mb-4">
+            <h2 className="text-xl font-semibold mb-4">📺 Op TV op de geboortedag</h2>
+            {tvLoading && <p className="text-gray-500 italic">TV programma's worden opgehaald...</p>}
+            {!tvLoading && tvPrograms && tvPrograms.programs.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 mb-3">Dit was er op TV op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}:</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {filterInterestingPrograms(tvPrograms.programs).map((program, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border border-violet-200">
+                      <p className="font-semibold text-gray-900">{program.title}</p>
+                      {program.episodeTitle && <p className="text-sm text-violet-700">{program.episodeTitle}</p>}
+                      {(program.channel || program.broadcaster) && <p className="text-xs text-violet-500 mt-1">{program.channel || program.broadcaster}</p>}
+                      {program.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{program.description}</p>}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  <a href={tvPrograms.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">Bron: {tvPrograms.source} →</a>
+                  {' '}• {filterInterestingPrograms(tvPrograms.programs).length} van {tvPrograms.totalFound} programma's getoond (gefilterd op interessante content)
+                </p>
+              </div>
+            )}
+            {!tvLoading && (!tvPrograms || tvPrograms.programs.length === 0) && <p className="text-gray-500 italic">Geen TV programma's gevonden voor deze datum</p>}
+          </div>
+
+          <div className="bg-slate-50 rounded-lg p-6 mb-4">
+            <h2 className="text-xl font-semibold mb-4">📖 TV Highlights {birthYear}</h2>
+            {wikipediaTVLoading && <p className="text-gray-500 italic">Wikipedia data wordt opgehaald...</p>}
+            {!wikipediaTVLoading && wikipediaTV && (
               <div className="space-y-4">
-                {nameMeaning.meaning ? (
+                {wikipediaTV.events.length > 0 && (
                   <div>
-                    <span className="font-medium text-gray-600">Betekenis:</span>
-                    <p className="text-gray-900 mt-1">{nameMeaning.meaning}</p>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 italic">Geen betekenis gevonden</p>
-                )}
-                {nameMeaning.origin && (
-                  <div>
-                    <span className="font-medium text-gray-600">Oorsprong:</span>
-                    <p className="text-gray-900 mt-1">{nameMeaning.origin}</p>
-                  </div>
-                )}
-                {nameMeaning.gender && (
-                  <div>
-                    <span className="font-medium text-gray-600">Geslacht:</span>
-                    <p className="text-gray-900 mt-1">{nameMeaning.gender}</p>
-                  </div>
-                )}
-                <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-purple-200">
-                  <span className="font-medium">Bron: </span>
-                  {nameMeaning.source ? (
-                    <a href={nameMeaning.source} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
-                      {nameMeaning.source.includes('naamdokter') ? 'Naamdokter.nl' : nameMeaning.source.includes('betekenisnamen') ? 'Betekenisnamen.nl' : 'Bron'}
-                    </a>
-                  ) : (
-                    <span>Geen bron gevonden</span>
-                  )}
-                </div>
-              </div>
-            )}
-            {!nameMeaningLoading && !nameMeaning && <p className="text-red-500">Naambetekenis kon niet worden opgehaald</p>}
-          </div>
-
-          <div className="bg-pink-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">⭐ Bekende mensen die {firstName} heten</h2>
-            {namesakesLoading && <p className="text-gray-500 italic">Bekende naamdragers worden opgehaald...</p>}
-            {!namesakesLoading && famousNamesakes && famousNamesakes.persons.length > 0 && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-3">
-                  {famousNamesakes.persons.map((person, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border border-pink-200">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          {person.wikipediaUrl ? (
-                            <a href={person.wikipediaUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-pink-700 hover:underline">{person.name}</a>
-                          ) : (
-                            <span className="font-semibold text-gray-900">{person.name}</span>
-                          )}
-                          <span className="text-xs text-gray-400 ml-2">({person.source.toUpperCase()})</span>
+                    <h3 className="font-medium text-gray-700 mb-2">Belangrijke TV-momenten</h3>
+                    <div className="space-y-2">
+                      {wikipediaTV.events.map((event, idx) => (
+                        <div key={idx} className="bg-white p-2 rounded border text-sm">
+                          {event.date && <span className="font-medium text-slate-600">{event.date}: </span>}
+                          <span className="text-gray-700">{event.description}</span>
                         </div>
-                      </div>
-                      {person.description && <p className="text-sm text-gray-600 mt-1">{person.description}</p>}
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-3">Totaal {famousNamesakes.persons.length} bekende naamdragers gevonden</p>
-                <div className="text-xs text-gray-500 pt-3 border-t border-pink-200">
-                  <span className="font-medium">Bronnen: </span>
-                  {famousNamesakes.sources.nl && <a href={famousNamesakes.sources.nl} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline mr-3">Wikipedia NL</a>}
-                  {famousNamesakes.sources.en && <a href={famousNamesakes.sources.en} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline">Wikipedia EN</a>}
-                </div>
-              </div>
-            )}
-            {!namesakesLoading && famousNamesakes && famousNamesakes.persons.length === 0 && <p className="text-gray-500 italic">Geen bekende naamdragers gevonden</p>}
-            {!namesakesLoading && !famousNamesakes && <p className="text-gray-500 italic">Kon geen gegevens ophalen</p>}
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">🌤️ Weerbericht</h2>
-            {weatherLoading && <p className="text-gray-500 italic">Weerbericht wordt opgehaald...</p>}
-            {!weatherLoading && weather && (
-              <div className="space-y-3">
-                <div>
-                  <span className="font-medium text-gray-600">
-                    Weer in {weather.city} op {new Date(weather.date).toLocaleDateString('nl-NL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}:
-                  </span>
-                  <p className="text-gray-900 mt-2">{formatWeatherReport(weather)}</p>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
-                  <div className="bg-white p-3 rounded border">
-                    <div className="text-gray-600 text-xs">Max temperatuur</div>
-                    <div className="text-xl font-semibold text-blue-600">{weather.temperature_max}°C</div>
                   </div>
-                  <div className="bg-white p-3 rounded border">
-                    <div className="text-gray-600 text-xs">Min temperatuur</div>
-                    <div className="text-xl font-semibold text-blue-600">{weather.temperature_min}°C</div>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <div className="text-gray-600 text-xs">Neerslag</div>
-                    <div className="text-xl font-semibold text-blue-600">{weather.precipitation}mm</div>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <div className="text-gray-600 text-xs">Zonneschijn</div>
-                    <div className="text-xl font-semibold text-blue-600">{weather.sunshine_duration}u</div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {!weatherLoading && !weather && <p className="text-red-500">Weerbericht kon niet worden opgehaald</p>}
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">🎂 Ook geboren op deze dag</h2>
-            {bornLoading && <p className="text-gray-500 italic">Bekende personen worden opgehaald...</p>}
-            {!bornLoading && bornPersons.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600 mb-3">Ook geboren op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}:</p>
-                <div className="grid grid-cols-1 gap-3">
-                  {bornPersons.map((person, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="font-semibold text-gray-900">{person.name}</span>
-                          <span className="text-gray-500 ml-2">({person.year})</span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">{person.description}</p>
+                )}
+                {wikipediaTV.runningShows.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Populaire programma's in {birthYear}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {wikipediaTV.runningShows.slice(0, 15).map((show, idx) => (
+                        <span key={idx} className="bg-white px-2 py-1 rounded border text-sm">
+                          {show.title}
+                          {show.years && <span className="text-gray-400 text-xs ml-1">({show.years})</span>}
+                        </span>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-3">Totaal {bornPersons.length} bekende personen gevonden</p>
+                  </div>
+                )}
+                {wikipediaTV.debuts.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Nieuwe programma's in {birthYear}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {wikipediaTV.debuts.map((show, idx) => (
+                        <span key={idx} className="bg-green-100 px-2 py-1 rounded text-sm text-green-800">{show}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {wikipediaTV.endings.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Gestopte programma's in {birthYear}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {wikipediaTV.endings.map((show, idx) => (
+                        <span key={idx} className="bg-red-100 px-2 py-1 rounded text-sm text-red-800">{show}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {wikipediaTV.sourceUrl && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    <a href={wikipediaTV.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:underline">Bron: Wikipedia →</a>
+                  </p>
+                )}
               </div>
             )}
-            {!bornLoading && bornPersons.length === 0 && <p className="text-gray-500 italic">Geen bekende personen gevonden voor deze datum</p>}
+            {!wikipediaTVLoading && (!wikipediaTV || (wikipediaTV.events.length === 0 && wikipediaTV.runningShows.length === 0)) && <p className="text-gray-500 italic">Geen Wikipedia TV data gevonden voor dit jaar</p>}
           </div>
+          </details>
 
           <div className="bg-gray-50 rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-4">📋 Ingevoerde Wizard Data (v3.0)</h2>
