@@ -8,9 +8,8 @@
 // UPDATE v3.0.0: ExtraVragen uitbreiding - 10 vragen in 5 secties
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import VersionFooter from '@/components/VersionFooter'
 import { APP_VERSION } from '@/lib/version'
 import type { BabykrantData } from '@/lib/types'
@@ -28,7 +27,6 @@ import { getWikipediaTVByYear, type WikipediaTVResult } from '@/lib/wikipediaTVA
 import { getDailyNews, getMonthlyNews, getWaybackNews, groupNewsByCategory, formatWaybackTimestamp, type DailyNewsResult, type MonthNewsResult, type WaybackNewsResult, type NewsEvent } from '@/lib/newsAPI'
 
 export default function TestResultsPage() {
-  const router = useRouter()
   const [data, setData] = useState<BabykrantData | null>(null)
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [bornPersons, setBornPersons] = useState<BornPerson[]>([])
@@ -224,37 +222,6 @@ export default function TestResultsPage() {
     kleur: getKleur(data.basisGegevens.geboorteDatum),
   }
 
-  // Function to save all enriched data to localStorage
-  const saveEnrichedData = () => {
-    const enrichedData = {
-      ...data,
-      berekend,
-      weather: weather || undefined,
-      dailyNews: dailyNews || undefined,
-      waybackNews: waybackNews || undefined,
-      monthlyNews: monthlyNews || undefined,
-      top40: top40 || undefined,
-      yearChart: yearChart || undefined,
-      tvPrograms: tvPrograms || undefined,
-      wikipediaTV: wikipediaTV || undefined,
-      nameMeaning: nameMeaning || undefined,
-      famousNamesakes: famousNamesakes || undefined,
-      bornPersons: bornPersons.length > 0 ? bornPersons : undefined,
-      movies: movies || undefined,
-      topMovies: topMovies || undefined,
-      series: series || undefined,
-    }
-
-    localStorage.setItem('babykrant_test_data', JSON.stringify(enrichedData))
-    console.log('[Babykrant v3.2] ✅ Enriched data saved to localStorage', Object.keys(enrichedData))
-  }
-
-  // Handler to save data and navigate to generate-articles
-  const handleGenerateArticles = () => {
-    saveEnrichedData()
-    router.push('/generate-articles')
-  }
-
   const sterrenbeeldInfo = getSterrenbeeldBeschrijving(sterrenbeeld)
   const chineesTekenInfo = getChineesTekenBeschrijving(chineesJaar)
   const firstName = nameMeaning?.firstName || famousNamesakes?.firstName || '...'
@@ -275,7 +242,7 @@ export default function TestResultsPage() {
           </div>
 
           {/* Categorie: Ingevulde gegevens */}
-          <details open className="mb-6 group">
+          <details className="mb-6 group">
             <summary className="cursor-pointer list-none mb-4">
               <div className="flex items-center gap-2">
                 <svg
@@ -349,7 +316,7 @@ export default function TestResultsPage() {
           </details>
 
           {/* Categorie: Weerbericht */}
-          <details open className="mb-6 group">
+          <details className="mb-6 group">
             <summary className="cursor-pointer list-none mb-4">
               <div className="flex items-center gap-2">
                 <svg
@@ -400,7 +367,7 @@ export default function TestResultsPage() {
           </details>
 
           {/* Categorie: Betekenis naam */}
-          <details open className="mb-6 group">
+          <details className="mb-6 group">
             <summary className="cursor-pointer list-none mb-4">
               <div className="flex items-center gap-2">
                 <svg
@@ -457,7 +424,7 @@ export default function TestResultsPage() {
           </details>
 
           {/* Categorie: Personen */}
-          <details open className="mb-6 group">
+          <details className="mb-6 group">
             <summary className="cursor-pointer list-none mb-4">
               <div className="flex items-center gap-2">
                 <svg
@@ -533,7 +500,7 @@ export default function TestResultsPage() {
           </details>
 
           {/* Categorie: Nieuws */}
-          <details open className="mb-6 group">
+          <details className="mb-6 group">
             <summary className="cursor-pointer list-none mb-4">
               <div className="flex items-center gap-2">
                 <svg
@@ -646,201 +613,8 @@ export default function TestResultsPage() {
           </div>
           </details>
 
-          <div className="bg-green-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">🎵 #1 Hit op geboortedatum</h2>
-            {top40Loading && <p className="text-gray-500 italic">Hitlijst wordt opgehaald...</p>}
-            {!top40Loading && top40?.numberOne && (
-              <div className="space-y-3">
-                <div className="bg-white p-4 rounded-lg border-2 border-green-300">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl font-bold text-green-600">#1</span>
-                    <div>
-                      <p className="text-xl font-semibold text-gray-900">{top40.numberOne.title}</p>
-                      <p className="text-lg text-gray-600">{top40.numberOne.artist}</p>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-500">Top 40 week {top40.weekNumber}, {top40.year}</p>
-                {top40.sourceUrl && <a href={top40.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline">Bron: Top40.nl →</a>}
-              </div>
-            )}
-            {!top40Loading && !top40?.numberOne && <p className="text-gray-500 italic">Geen hitlijst gevonden voor deze datum</p>}
-          </div>
-
-          <div className="bg-emerald-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">🎤 Populaire hits in {birthYear}</h2>
-            {yearChartLoading && <p className="text-gray-500 italic">Jaaroverzicht wordt opgehaald...</p>}
-            {!yearChartLoading && yearChart && yearChart.entries.length > 0 && (
-              <div className="space-y-2">
-                {yearChart.entries.slice(0, 5).map((entry, idx) => (
-                  <div key={idx} className="flex items-center gap-3 bg-white p-2 rounded border">
-                    <span className="text-lg font-bold text-emerald-600 w-8">{entry.position}.</span>
-                    <div className="flex-1">
-                      <span className="font-medium">{entry.artist}</span>
-                      <span className="text-gray-500"> - </span>
-                      <span className="text-gray-700">{entry.title}</span>
-                    </div>
-                  </div>
-                ))}
-                {yearChart.sourceUrl && <a href={yearChart.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline block mt-2">Bron: DutchCharts.nl →</a>}
-              </div>
-            )}
-            {!yearChartLoading && (!yearChart || yearChart.entries.length === 0) && <p className="text-gray-500 italic">Geen jaaroverzicht gevonden</p>}
-          </div>
-
-          <div className="bg-amber-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">🎬 Films in de bioscoop</h2>
-            {moviesLoading && <p className="text-gray-500 italic">Films worden opgehaald...</p>}
-            {!moviesLoading && movies && movies.movies.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600 mb-3">Films in Nederland rond {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL')}:</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {movies.movies.slice(0, 6).map((movie) => (
-                    <div key={movie.id} className="bg-white p-3 rounded border flex gap-3">
-                      {movie.posterPath && <img src={getPosterUrl(movie.posterPath, 'w92') || ''} alt={movie.title} className="w-12 h-18 object-cover rounded" />}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 truncate">{movie.title}</p>
-                        <p className="text-xs text-gray-500">{formatGenres(movie.genreIds).slice(0, 2).join(', ')}</p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <span className="text-yellow-500">★</span>
-                          <span className="text-sm text-gray-600">{movie.voteAverage.toFixed(1)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-2">Bron: TMDB • Totaal {movies.totalResults} films gevonden</p>
-              </div>
-            )}
-            {!moviesLoading && (!movies || movies.movies.length === 0) && <p className="text-gray-500 italic">Geen films gevonden voor deze periode</p>}
-          </div>
-
-          {topMovies && topMovies.movies.length > 0 && (
-            <div className="bg-orange-50 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">🏆 Populairste films van {birthYear}</h2>
-              <div className="space-y-2">
-                {topMovies.movies.map((movie, idx) => (
-                  <div key={movie.id} className="flex items-center gap-3 bg-white p-2 rounded border">
-                    <span className="text-lg font-bold text-orange-600 w-8">{idx + 1}.</span>
-                    <div className="flex-1">
-                      <span className="font-medium">{movie.title}</span>
-                      <span className="text-gray-500 text-sm ml-2">★ {movie.voteAverage.toFixed(1)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="bg-indigo-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">📺 Populaire series in {birthYear}</h2>
-            {seriesLoading && <p className="text-gray-500 italic">Series worden opgehaald...</p>}
-            {!seriesLoading && series && series.movies.length > 0 && (
-              <div className="space-y-2">
-                {series.movies.map((show, idx) => (
-                  <div key={show.id} className="flex items-center gap-3 bg-white p-2 rounded border">
-                    <span className="text-lg font-bold text-indigo-600 w-8">{idx + 1}.</span>
-                    {show.posterPath && <img src={getPosterUrl(show.posterPath, 'w92') || ''} alt={show.title} className="w-10 h-14 object-cover rounded" />}
-                    <div className="flex-1">
-                      <span className="font-medium">{show.title}</span>
-                      <span className="text-gray-500 text-sm ml-2">★ {show.voteAverage.toFixed(1)}</span>
-                    </div>
-                  </div>
-                ))}
-                <p className="text-xs text-gray-500 mt-2">Bron: TMDB</p>
-              </div>
-            )}
-            {!seriesLoading && (!series || series.movies.length === 0) && <p className="text-gray-500 italic">Geen series gevonden voor dit jaar</p>}
-          </div>
-
-          <div className="bg-violet-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">📺 Op TV op de geboortedag</h2>
-            {tvLoading && <p className="text-gray-500 italic">TV programma's worden opgehaald...</p>}
-            {!tvLoading && tvPrograms && tvPrograms.programs.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600 mb-3">Dit was er op TV op {new Date(data.basisGegevens.geboorteDatum).toLocaleDateString('nl-NL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}:</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {filterInterestingPrograms(tvPrograms.programs).map((program, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded border border-violet-200">
-                      <p className="font-semibold text-gray-900">{program.title}</p>
-                      {program.episodeTitle && <p className="text-sm text-violet-700">{program.episodeTitle}</p>}
-                      {(program.channel || program.broadcaster) && <p className="text-xs text-violet-500 mt-1">{program.channel || program.broadcaster}</p>}
-                      {program.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{program.description}</p>}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-3">
-                  <a href={tvPrograms.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">Bron: {tvPrograms.source} →</a>
-                  {' '}• {filterInterestingPrograms(tvPrograms.programs).length} van {tvPrograms.totalFound} programma's getoond (gefilterd op interessante content)
-                </p>
-              </div>
-            )}
-            {!tvLoading && (!tvPrograms || tvPrograms.programs.length === 0) && <p className="text-gray-500 italic">Geen TV programma's gevonden voor deze datum</p>}
-          </div>
-
-          <div className="bg-slate-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">📖 TV Highlights {birthYear}</h2>
-            {wikipediaTVLoading && <p className="text-gray-500 italic">Wikipedia data wordt opgehaald...</p>}
-            {!wikipediaTVLoading && wikipediaTV && (
-              <div className="space-y-4">
-                {wikipediaTV.events.length > 0 && (
-                  <div>
-                    <h3 className="font-medium text-gray-700 mb-2">Belangrijke TV-momenten</h3>
-                    <div className="space-y-2">
-                      {wikipediaTV.events.map((event, idx) => (
-                        <div key={idx} className="bg-white p-2 rounded border text-sm">
-                          {event.date && <span className="font-medium text-slate-600">{event.date}: </span>}
-                          <span className="text-gray-700">{event.description}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {wikipediaTV.runningShows.length > 0 && (
-                  <div>
-                    <h3 className="font-medium text-gray-700 mb-2">Populaire programma's in {birthYear}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {wikipediaTV.runningShows.slice(0, 15).map((show, idx) => (
-                        <span key={idx} className="bg-white px-2 py-1 rounded border text-sm">
-                          {show.title}
-                          {show.years && <span className="text-gray-400 text-xs ml-1">({show.years})</span>}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {wikipediaTV.debuts.length > 0 && (
-                  <div>
-                    <h3 className="font-medium text-gray-700 mb-2">Nieuwe programma's in {birthYear}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {wikipediaTV.debuts.map((show, idx) => (
-                        <span key={idx} className="bg-green-100 px-2 py-1 rounded text-sm text-green-800">{show}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {wikipediaTV.endings.length > 0 && (
-                  <div>
-                    <h3 className="font-medium text-gray-700 mb-2">Gestopte programma's in {birthYear}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {wikipediaTV.endings.map((show, idx) => (
-                        <span key={idx} className="bg-red-100 px-2 py-1 rounded text-sm text-red-800">{show}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {wikipediaTV.sourceUrl && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    <a href={wikipediaTV.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:underline">Bron: Wikipedia →</a>
-                  </p>
-                )}
-              </div>
-            )}
-            {!wikipediaTVLoading && (!wikipediaTV || (wikipediaTV.events.length === 0 && wikipediaTV.runningShows.length === 0)) && <p className="text-gray-500 italic">Geen Wikipedia TV data gevonden voor dit jaar</p>}
-          </div>
-
           {/* Categorie: Cultuur */}
-          <details open className="mb-6 group">
+          <details className="mb-6 group">
             <summary className="cursor-pointer list-none mb-4">
               <div className="flex items-center gap-2">
                 <svg
@@ -1180,25 +954,6 @@ export default function TestResultsPage() {
             </details>
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-4">
-            <Link href="/wizard" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold">Nieuwe babykrant maken</Link>
-            <button
-              onClick={handleGenerateArticles}
-              disabled={waybackNewsLoading}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                waybackNewsLoading
-                  ? 'bg-gray-400 cursor-not-allowed text-gray-200'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
-            >
-              {waybackNewsLoading ? (
-                <>⏳ Wachten op Wayback nieuws...</>
-              ) : (
-                <>💾 Opslaan & AI Artikelen Genereren ✨</>
-              )}
-            </button>
-          </div>
-          
           <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 text-right">
             test-results {APP_VERSION}
           </div>
