@@ -359,6 +359,9 @@ Schrijf de tekst:`
           day: 'numeric'
         })
 
+        // Check of het december is
+        const isDecember = new Date(datum).getMonth() === 11
+
         return `Schrijf een nieuwsoverzicht (120-150 woorden) voor een babykrant over ${datumVolledig}.
 
 STRUCTUUR:
@@ -381,9 +384,28 @@ SELECTIE:
 - Vermijd: saai bureaucratisch nieuws, 2 items uit dezelfde categorie
 - Zorg voor balans: binnenland én buitenland, zwaar én licht
 
+${isDecember ? `
+LET OP - DECEMBER DATA:
+- Eind december bevatten bronnen vaak jaaroverzichten en terugblikken op het hele jaar
+- Focus op de BOVENSTE 20-30 headlines (nieuws dat laag in de lijst staat is waarschijnlijk een terugblik)
+- Herken terugblikken aan signaalwoorden: "het jaar", "jaaroverzicht", "terugblik", "de belangrijkste", gebeurtenissen van maanden geleden
+- Skip overzichten en samenvattingen - kies alleen actuele ontwikkelingen van ${datumVolledig} zelf
+` : ''}
+
+HEADLINE KWALITEIT:
+- Test begrijpelijkheid: Zou iemand over 2-3 jaar nog direct snappen waar dit over gaat?
+- Te cryptisch of abstract? Skip het item en kies iets duidelijkers
+- Geef altijd genoeg context: volledige namen, functie/rol, wat er precies gebeurde
+
+VOETBAL WEDSTRIJDEN:
+- Vaak staan er veel headlines over 1 wedstrijd (live updates tijdens de wedstrijd)
+- Gebruik alleen de laatste 2-3 headlines met de definitieve uitslag
+- Combineer NOOIT meerdere headlines over dezelfde wedstrijd - dit leidt tot fouten
+- Noem alleen spelers die expliciet in de headline staan
+
 SCHRIJFSTIJL:
 - Begrijpelijk voor gemiddelde lezer, geef context waar nodig
-- Logische overgangen met verbindende zinnen (bijv. "Op een ander vlak...", "Ondertussen...")
+- Natuurlijke overgangen tussen items (of begin direct met het nieuws)
 - Behandel tragedies respectvol (niet "nieuwtje", wel "incident")
 - Zakelijk maar toegankelijk, korte beschrijvingen (1-2 zinnen per item)
 
@@ -650,6 +672,7 @@ SCHRIJFSTIJL:
 - Eindig met persoonlijke koppeling waar relevant
 - Gebruik correcte Nederlandse spelling en grammatica
 - Geen Markdown formatting (geen **, ##, etc.)
+- Vermijd geforceerde overgangszinnen zoals "Op internationaal vlak", "In de sportwereld", "Politiek gezien"
 
 VERBODEN:
 - Overdreven lyrisch of poëtisch
