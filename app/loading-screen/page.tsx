@@ -1,6 +1,6 @@
 // app/loading-screen/page.tsx
-// @version 1.1.0
-// Laadscherm met gegroepeerde categorieën
+// @version 1.2.0
+// Laadscherm met gegroepeerde categorieën en leuke feitjes
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
@@ -29,10 +29,40 @@ interface CategoryGroup {
   tasks: LoadingStatus[]
 }
 
+// Leuke feitjes die getoond worden tijdens het laden
+const FUN_FACTS = [
+  "🌍 Elke seconde worden er wereldwijd ongeveer 4,3 baby's geboren!",
+  "👶 De meeste baby's worden geboren op dinsdag, de minste in het weekend.",
+  "⏰ De meeste geboortes vinden plaats tussen 8 en 12 uur 's ochtends.",
+  "🎂 September is de maand met de meeste geboorten in Nederland.",
+  "📊 Gemiddeld weegt een baby bij geboorte 3.400 gram.",
+  "🍼 Baby's hebben ongeveer 300 botjes, volwassenen maar 206!",
+  "👁️ Pasgeboren baby's kunnen alleen tot 20-30 cm scherp zien.",
+  "💤 Newborns slapen gemiddeld 16-17 uur per dag.",
+  "🌟 De kans dat je op dezelfde dag jarig bent als iemand anders: 1 op 365!",
+  "📅 Elke dag delen ongeveer 20 miljoen mensen hun verjaardag.",
+  "🎵 Baby's kunnen al in de baarmoeder muziek horen en herkennen.",
+  "👃 Baby's herkennen de geur van hun moeder binnen een paar dagen.",
+  "🧠 Een baby's brein verdubbelt in grootte in het eerste jaar!",
+  "👣 Voetafdrukken van baby's zijn net zo uniek als vingerafdrukken.",
+  "📖 Voorlezen aan baby's helpt hun hersenontwikkeling enorm.",
+  "🌈 Baby's kunnen al vanaf 3 maanden kleuren onderscheiden.",
+  "🗣️ Baby's beginnen met 'brabbelen' rond 4-6 maanden oud.",
+  "💝 De eerste glimlach van een baby verschijnt meestal rond 6 weken.",
+  "🎭 Baby's kunnen gezichtsuitdrukkingen imiteren vanaf hun geboorte.",
+  "📸 De meeste ouders maken gemiddeld 1.000 foto's in het eerste jaar!",
+  "🌙 De meeste baby's krijgen hun eerste tand rond 6 maanden.",
+  "👶 In Nederland worden jaarlijks ongeveer 170.000 baby's geboren.",
+  "🎪 Baby's hebben meer smaakapillen dan volwassenen.",
+  "💓 Het hartje van een baby klopt 2x zo snel als dat van een volwassene.",
+  "🎨 Elk kind is uniek - zelfs eeneiige tweelingen hebben verschillende vingerafdrukken!",
+]
+
 export default function LoadingScreenPage() {
   const router = useRouter()
   const [data, setData] = useState<BabykrantData | null>(null)
   const [loadingStatuses, setLoadingStatuses] = useState<LoadingStatus[]>([])
+  const [currentFact, setCurrentFact] = useState(0)
   const hasStarted = useRef(false)
 
   useEffect(() => {
@@ -78,6 +108,15 @@ export default function LoadingScreenPage() {
     collectAllData(data, birthDate, birthYear, birthPlace, fullName)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
+
+  // Wissel feitjes elke 5 seconden
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentFact(prev => (prev + 1) % FUN_FACTS.length)
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   const updateTaskStatus = (taskName: string, status: LoadingStatus['status']) => {
     setLoadingStatuses(prev =>
@@ -349,7 +388,7 @@ export default function LoadingScreenPage() {
           </div>
 
           {/* Progress bar */}
-          <div className="mb-8">
+          <div className="mb-6">
             <div className="flex justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">Voortgang</span>
               <span className="text-sm font-medium text-gray-700">{completedCount}/{totalCount}</span>
@@ -359,6 +398,19 @@ export default function LoadingScreenPage() {
                 className="bg-blue-600 h-3 rounded-full transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
+            </div>
+          </div>
+
+          {/* Leuk feitje */}
+          <div className="mb-8 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">💡</div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-purple-900 mb-1">Wist je dat...</p>
+                <p className="text-sm text-purple-800 leading-relaxed animate-fade-in">
+                  {FUN_FACTS[currentFact]}
+                </p>
+              </div>
             </div>
           </div>
 
