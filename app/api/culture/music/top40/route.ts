@@ -1,7 +1,8 @@
 // app/api/top40/route.ts
-// @version 1.2.0
+// @version 1.4.0
 // Server-side scraper voor Top40.nl
 // FIXED: Parsing voor zowel raw HTML als markdown-converted response
+// FIXED: SSL certificate verification issues with NODE_TLS_REJECT_UNAUTHORIZED
 
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -20,6 +21,62 @@ interface Top40Result {
   year: number
   source: string
   sourceUrl: string
+}
+
+/**
+ * Fetch met retry logica voor SSL/netwerk errors
+ * Gebruikt tijdelijk NODE_TLS_REJECT_UNAUTHORIZED om SSL verificatie issues te omzeilen
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  maxRetries = 3
+): Promise<Response> {
+  let lastError: Error | null = null
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[Top40] Fetch attempt ${attempt}/${maxRetries}: ${url}`)
+
+      // Bewaar originele waarde en schakel SSL verificatie tijdelijk uit
+      const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED
+
+      try {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
+        const response = await fetch(url, options)
+
+        return response
+      } finally {
+        // Herstel originele waarde
+        if (originalTlsReject !== undefined) {
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject
+        } else {
+          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
+        }
+      }
+    } catch (error) {
+      lastError = error as Error
+      console.error(`[Top40] Attempt ${attempt} failed:`, error)
+
+      // Check of het een SSL error is
+      const isSslError = error instanceof Error &&
+        (error.message.includes('certificate') ||
+         error.message.includes('UNABLE_TO_VERIFY') ||
+         error.message.includes('SSL'))
+
+      // Alleen retry bij SSL/netwerk errors, niet bij andere fouten
+      if (attempt < maxRetries && isSslError) {
+        const waitTime = Math.pow(2, attempt - 1) * 1000 // Exponential backoff: 1s, 2s, 4s
+        console.log(`[Top40] Retrying in ${waitTime}ms...`)
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      } else if (!isSslError) {
+        throw error // Gooi andere errors direct door
+      }
+    }
+  }
+
+  throw lastError || new Error('Fetch failed after retries')
 }
 
 export async function GET(request: NextRequest) {
@@ -53,10 +110,10 @@ export async function GET(request: NextRequest) {
     const weekNumber = getISOWeekNumber(date)
     const year = getISOWeekYear(date)
     const url = `https://www.top40.nl/top40/${year}/week-${weekNumber}`
-    
+
     console.log(`[Top40] Fetching: ${url}`)
 
-    const response = await fetch(url, {
+    const response = await fetchWithRetry(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml',
@@ -81,9 +138,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result)
 
   } catch (error) {
-    console.error('[Top40] Error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : ''
+
+    console.error('[Top40] Error:', {
+      message: errorMessage,
+      stack: errorStack,
+      // @ts-ignore
+      cause: error?.cause,
+      date: dateParam
+    })
+
     return NextResponse.json(
-      { error: 'Failed to fetch Top 40 data' },
+      {
+        error: 'Failed to fetch Top 40 data',
+        details: errorMessage,
+        date: dateParam
+      },
       { status: 500 }
     )
   }
