@@ -208,7 +208,8 @@ REDACTIONELE AANPAK:
 SELECTIE:
 - Prioriteer: Nederlandse headlines + grote internationale gebeurtenissen
 - Terugkerend in meerdere bronnen = belangrijk (gebruik maandoverzicht voor context)
-- Vermijd: saai bureaucratisch nieuws, 2 items uit dezelfde categorie
+- STRIKTE LIMIETEN: MAX 1 sport, MAX 1 cultuur, MAX 2 politiek/economie (1 binnenland + 1 buitenland)
+- Vermijd: saai bureaucratisch nieuws
 - Zorg voor balans: binnenland én buitenland, zwaar én licht
 
 ${isDecember ? `
@@ -232,7 +233,8 @@ VOETBAL WEDSTRIJDEN:
 
 SCHRIJFSTIJL:
 - Begrijpelijk voor gemiddelde lezer, geef context waar nodig
-- Natuurlijke overgangen tussen items (of begin direct met het nieuws)
+- Sla categorie-introducties over ("Er waren spanningen..." i.p.v. "In de politiek waren er spanningen...")
+- Begin direct met nieuws of gebruik natuurlijke overgangen
 - Behandel tragedies respectvol (niet "nieuwtje", wel "incident")
 - Zakelijk maar toegankelijk, korte beschrijvingen (1-2 zinnen per item)
 
