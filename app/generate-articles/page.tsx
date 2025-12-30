@@ -504,8 +504,13 @@ export default function GenerateArticlesPage() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-pink-50 py-12 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <Link href="/test-results" className="text-blue-600 hover:underline">← Terug naar resultaten</Link>
+        <div className="mb-6 flex justify-between items-center">
+          <Link href="/wizard" className="text-blue-600 hover:underline">← Terug naar wizard</Link>
+          {devMode && (
+            <Link href="/test-results" className="text-purple-600 hover:underline text-sm">
+              🔧 Dev: Test Results →
+            </Link>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-8 mb-6">

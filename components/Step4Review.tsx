@@ -17,7 +17,7 @@ export default function Step4Review({ data, onBack }: Props) {
   
   const handleGenerate = () => {
     localStorage.setItem('babykrant_test_data', JSON.stringify(data))
-    router.push('/test-results')
+    router.push('/loading-screen')
   }
 
   const formatDate = (dateString: string) => {
