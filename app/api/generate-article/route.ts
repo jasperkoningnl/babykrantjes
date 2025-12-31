@@ -278,30 +278,65 @@ Schrijf de tekst:`
       const yearChart = data.yearChart
       const tvPrograms = data.tvPrograms?.programs || []
       const wikipediaTV = data.wikipediaTV
-      
+      const movies = data.movies?.movies || []
+      const topMovies = data.topMovies?.movies || []
+      const series = data.series?.movies || []
+
       const nummer1 = top40?.numberOne ? `${top40.numberOne.artist} - ${top40.numberOne.title}` : null
       const topYear = yearChart?.entries?.slice(0, 5) || []
       const tvToday = tvPrograms.slice(0, 6).map((p: any) => `${p.title}${p.channel ? ` (${p.channel})` : ''}`).join('\n')
       const tvEvents = wikipediaTV?.events?.slice(0, 3) || []
-      
-      return `Schrijf een overzicht van muziek en televisie voor de babykrant.
+
+      // Format films rond geboortedatum
+      const moviesAround = movies.slice(0, 8).map((m: any) =>
+        `${m.title} (${m.releaseDate?.split('-')[0] || '?'})`
+      ).join('\n')
+
+      // Format top films van het jaar
+      const topMoviesYear = topMovies.slice(0, 5).map((m: any) =>
+        `${m.title} (${m.voteAverage?.toFixed(1) || '?'}/10)`
+      ).join('\n')
+
+      // Format populaire series
+      const popularSeries = series.slice(0, 5).map((s: any) =>
+        `${s.title || s.name}`
+      ).join('\n')
+
+      return `Schrijf een overzicht van muziek, film en televisie voor de babykrant (100-140 woorden).
+
+STRUCTUUR:
+1. Open met de #1 hit (als beschikbaar)
+2. Noem andere populaire muzikanten/hits van dat moment
+3. Bespreek grote filmreleases in de bioscoop (blockbusters, bekende films)
+4. Noem andere populaire films en series rond die periode
+5. Sluit af met TV programma's op de geboortedag
+6. Vul aan met TV hoogtepunten uit dat jaar (als beschikbaar)
+
+SCHRIJFSTIJL:
+- Vlot en journalistiek
+- Direct en feitelijk
+- Geen overbodige intro- of slotzinnen
+- Geen interpretatie of waardeoordelen
+- Korte, pakkende beschrijvingen
+
+BESCHIKBARE DATA:
 
 MUZIEK:
 ${nummer1 ? `#1 Hit: ${nummer1}` : 'Geen Top 40 data'}
 ${topYear.length > 0 ? `\nTop hits van het jaar:\n${topYear.map((e: any) => `${e.position}. ${e.artist} - ${e.title}`).join('\n')}` : ''}
 
+FILMS IN DE BIOSCOOP (rond geboorteperiode):
+${moviesAround || 'Geen filmdata'}
+
+TOP FILMS VAN HET JAAR:
+${topMoviesYear || 'Geen filmdata'}
+
+POPULAIRE SERIES:
+${popularSeries || 'Geen seriedata'}
+
 TELEVISIE:
 ${tvToday ? `Op TV die dag:\n${tvToday}` : 'Geen TV data'}
-${tvEvents.length > 0 ? `\nTV momenten dat jaar:\n${tvEvents.map((e: any) => e.description).join('\n')}` : ''}
-
-STRUCTUUR:
-1. Start met #1 hit (prominent)
-2. Noem 2-3 andere populaire hits
-3. Highlight 3-4 TV programma's
-4. Energieke, informatieve toon
-
-LENGTE: 100-140 woorden
-TONE: Energiek, enthousiast maar niet overdreven
+${tvEvents.length > 0 ? `\nTV hoogtepunten dat jaar:\n${tvEvents.map((e: any) => e.description).join('\n')}` : ''}
 
 Schrijf de tekst:`
 
