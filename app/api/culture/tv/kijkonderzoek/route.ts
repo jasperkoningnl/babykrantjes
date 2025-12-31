@@ -55,43 +55,34 @@ function calculateDaysAgo(dateString: string): number {
 
 /**
  * Parseert de Top 25 tabel van kijkonderzoek.nl
+ * Structuur van voorpagina Top 25:
+ * <td class='kc_cdcb'>1</td>                           // Positie
+ * <td class='kc_cdtitle'>PROGRAMMA TITEL</td>         // Titel
+ * <td class='kc_cdstation'>RTL 4</td>                 // Zender
+ * <td class='kc_cdrt0'>2.567.000</td>                 // Gemiddeld
+ * <td class='kc_cdrt0'>3.599.000</td>                 // Totaal
  */
 function parseKijkonderzoekTop25(html: string, dateString: string): KijkonderzoekProgram[] {
   const programs: KijkonderzoekProgram[] = []
 
   try {
-    // De tabel structuur:
-    // <tr>
-    //   <td>1</td>                                   // Positie
-    //   <td>20:33</td>                              // Tijd
-    //   <td>ALL YOU NEED IS LOVE KERSTSPECIAL</td> // Titel
-    //   <td>RTL 4</td>                              // Zender
-    //   <td>15,4</td>                               // KDH (kijkdichtheid %)
-    //   <td>43,3</td>                               // MADL (marktaandeel %)
-    //   <td>2.567.000</td>                          // GEM (gemiddeld aantal kijkers)
-    //   <td>3.599.000</td>                          // TOT (totaal bereik)
-    // </tr>
-
-    // Vind alle data rijen (skip header rows met class kc_headerrow of kc_chrt1)
-    const rowRegex = /<tr>\s*<td>(\d+)<\/td>\s*<td>([\d:]+)<\/td>\s*<td>([^<]+)<\/td>\s*<td>([^<]+)<\/td>\s*<td>([\d,]+)<\/td>\s*<td>([\d,]+)<\/td>\s*<td>([\d.]+)<\/td>\s*<td>([\d.]+)<\/td>\s*<\/tr>/gi
+    // Regex voor voorpagina Top 25 structuur
+    const rowRegex = /<tr>\s*<td class=['"]kc_cdcb['"]>(\d+)<\/td>\s*<td class=['"]kc_cdtitle['"]>([^<]+)<\/td>\s*<td class=['"]kc_cdstation['"]>([^<]+)<\/td>\s*<td class=['"]kc_cdrt0['"]>([\d.]+)<\/td>\s*<td class=['"]kc_cdrt0['"]>([\d.]+)<\/td>\s*<\/tr>/gi
 
     let match
     while ((match = rowRegex.exec(html)) !== null) {
       const [
         ,
         positionStr,
-        time,
         title,
         channel,
-        kijkdichtheidStr,
-        marktaandeelStr,
         gemiddeldStr,
         totaalStr
       ] = match
 
       const position = parseInt(positionStr, 10)
       const viewerCount = parseViewerCount(gemiddeldStr)
-      const viewerShare = parsePercentage(marktaandeelStr)
+      const totalViewers = parseViewerCount(totaalStr)
 
       // Skip als we geen valide positie hebben (1-25)
       if (position < 1 || position > 25) continue
@@ -104,10 +95,10 @@ function parseKijkonderzoekTop25(html: string, dateString: string): Kijkonderzoe
         channel: channel.trim(),
         imageUrl: null,      // kijkonderzoek.nl heeft geen images
         sourceUrl: null,
-        time: time.trim(),
+        time: null,          // Voorpagina heeft geen tijdsinformatie
         ranking: position,
         viewerCount,
-        viewerShare
+        viewerShare: null    // Voorpagina heeft geen marktaandeel data
       })
     }
 
