@@ -54,6 +54,35 @@ function calculateDaysAgo(dateString: string): number {
 }
 
 /**
+ * Extraheert de datum uit de kijkonderzoek HTML
+ * Formaat: <td class='kc_headerright'>woensdag 24 december 2025</td>
+ * Returns: YYYY-MM-DD formaat of null als niet gevonden
+ */
+function extractDateFromHTML(html: string): string | null {
+  try {
+    const dateMatch = html.match(/<td class=['"]kc_headerright['"]>(?:\w+\s+)?(\d+)\s+(\w+)\s+(\d{4})<\/td>/i)
+    if (!dateMatch) return null
+
+    const [, day, monthName, year] = dateMatch
+
+    // Nederlandse maanden mapping
+    const months: Record<string, string> = {
+      'januari': '01', 'februari': '02', 'maart': '03', 'april': '04',
+      'mei': '05', 'juni': '06', 'juli': '07', 'augustus': '08',
+      'september': '09', 'oktober': '10', 'november': '11', 'december': '12'
+    }
+
+    const month = months[monthName.toLowerCase()]
+    if (!month) return null
+
+    const paddedDay = day.padStart(2, '0')
+    return `${year}-${month}-${paddedDay}`
+  } catch {
+    return null
+  }
+}
+
+/**
  * Parseert de Top 25 tabel van kijkonderzoek.nl
  * Structuur van voorpagina Top 25:
  * <td class='kc_cdcb'>1</td>                           // Positie
@@ -256,9 +285,40 @@ export async function GET(request: NextRequest) {
     }
 
     const html = await response.text()
+
+    // Extract en valideer de datum uit de HTML
+    const actualDate = extractDateFromHTML(html)
+
+    if (!actualDate) {
+      console.error(`[Kijkonderzoek] Could not extract date from HTML for ${dateParam}`)
+      return NextResponse.json({
+        programs: [],
+        date: dateParam,
+        totalFound: 0,
+        source: 'kijkonderzoek.nl',
+        sourceUrl: url,
+        apiVersion: API_VERSION,
+        error: `Could not extract date from HTML. Data might not be available.`
+      } as KijkonderzoekResult)
+    }
+
+    // Controleer of de datum overeenkomt met wat we verwachten
+    if (actualDate !== dateParam) {
+      console.warn(`[Kijkonderzoek] Date mismatch: requested ${dateParam}, got ${actualDate}`)
+      return NextResponse.json({
+        programs: [],
+        date: dateParam,
+        totalFound: 0,
+        source: 'kijkonderzoek.nl',
+        sourceUrl: url,
+        apiVersion: API_VERSION,
+        error: `Data not available for ${dateParam}. Most recent data is from ${actualDate}`
+      } as KijkonderzoekResult)
+    }
+
     const programs = parseKijkonderzoekTop25(html, dateParam)
 
-    console.log(`[Kijkonderzoek] Found ${programs.length} programs for ${dateParam}`)
+    console.log(`[Kijkonderzoek] Found ${programs.length} programs for ${dateParam} (date validated)`)
 
     return NextResponse.json({
       programs,
