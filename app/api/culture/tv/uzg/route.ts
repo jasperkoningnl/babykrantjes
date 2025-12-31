@@ -76,29 +76,36 @@ export async function GET(request: NextRequest) {
       if (response.ok) {
         const data = await response.json()
 
-        // Transform kijkonderzoek format to standard format
-        return NextResponse.json({
-          programs: data.programs.map((p: any) => ({
-            title: p.title,
-            episodeTitle: p.episodeTitle,
-            description: p.description,
-            broadcaster: p.broadcaster,
-            channel: p.channel,
-            imageUrl: p.imageUrl,
-            sourceUrl: p.sourceUrl,
-            time: p.time,
-            ranking: p.ranking,
-            viewerCount: p.viewerCount
-          })),
-          date: dateParam,
-          totalFound: data.totalFound,
-          source: 'kijkonderzoek.nl (live)',
-          sourceUrl: data.sourceUrl,
-          apiVersion: API_VERSION
-        })
-      }
+        // Check of er daadwerkelijk data is (geen error en programma's gevonden)
+        if (!data.error && data.programs && data.programs.length > 0) {
+          console.log(`[TV API] ✓ kijkonderzoek.nl: ${data.programs.length} programs found`)
 
-      console.log(`[TV API] kijkonderzoek.nl failed (HTTP ${response.status}), trying tvblik.nl...`)
+          // Transform kijkonderzoek format to standard format
+          return NextResponse.json({
+            programs: data.programs.map((p: any) => ({
+              title: p.title,
+              episodeTitle: p.episodeTitle,
+              description: p.description,
+              broadcaster: p.broadcaster,
+              channel: p.channel,
+              imageUrl: p.imageUrl,
+              sourceUrl: p.sourceUrl,
+              time: p.time,
+              ranking: p.ranking,
+              viewerCount: p.viewerCount
+            })),
+            date: dateParam,
+            totalFound: data.totalFound,
+            source: 'kijkonderzoek.nl (live)',
+            sourceUrl: data.sourceUrl,
+            apiVersion: API_VERSION
+          })
+        }
+
+        console.log(`[TV API] kijkonderzoek.nl returned no data (error: ${data.error}), trying tvblik.nl...`)
+      } else {
+        console.log(`[TV API] kijkonderzoek.nl failed (HTTP ${response.status}), trying tvblik.nl...`)
+      }
     } catch (error) {
       console.error('[TV API] kijkonderzoek.nl error:', error)
     }
@@ -111,29 +118,36 @@ export async function GET(request: NextRequest) {
       if (response.ok) {
         const data = await response.json()
 
-        // Transform tvblik format to standard format
-        return NextResponse.json({
-          programs: data.programs.map((p: any) => ({
-            title: p.title,
-            episodeTitle: p.episodeTitle,
-            description: p.description,
-            broadcaster: p.broadcaster,
-            channel: p.channel,
-            imageUrl: p.imageUrl,
-            sourceUrl: p.sourceUrl,
-            time: p.time,
-            ranking: p.ranking,
-            viewerCount: p.viewerCount
-          })),
-          date: dateParam,
-          totalFound: data.totalFound,
-          source: 'tvblik.nl (live)',
-          sourceUrl: data.sourceUrl,
-          apiVersion: API_VERSION
-        })
-      }
+        // Check of er daadwerkelijk data is (geen error en programma's gevonden)
+        if (!data.error && data.programs && data.programs.length > 0) {
+          console.log(`[TV API] ✓ tvblik.nl: ${data.programs.length} programs found`)
 
-      console.log(`[TV API] tvblik.nl failed (HTTP ${response.status}), falling back to Layer 3`)
+          // Transform tvblik format to standard format
+          return NextResponse.json({
+            programs: data.programs.map((p: any) => ({
+              title: p.title,
+              episodeTitle: p.episodeTitle,
+              description: p.description,
+              broadcaster: p.broadcaster,
+              channel: p.channel,
+              imageUrl: p.imageUrl,
+              sourceUrl: p.sourceUrl,
+              time: p.time,
+              ranking: p.ranking,
+              viewerCount: p.viewerCount
+            })),
+            date: dateParam,
+            totalFound: data.totalFound,
+            source: 'tvblik.nl (live)',
+            sourceUrl: data.sourceUrl,
+            apiVersion: API_VERSION
+          })
+        }
+
+        console.log(`[TV API] tvblik.nl returned no data (error: ${data.error}), falling back to Layer 3`)
+      } else {
+        console.log(`[TV API] tvblik.nl failed (HTTP ${response.status}), falling back to Layer 3`)
+      }
     } catch (error) {
       console.error('[TV API] tvblik.nl error:', error)
       // Fall through to Layer 3
