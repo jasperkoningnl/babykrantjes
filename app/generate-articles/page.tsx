@@ -166,63 +166,40 @@ Schrijf de tekst:`
       // Check of het december is
       const isDecember = new Date(datum).getMonth() === 11
 
-      return `Schrijf een nieuwsoverzicht (120-150 woorden) voor een babykrant over ${datumVolledig}.
+      return `Schrijf een nieuwsoverzicht (120-150 woorden) voor een babykrant over ${datumVolledig} en baseer je op het beschikbare nieuws.
 
 STRUCTUUR:
-1. Intro: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag."
-2. Selecteer 4-5 BESCHIKBARE nieuwsitems uit onderstaande bronnen:
+1. Intro: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag." Of een variatie hierop.
+2. Selecteer 4-5 beschikbare nieuwsitems uit onderstaande bronnen:
    - Bij voorkeur mix van: politiek/economie, cultuur/entertainment, sport/wetenschap
    - Binnenland én buitenland waar mogelijk
-   - BELANGRIJK: Als een categorie geen geschikt nieuws heeft → skip die categorie gewoon
-   - Schrijf ALLEEN over nieuws dat beschikbaar is, nooit melden dat er "geen nieuws" is
+   - Niet melden als er geen nieuws in een categorie is.
 
 REDACTIONELE AANPAK:
 - Herken patronen: Als onderwerp vaak terugkomt → inleidende zin + specifieke ontwikkeling
 - Contextualiseer: Leg altijd uit wat dingen zijn (welke film? welk team? wat is het?)
 - Interpreteer: Gebruik redactionele kennis om te bepalen wat in de krant hoort
-- Balanceer: Mix zwaar nieuws (oorlog, ziekte) met luchtig (cultuur, sport, opmerkelijk)
 
 SELECTIE:
 - Prioriteer: Nederlandse headlines + grote internationale gebeurtenissen
 - Terugkerend in meerdere bronnen = belangrijk (gebruik maandoverzicht voor context)
-- STRIKTE LIMIETEN: MAX 1 sport, MAX 1 cultuur, MAX 2 politiek/economie (1 binnenland + 1 buitenland)
+- Balanceer: Mix zwaar nieuws (oorlog, ziekte) met luchtig (cultuur, sport, opmerkelijk)
 - Vermijd: saai bureaucratisch nieuws
-- Zorg voor balans: binnenland én buitenland, zwaar én licht
 
-${isDecember ? `
-LET OP - DECEMBER NIEUWS (LET GOED OP!):
-- December-bronnen bevatten vaak jaaroverzichten en terugblikken op gebeurtenissen van MAANDEN geleden
-- Selecteer ALLEEN actueel nieuws uit december zelf - GEEN terugblikken op het jaar
-- Denk kritisch na: Is dit nieuws van ${datumVolledig} of een terugblik op eerder in het jaar?
--VOORBEELD FOUT: Verkiezingen uit oktober/november zijn GEEN december-nieuws
-- VOORBEELD FOUT: "Belangrijkste momenten van 2024" is een terugblik, geen actueel nieuws
-- Focus op de MEEST RECENTE headlines (top 20-30) voor actueel nieuws
-- Herken terugblikken: "het jaar", "jaaroverzicht", "terugblik", "hoogtepunten", maandnamen die niet december zijn
-- Bij twijfel: Is dit nieuws dat OP ${datumVolledig} gebeurde? Zo nee → skip het
-` : ''}
+${isDecember ? `SPECIFIEK VOOR DAGEN IN DECEMBER:
+- Deze dagen kunnen terugblikken en jaaroverzicht bevatten
+- Selecteer actueel nieuws van de geboortedag
+- Focus op de meest recente headlines
+- Denk kritisch na: Is dit nieuws van de geboortedag of een terugblik op eerder in het jaar?
 
-HEADLINE KWALITEIT:
+` : ''}HEADLINE KWALITEIT:
 - Test begrijpelijkheid: Zou iemand over 2-3 jaar nog direct snappen waar dit over gaat?
 - Te cryptisch of abstract? Skip het item en kies iets duidelijkers
 - Geef altijd genoeg context: volledige namen, functie/rol, wat er precies gebeurde
 
-VOETBAL WEDSTRIJDEN:
-- Vaak staan er veel headlines over 1 wedstrijd (live updates tijdens de wedstrijd)
-- Gebruik alleen de laatste 2-3 headlines met de definitieve uitslag
-- Combineer NOOIT meerdere headlines over dezelfde wedstrijd - dit leidt tot fouten
-- Noem alleen spelers die expliciet in de headline staan
-
 SCHRIJFSTIJL:
 - Begrijpelijk voor gemiddelde lezer, geef context waar nodig
-- GEEN categorie-introducties! Schrijf direct over het nieuws zelf.
-  ❌ FOUT: "Internationaal waren er verschillende ontwikkelingen."
-  ❌ FOUT: "In de sportwereld was er..."
-  ❌ FOUT: "Op politiek vlak waren er spanningen..."
-  ✓ GOED: Direct beginnen met het nieuws ("President X kondigde aan...", "Ajax won...")
-- NOOIT melden dat er "geen nieuws" is in een categorie
-  ❌ FOUT: "Op sportgebied was er helaas geen prominente Nederlandse prestatie."
-  ❌ FOUT: "In de entertainmentwereld bleven grote aankondigingen uit."
-  ✓ GOED: Skip die categorie gewoon en schrijf alleen over beschikbaar nieuws
+- Geen categorie-introducties. Schrijf direct over het nieuws zelf.
 - Begin direct met nieuws of gebruik natuurlijke overgangen tussen items
 - Behandel tragedies respectvol (niet "nieuwtje", wel "incident")
 - Zakelijk maar toegankelijk, korte beschrijvingen (1-2 zinnen per item)
