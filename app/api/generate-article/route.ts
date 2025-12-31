@@ -278,12 +278,30 @@ Schrijf de tekst:`
       const yearChart = data.yearChart
       const tvPrograms = data.tvPrograms?.programs || []
       const wikipediaTV = data.wikipediaTV
-      
+      const movies = data.movies?.movies || []
+      const topMovies = data.topMovies?.movies || []
+      const series = data.series?.movies || []
+
       const nummer1 = top40?.numberOne ? `${top40.numberOne.artist} - ${top40.numberOne.title}` : null
       const topYear = yearChart?.entries?.slice(0, 5) || []
       const tvToday = tvPrograms.slice(0, 6).map((p: any) => `${p.title}${p.channel ? ` (${p.channel})` : ''}`).join('\n')
       const tvEvents = wikipediaTV?.events?.slice(0, 3) || []
-      
+
+      // Format films rond geboortedatum
+      const moviesAround = movies.slice(0, 8).map((m: any) =>
+        `${m.title} (${m.releaseDate?.split('-')[0] || '?'})`
+      ).join('\n')
+
+      // Format top films van het jaar
+      const topMoviesYear = topMovies.slice(0, 5).map((m: any) =>
+        `${m.title} (${m.voteAverage?.toFixed(1) || '?'}/10)`
+      ).join('\n')
+
+      // Format populaire series
+      const popularSeries = series.slice(0, 5).map((s: any) =>
+        `${s.title || s.name}`
+      ).join('\n')
+
       return `Schrijf een overzicht van muziek, film en televisie voor de babykrant (100-140 woorden).
 
 STRUCTUUR:
@@ -307,12 +325,18 @@ MUZIEK:
 ${nummer1 ? `#1 Hit: ${nummer1}` : 'Geen Top 40 data'}
 ${topYear.length > 0 ? `\nTop hits van het jaar:\n${topYear.map((e: any) => `${e.position}. ${e.artist} - ${e.title}`).join('\n')}` : ''}
 
+FILMS IN DE BIOSCOOP (rond geboorteperiode):
+${moviesAround || 'Geen filmdata'}
+
+TOP FILMS VAN HET JAAR:
+${topMoviesYear || 'Geen filmdata'}
+
+POPULAIRE SERIES:
+${popularSeries || 'Geen seriedata'}
+
 TELEVISIE:
 ${tvToday ? `Op TV die dag:\n${tvToday}` : 'Geen TV data'}
 ${tvEvents.length > 0 ? `\nTV hoogtepunten dat jaar:\n${tvEvents.map((e: any) => e.description).join('\n')}` : ''}
-
-FILMS:
-(Gebruik algemene kennis over filmreleases rond deze periode)
 
 Schrijf de tekst:`
 
