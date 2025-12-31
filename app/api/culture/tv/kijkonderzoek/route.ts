@@ -54,44 +54,64 @@ function calculateDaysAgo(dateString: string): number {
 }
 
 /**
+ * Extraheert de datum uit de kijkonderzoek HTML
+ * Formaat: <td class='kc_headerright'>woensdag 24 december 2025</td>
+ * Returns: YYYY-MM-DD formaat of null als niet gevonden
+ */
+function extractDateFromHTML(html: string): string | null {
+  try {
+    const dateMatch = html.match(/<td class=['"]kc_headerright['"]>(?:\w+\s+)?(\d+)\s+(\w+)\s+(\d{4})<\/td>/i)
+    if (!dateMatch) return null
+
+    const [, day, monthName, year] = dateMatch
+
+    // Nederlandse maanden mapping
+    const months: Record<string, string> = {
+      'januari': '01', 'februari': '02', 'maart': '03', 'april': '04',
+      'mei': '05', 'juni': '06', 'juli': '07', 'augustus': '08',
+      'september': '09', 'oktober': '10', 'november': '11', 'december': '12'
+    }
+
+    const month = months[monthName.toLowerCase()]
+    if (!month) return null
+
+    const paddedDay = day.padStart(2, '0')
+    return `${year}-${month}-${paddedDay}`
+  } catch {
+    return null
+  }
+}
+
+/**
  * Parseert de Top 25 tabel van kijkonderzoek.nl
+ * Structuur van voorpagina Top 25:
+ * <td class='kc_cdcb'>1</td>                           // Positie
+ * <td class='kc_cdtitle'>PROGRAMMA TITEL</td>         // Titel
+ * <td class='kc_cdstation'>RTL 4</td>                 // Zender
+ * <td class='kc_cdrt0'>2.567.000</td>                 // Gemiddeld
+ * <td class='kc_cdrt0'>3.599.000</td>                 // Totaal
  */
 function parseKijkonderzoekTop25(html: string, dateString: string): KijkonderzoekProgram[] {
   const programs: KijkonderzoekProgram[] = []
 
   try {
-    // De tabel structuur:
-    // <tr>
-    //   <td>1</td>                                   // Positie
-    //   <td>20:33</td>                              // Tijd
-    //   <td>ALL YOU NEED IS LOVE KERSTSPECIAL</td> // Titel
-    //   <td>RTL 4</td>                              // Zender
-    //   <td>15,4</td>                               // KDH (kijkdichtheid %)
-    //   <td>43,3</td>                               // MADL (marktaandeel %)
-    //   <td>2.567.000</td>                          // GEM (gemiddeld aantal kijkers)
-    //   <td>3.599.000</td>                          // TOT (totaal bereik)
-    // </tr>
-
-    // Vind alle data rijen (skip header rows met class kc_headerrow of kc_chrt1)
-    const rowRegex = /<tr>\s*<td>(\d+)<\/td>\s*<td>([\d:]+)<\/td>\s*<td>([^<]+)<\/td>\s*<td>([^<]+)<\/td>\s*<td>([\d,]+)<\/td>\s*<td>([\d,]+)<\/td>\s*<td>([\d.]+)<\/td>\s*<td>([\d.]+)<\/td>\s*<\/tr>/gi
+    // Regex voor voorpagina Top 25 structuur
+    const rowRegex = /<tr>\s*<td class=['"]kc_cdcb['"]>(\d+)<\/td>\s*<td class=['"]kc_cdtitle['"]>([^<]+)<\/td>\s*<td class=['"]kc_cdstation['"]>([^<]+)<\/td>\s*<td class=['"]kc_cdrt0['"]>([\d.]+)<\/td>\s*<td class=['"]kc_cdrt0['"]>([\d.]+)<\/td>\s*<\/tr>/gi
 
     let match
     while ((match = rowRegex.exec(html)) !== null) {
       const [
         ,
         positionStr,
-        time,
         title,
         channel,
-        kijkdichtheidStr,
-        marktaandeelStr,
         gemiddeldStr,
         totaalStr
       ] = match
 
       const position = parseInt(positionStr, 10)
       const viewerCount = parseViewerCount(gemiddeldStr)
-      const viewerShare = parsePercentage(marktaandeelStr)
+      const totalViewers = parseViewerCount(totaalStr)
 
       // Skip als we geen valide positie hebben (1-25)
       if (position < 1 || position > 25) continue
@@ -104,10 +124,10 @@ function parseKijkonderzoekTop25(html: string, dateString: string): Kijkonderzoe
         channel: channel.trim(),
         imageUrl: null,      // kijkonderzoek.nl heeft geen images
         sourceUrl: null,
-        time: time.trim(),
+        time: null,          // Voorpagina heeft geen tijdsinformatie
         ranking: position,
         viewerCount,
-        viewerShare
+        viewerShare: null    // Voorpagina heeft geen marktaandeel data
       })
     }
 
@@ -265,9 +285,40 @@ export async function GET(request: NextRequest) {
     }
 
     const html = await response.text()
+
+    // Extract en valideer de datum uit de HTML
+    const actualDate = extractDateFromHTML(html)
+
+    if (!actualDate) {
+      console.error(`[Kijkonderzoek] Could not extract date from HTML for ${dateParam}`)
+      return NextResponse.json({
+        programs: [],
+        date: dateParam,
+        totalFound: 0,
+        source: 'kijkonderzoek.nl',
+        sourceUrl: url,
+        apiVersion: API_VERSION,
+        error: `Could not extract date from HTML. Data might not be available.`
+      } as KijkonderzoekResult)
+    }
+
+    // Controleer of de datum overeenkomt met wat we verwachten
+    if (actualDate !== dateParam) {
+      console.warn(`[Kijkonderzoek] Date mismatch: requested ${dateParam}, got ${actualDate}`)
+      return NextResponse.json({
+        programs: [],
+        date: dateParam,
+        totalFound: 0,
+        source: 'kijkonderzoek.nl',
+        sourceUrl: url,
+        apiVersion: API_VERSION,
+        error: `Data not available for ${dateParam}. Most recent data is from ${actualDate}`
+      } as KijkonderzoekResult)
+    }
+
     const programs = parseKijkonderzoekTop25(html, dateParam)
 
-    console.log(`[Kijkonderzoek] Found ${programs.length} programs for ${dateParam}`)
+    console.log(`[Kijkonderzoek] Found ${programs.length} programs for ${dateParam} (date validated)`)
 
     return NextResponse.json({
       programs,
