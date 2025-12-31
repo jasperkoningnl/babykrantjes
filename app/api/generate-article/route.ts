@@ -193,11 +193,11 @@ Schrijf de tekst:`
 
 STRUCTUUR:
 1. Intro: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag."
-2. Selecteer 4-5 nieuwsitems:
-   - 2 politiek/economie (1 binnenland + 1 buitenland)
-   - 1 cultuur/entertainment
-   - 1 sport/wetenschap
-   - Optioneel: 1 grappig/opmerkelijk nieuwtje
+2. Selecteer 4-5 BESCHIKBARE nieuwsitems uit onderstaande bronnen:
+   - Bij voorkeur mix van: politiek/economie, cultuur/entertainment, sport/wetenschap
+   - Binnenland én buitenland waar mogelijk
+   - BELANGRIJK: Als een categorie geen geschikt nieuws heeft → skip die categorie gewoon
+   - Schrijf ALLEEN over nieuws dat beschikbaar is, nooit melden dat er "geen nieuws" is
 
 REDACTIONELE AANPAK:
 - Herken patronen: Als onderwerp vaak terugkomt → inleidende zin + specifieke ontwikkeling
@@ -242,6 +242,10 @@ SCHRIJFSTIJL:
   ❌ FOUT: "In de sportwereld was er..."
   ❌ FOUT: "Op politiek vlak waren er spanningen..."
   ✓ GOED: Direct beginnen met het nieuws ("President X kondigde aan...", "Ajax won...")
+- NOOIT melden dat er "geen nieuws" is in een categorie
+  ❌ FOUT: "Op sportgebied was er helaas geen prominente Nederlandse prestatie."
+  ❌ FOUT: "In de entertainmentwereld bleven grote aankondigingen uit."
+  ✓ GOED: Skip die categorie gewoon en schrijf alleen over beschikbaar nieuws
 - Begin direct met nieuws of gebruik natuurlijke overgangen tussen items
 - Behandel tragedies respectvol (niet "nieuwtje", wel "incident")
 - Zakelijk maar toegankelijk, korte beschrijvingen (1-2 zinnen per item)
