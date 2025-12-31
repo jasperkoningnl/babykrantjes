@@ -213,11 +213,15 @@ SELECTIE:
 - Zorg voor balans: binnenland én buitenland, zwaar én licht
 
 ${isDecember ? `
-LET OP - DECEMBER DATA:
-- Eind december bevatten bronnen vaak jaaroverzichten en terugblikken op het hele jaar
-- Focus op de BOVENSTE 20-30 headlines (nieuws dat laag in de lijst staat is waarschijnlijk een terugblik)
-- Herken terugblikken aan signaalwoorden: "het jaar", "jaaroverzicht", "terugblik", "de belangrijkste", gebeurtenissen van maanden geleden
-- Skip overzichten en samenvattingen - kies alleen actuele ontwikkelingen van ${datumVolledig} zelf
+LET OP - DECEMBER NIEUWS (LET GOED OP!):
+- December-bronnen bevatten vaak jaaroverzichten en terugblikken op gebeurtenissen van MAANDEN geleden
+- Selecteer ALLEEN actueel nieuws uit december zelf - GEEN terugblikken op het jaar
+- Denk kritisch na: Is dit nieuws van ${datumVolledig} of een terugblik op eerder in het jaar?
+- VOORBEELD FOUT: Verkiezingen uit oktober/november zijn GEEN december-nieuws
+- VOORBEELD FOUT: "Belangrijkste momenten van 2024" is een terugblik, geen actueel nieuws
+- Focus op de MEEST RECENTE headlines (top 20-30) voor actueel nieuws
+- Herken terugblikken: "het jaar", "jaaroverzicht", "terugblik", "hoogtepunten", maandnamen die niet december zijn
+- Bij twijfel: Is dit nieuws dat OP ${datumVolledig} gebeurde? Zo nee → skip het
 ` : ''}
 
 HEADLINE KWALITEIT:
@@ -233,8 +237,12 @@ VOETBAL WEDSTRIJDEN:
 
 SCHRIJFSTIJL:
 - Begrijpelijk voor gemiddelde lezer, geef context waar nodig
-- Sla categorie-introducties over ("Er waren spanningen..." i.p.v. "In de politiek waren er spanningen...")
-- Begin direct met nieuws of gebruik natuurlijke overgangen
+- GEEN categorie-introducties! Schrijf direct over het nieuws zelf.
+  ❌ FOUT: "Internationaal waren er verschillende ontwikkelingen."
+  ❌ FOUT: "In de sportwereld was er..."
+  ❌ FOUT: "Op politiek vlak waren er spanningen..."
+  ✓ GOED: Direct beginnen met het nieuws ("President X kondigde aan...", "Ajax won...")
+- Begin direct met nieuws of gebruik natuurlijke overgangen tussen items
 - Behandel tragedies respectvol (niet "nieuwtje", wel "incident")
 - Zakelijk maar toegankelijk, korte beschrijvingen (1-2 zinnen per item)
 
