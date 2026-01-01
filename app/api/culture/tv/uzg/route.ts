@@ -24,6 +24,42 @@ function calculateDaysAgo(dateString: string): number {
   return Math.floor(diffTime / (1000 * 60 * 60 * 24))
 }
 
+/**
+ * Filtert programma's voor prime time van belangrijkste zenders
+ * - Channels: NPO 1, NPO 2, NPO 3, RTL 4, RTL 5, SBS6
+ * - Time: 20:00 - 22:00 uur
+ */
+function filterPrimeTimePrograms(programs: any[]): any[] {
+  const PRIME_TIME_CHANNELS = [
+    'NPO 1', 'NPO 2', 'NPO 3',
+    'RTL 4', 'RTL 5',
+    'SBS6'
+  ]
+
+  const PRIME_TIME_START = 20 * 60 // 20:00 in minutes
+  const PRIME_TIME_END = 22 * 60   // 22:00 in minutes
+
+  return programs.filter(program => {
+    // Filter op channel
+    if (!program.channel || !PRIME_TIME_CHANNELS.includes(program.channel)) {
+      return false
+    }
+
+    // Filter op time (als aanwezig)
+    if (program.time) {
+      const [hours, minutes] = program.time.split(':').map(Number)
+      if (isNaN(hours) || isNaN(minutes)) return false
+
+      const timeInMinutes = hours * 60 + minutes
+      if (timeInMinutes < PRIME_TIME_START || timeInMinutes >= PRIME_TIME_END) {
+        return false
+      }
+    }
+
+    return true
+  })
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const dateParam = searchParams.get('date') // YYYY-MM-DD format
@@ -81,22 +117,28 @@ export async function GET(request: NextRequest) {
           console.log(`[TV API] ✓ tvblik.nl: ${data.programs.length} programs found`)
 
           // Transform tvblik format to standard format
+          const transformedPrograms = data.programs.map((p: any) => ({
+            title: p.title,
+            episodeTitle: p.episodeTitle,
+            description: p.description,
+            broadcaster: p.broadcaster,
+            channel: p.channel,
+            imageUrl: p.imageUrl,
+            sourceUrl: p.sourceUrl,
+            time: p.time,
+            ranking: p.ranking,
+            viewerCount: p.viewerCount
+          }))
+
+          // Filter voor prime time programma's
+          const primeTimePrograms = filterPrimeTimePrograms(transformedPrograms)
+          console.log(`[TV API] ✓ Prime time filter: ${primeTimePrograms.length} programs (20:00-22:00, NPO 1/2/3, RTL 4/5, SBS6)`)
+
           return NextResponse.json({
-            programs: data.programs.map((p: any) => ({
-              title: p.title,
-              episodeTitle: p.episodeTitle,
-              description: p.description,
-              broadcaster: p.broadcaster,
-              channel: p.channel,
-              imageUrl: p.imageUrl,
-              sourceUrl: p.sourceUrl,
-              time: p.time,
-              ranking: p.ranking,
-              viewerCount: p.viewerCount
-            })),
+            programs: primeTimePrograms,
             date: dateParam,
-            totalFound: data.totalFound,
-            source: 'tvblik.nl (live)',
+            totalFound: primeTimePrograms.length,
+            source: 'tvblik.nl (live, prime time)',
             sourceUrl: data.sourceUrl,
             apiVersion: API_VERSION
           })
@@ -123,22 +165,28 @@ export async function GET(request: NextRequest) {
           console.log(`[TV API] ✓ kijkonderzoek.nl: ${data.programs.length} programs found`)
 
           // Transform kijkonderzoek format to standard format
+          const transformedPrograms = data.programs.map((p: any) => ({
+            title: p.title,
+            episodeTitle: p.episodeTitle,
+            description: p.description,
+            broadcaster: p.broadcaster,
+            channel: p.channel,
+            imageUrl: p.imageUrl,
+            sourceUrl: p.sourceUrl,
+            time: p.time,
+            ranking: p.ranking,
+            viewerCount: p.viewerCount
+          }))
+
+          // Filter voor prime time programma's (channel filter only - kijkonderzoek heeft geen tijden)
+          const filteredPrograms = filterPrimeTimePrograms(transformedPrograms)
+          console.log(`[TV API] ✓ Channel filter: ${filteredPrograms.length} programs (NPO 1/2/3, RTL 4/5, SBS6)`)
+
           return NextResponse.json({
-            programs: data.programs.map((p: any) => ({
-              title: p.title,
-              episodeTitle: p.episodeTitle,
-              description: p.description,
-              broadcaster: p.broadcaster,
-              channel: p.channel,
-              imageUrl: p.imageUrl,
-              sourceUrl: p.sourceUrl,
-              time: p.time,
-              ranking: p.ranking,
-              viewerCount: p.viewerCount
-            })),
+            programs: filteredPrograms,
             date: dateParam,
-            totalFound: data.totalFound,
-            source: 'kijkonderzoek.nl (live)',
+            totalFound: filteredPrograms.length,
+            source: 'kijkonderzoek.nl (live, filtered)',
             sourceUrl: data.sourceUrl,
             apiVersion: API_VERSION
           })
