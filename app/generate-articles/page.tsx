@@ -261,7 +261,8 @@ Schrijf de tekst:`
 
       const nummer1 = top40?.numberOne ? `${top40.numberOne.artist} - ${top40.numberOne.title}` : null
       const topYear = yearChart?.entries?.slice(0, 5) || []
-      const tvToday = tvPrograms.slice(0, 6).map((p: any) => `${p.title}${p.channel ? ` (${p.channel})` : ''}`).join('\n')
+      // Alle prime time programma's (al gefilterd door API op 20:00-22:00 + belangrijkste zenders)
+      const tvToday = tvPrograms.map((p: any) => `${p.title}${p.channel ? ` (${p.channel})` : ''}`).join('\n')
       const tvEvents = wikipediaTV?.events?.slice(0, 3) || []
 
       // Format films rond geboortedatum
