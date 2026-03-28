@@ -1,0 +1,55 @@
+name: News discovery (Wayback Machine bulk scrape)
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: 'Jaar om te scrapen (bijv. 2022)'
+        required: true
+      resume:
+        description: 'Resume: sla al gecachte datums over'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350   # Maximaal ~5,8 uur — genoeg voor 1 vol jaar
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run news discovery
+        run: |
+          RESUME_FLAG=""
+          if [ "${{ github.event.inputs.resume }}" = "true" ]; then
+            RESUME_FLAG="--resume"
+          fi
+          npx tsx scripts/discover-news.ts \
+            --year ${{ github.event.inputs.year }} \
+            $RESUME_FLAG
+
+      - name: Commit resultaten
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/cache/news/
+          git diff --staged --quiet || git commit -m "chore: news cache jaar ${{ github.event.inputs.year }}"
+          git push

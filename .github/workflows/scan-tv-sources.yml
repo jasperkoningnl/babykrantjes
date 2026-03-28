@@ -1,0 +1,46 @@
+name: Scan TV bronnen (Wayback Machine dekking)
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_year:
+        description: 'Startjaar'
+        required: false
+        default: '2010'
+      to_year:
+        description: 'Eindjaar'
+        required: false
+        default: '2024'
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TV source scanner
+        run: |
+          npx tsx scripts/scan-tv-sources.ts \
+            --from ${{ github.event.inputs.from_year }} \
+            --to ${{ github.event.inputs.to_year }}
+
+      - name: Commit rapport
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/tv-source-report.json
+          git diff --staged --quiet || git commit -m "chore: tv source scan rapport (${{ github.event.inputs.from_year }}-${{ github.event.inputs.to_year }})"
+          git push
