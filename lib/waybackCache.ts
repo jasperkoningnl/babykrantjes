@@ -1,10 +1,11 @@
 // lib/waybackCache.ts
-// @version 2.2.0
+// @version 2.3.0
 // Wayback Machine snapshot cache
 // Stores which dates have available snapshots to avoid redundant Archive.org queries
 // UPDATE v2.0.0: Hybrid storage - Upstash Redis (Vercel) + filesystem fallback (local)
 // UPDATE v2.1.0: Store full headlines in cache for true performance gain
 // UPDATE v2.2.0: Simplified - only cache successful results (no overwrite issues)
+// UPDATE v2.3.0: Static JSON fallback - leest data/cache/news/news-YYYY.json als Redis/file miss
 
 import { Redis } from '@upstash/redis'
 
@@ -213,14 +214,87 @@ async function getCacheStatsFile(): Promise<{
 }
 
 // =============================================================================
+// Static JSON cache (Laag A — afgeronde jaren, versioned in Git)
+// =============================================================================
+
+// Cache bestanden per jaar: data/cache/news/news-YYYY.json
+// Read-only op Vercel (baked in bij deploy), schrijfbaar lokaal via discovery scripts.
+
+const STATIC_NEWS_CACHE_DIR = path.join(process.cwd(), 'data', 'cache', 'news')
+
+// In-memory cache van geladen JSON bestanden (per jaar)
+const staticCacheMemory: Record<string, WaybackCache> = {}
+
+async function loadStaticCacheForYear(year: string): Promise<WaybackCache> {
+  if (staticCacheMemory[year]) return staticCacheMemory[year]
+
+  const filePath = path.join(STATIC_NEWS_CACHE_DIR, `news-${year}.json`)
+  try {
+    const data = await fs.readFile(filePath, 'utf-8')
+    const parsed = JSON.parse(data) as WaybackCache
+    staticCacheMemory[year] = parsed
+    return parsed
+  } catch {
+    return {}
+  }
+}
+
+async function checkCacheStatic(date: string): Promise<WaybackCacheEntry | null> {
+  const year = date.split('-')[0]
+  const cache = await loadStaticCacheForYear(year)
+  return cache[date] || null
+}
+
+/**
+ * Schrijft een entry naar de statische JSON cache (alleen voor discovery scripts lokaal).
+ * Exporteer voor gebruik in scripts/discover-news.ts.
+ */
+export async function updateStaticNewsCache(date: string, entry: Omit<WaybackCacheEntry, 'lastChecked'>): Promise<void> {
+  if (entry.status !== 'found' || !entry.headlines || entry.headlines.length === 0) return
+
+  const year = date.split('-')[0]
+  const filePath = path.join(STATIC_NEWS_CACHE_DIR, `news-${year}.json`)
+
+  try {
+    await fs.mkdir(STATIC_NEWS_CACHE_DIR, { recursive: true })
+
+    // Laad bestaande cache (of begin fresh)
+    let cache: WaybackCache = {}
+    try {
+      const data = await fs.readFile(filePath, 'utf-8')
+      cache = JSON.parse(data)
+    } catch {}
+
+    cache[date] = { ...entry, lastChecked: new Date().toISOString() }
+
+    // Sorteer op datum voor leesbare diffs
+    const sorted: WaybackCache = {}
+    Object.keys(cache).sort().forEach(k => { sorted[k] = cache[k] })
+
+    await fs.writeFile(filePath, JSON.stringify(sorted, null, 2))
+
+    // Invalideer memory cache zodat volgende checkCache de nieuwe data leest
+    delete staticCacheMemory[year]
+  } catch (error) {
+    console.error('[WaybackCache] Static write error:', error)
+  }
+}
+
+// =============================================================================
 // Public API (automatically chooses Redis or File based on environment)
 // =============================================================================
 
 /**
- * Check if a date has cached Wayback Machine snapshot info
+ * Check if a date has cached Wayback Machine snapshot info.
+ * Volgorde: Redis/File → static JSON (afgeronde jaren in Git)
  */
 export async function checkCache(date: string): Promise<WaybackCacheEntry | null> {
-  return hasUpstashEnv() ? checkCacheRedis(date) : checkCacheFile(date)
+  // Laag 1: Redis (productie) of bestand (lokaal)
+  const dynamic = hasUpstashEnv() ? await checkCacheRedis(date) : await checkCacheFile(date)
+  if (dynamic) return dynamic
+
+  // Laag 2: Statische JSON (afgeronde jaren, versioned in Git)
+  return checkCacheStatic(date)
 }
 
 /**
