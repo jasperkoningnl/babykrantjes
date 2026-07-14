@@ -1,10 +1,14 @@
 // app/api/top40/route.ts
-// @version 1.4.0
+// @version 2.0.0
 // Server-side scraper voor Top40.nl
-// FIXED: Parsing voor zowel raw HTML als markdown-converted response
-// FIXED: SSL certificate verification issues with NODE_TLS_REJECT_UNAUTHORIZED
+// FIXED v2.0.0: NODE_TLS_REJECT_UNAUTHORIZED-hack verwijderd. Die schakelde
+// TLS-verificatie proces-breed uit tijdens de fetch en kon door de async
+// race "aan" blijven staan voor al het andere verkeer (Anthropic, betalen).
+// Nu: gewone fetch eerst; alleen bij een certificaatfout van top40.nl een
+// undici-dispatcher die uitsluitend voor die ene request soepeler valideert.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { Agent, fetch as undiciFetch } from 'undici'
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase'
 
 interface ChartEntry {
@@ -24,55 +28,61 @@ interface Top40Result {
   sourceUrl: string
 }
 
+// Dispatcher die alleen voor top40.nl gebruikt wordt als de normale fetch
+// op een certificaatfout stukloopt (de site serveert een onvolledige
+// certificaatketen). De verificatie wordt dus nooit proces-breed geraakt.
+let top40FallbackAgent: Agent | null = null
+
+function getTop40FallbackAgent(): Agent {
+  if (!top40FallbackAgent) {
+    top40FallbackAgent = new Agent({
+      connect: { rejectUnauthorized: false },
+    })
+  }
+  return top40FallbackAgent
+}
+
+function isTlsError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const text = `${error.message} ${(error.cause as Error | undefined)?.message ?? ''}`
+  return /certificate|UNABLE_TO_VERIFY|SSL|TLS/i.test(text)
+}
+
 /**
- * Fetch met retry logica voor SSL/netwerk errors
- * Gebruikt tijdelijk NODE_TLS_REJECT_UNAUTHORIZED om SSL verificatie issues te omzeilen
+ * Fetch met retry-logica. Eerst gewone fetch (volledige TLS-verificatie);
+ * alleen bij een certificaatfout een tweede poging via de scoped
+ * undici-dispatcher voor uitsluitend deze request.
  */
 async function fetchWithRetry(
   url: string,
-  options: RequestInit = {},
+  headers: Record<string, string>,
   maxRetries = 3
-): Promise<Response> {
+): Promise<{ ok: boolean; status: number; text: () => Promise<string> }> {
   let lastError: Error | null = null
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`[Top40] Fetch attempt ${attempt}/${maxRetries}: ${url}`)
-
-      // Bewaar originele waarde en schakel SSL verificatie tijdelijk uit
-      const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED
-
-      try {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-
-        const response = await fetch(url, options)
-
-        return response
-      } finally {
-        // Herstel originele waarde
-        if (originalTlsReject !== undefined) {
-          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject
-        } else {
-          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
-        }
-      }
+      return await fetch(url, { headers, next: { revalidate: 86400 } })
     } catch (error) {
       lastError = error as Error
-      console.error(`[Top40] Attempt ${attempt} failed:`, error)
 
-      // Check of het een SSL error is
-      const isSslError = error instanceof Error &&
-        (error.message.includes('certificate') ||
-         error.message.includes('UNABLE_TO_VERIFY') ||
-         error.message.includes('SSL'))
+      if (isTlsError(error)) {
+        console.warn('[Top40] Certificaatfout — fallback via scoped undici-dispatcher')
+        try {
+          return await undiciFetch(url, {
+            headers,
+            dispatcher: getTop40FallbackAgent(),
+          }) as unknown as { ok: boolean; status: number; text: () => Promise<string> }
+        } catch (fallbackError) {
+          lastError = fallbackError as Error
+        }
+      }
 
-      // Alleen retry bij SSL/netwerk errors, niet bij andere fouten
-      if (attempt < maxRetries && isSslError) {
-        const waitTime = Math.pow(2, attempt - 1) * 1000 // Exponential backoff: 1s, 2s, 4s
+      if (attempt < maxRetries) {
+        const waitTime = Math.pow(2, attempt - 1) * 1000 // 1s, 2s, 4s
         console.log(`[Top40] Retrying in ${waitTime}ms...`)
         await new Promise(resolve => setTimeout(resolve, waitTime))
-      } else if (!isSslError) {
-        throw error // Gooi andere errors direct door
       }
     }
   }
@@ -149,12 +159,9 @@ export async function GET(request: NextRequest) {
     console.log(`[Top40] Fetching: ${url}`)
 
     const response = await fetchWithRetry(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'nl-NL,nl;q=0.9'
-      },
-      next: { revalidate: 86400 }
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'nl-NL,nl;q=0.9'
     })
 
     if (!response.ok) {

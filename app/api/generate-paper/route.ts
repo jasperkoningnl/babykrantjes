@@ -12,6 +12,7 @@ import { SYSTEM_PROMPT, buildFullPaperPrompt, PAPER_TOOL } from '@/lib/prompts'
 import { callClaudeStructured } from '@/lib/claude'
 import { enrichNewsData } from '@/lib/newsContext'
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase'
+import { checkRateLimit, addDailyCost, getDailyCost, DAILY_COST_BUDGET } from '@/lib/rateLimit'
 
 export interface PaperGenerationResponse {
   success: boolean
@@ -46,6 +47,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Rate limiting op IP (strakker dan per-sectie: dit is de dure call)
+    const rateLimit = await checkRateLimit(request, 'paper')
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Limiet bereikt, probeer het later opnieuw' } as PaperGenerationResponse,
+        { status: 429 }
+      )
+    }
+
+    // Globaal dagbudget (alle gebruikers samen)
+    const dailyCost = await getDailyCost()
+    if (dailyCost >= DAILY_COST_BUDGET) {
+      return NextResponse.json(
+        { success: false, error: 'Dagbudget bereikt, probeer het morgen opnieuw' } as PaperGenerationResponse,
+        { status: 429 }
+      )
+    }
+
     // Nieuws-context (Google News + actieve dossiers) server-side toevoegen
     await enrichNewsData(data)
 
@@ -68,6 +87,7 @@ export async function POST(request: NextRequest) {
 
     const totalTokens = result.tokensUsed.input + result.tokensUsed.output
     const cost = calculateCost(result.tokensUsed.input, result.tokensUsed.output)
+    await addDailyCost(cost)
     console.log(`[GeneratePaper] Succes - ${totalTokens} tokens, $${cost.toFixed(4)}`)
 
     // Resultaat opslaan bij de concept-krant (indien aanwezig)

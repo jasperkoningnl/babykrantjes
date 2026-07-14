@@ -33,12 +33,17 @@ interface CronResult {
 export async function GET(request: NextRequest) {
   const start = Date.now()
 
-  // Optioneel: beveilig de cron route met een secret
-  // Vercel stuurt automatisch de juiste header; handmatige aanroepen hebben dit nodig.
+  // CRON_SECRET is verplicht: zonder secret is deze route niet aan te roepen.
+  // Vercel Cron stuurt automatisch de juiste Authorization-header mee.
   const authHeader = request.headers.get('Authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret) {
+    console.error('[CronJob] CRON_SECRET is niet geconfigureerd — route geweigerd')
+    return NextResponse.json({ error: 'CRON_SECRET niet geconfigureerd' }, { status: 503 })
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
