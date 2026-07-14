@@ -1,10 +1,11 @@
 // app/api/generate-article/route.ts
-// @version 2.1.0 - Claude Haiku 3.5 integratie met alle 8 secties + inline sterrenbeeld fallback
+// @version 2.2.0 - Nieuwssectie krijgt dossiercontext (langlopende nieuwsdossiers) via dossierMatcher
 
 import { NextRequest, NextResponse } from 'next/server'
 import type { ArticleGenerationRequest, ArticleGenerationResponse, UsageStats } from '@/lib/articleTypes'
 import { USAGE_LIMITS, CLAUDE_PRICING } from '@/lib/articleTypes'
 import { getSterrenbeeld, getChineesJaar } from '@/lib/calculations'
+import { matchDossiers, buildDossierPromptBlock } from '@/lib/dossierMatcher'
 
 const dailyUsage = new Map<string, UsageStats>()
 
@@ -179,6 +180,15 @@ Schrijf de tekst:`
       const topWayback = waybackNews.map((h: any) => `${h.title}`).join('\n')
       const topMonth = monthNews.map((m: any) => `${m.day}: ${m.text}`).join('\n')
 
+      // Dossiercontext: match koppen van de geboortedag zelf (niet het
+      // maandoverzicht) tegen langlopende dossiers die toen actief waren.
+      // Geen match => lege string => prompt blijft zoals hij was.
+      const dagKoppen: string[] = [
+        ...dailyNews.map((e: any) => String(e?.text ?? '')),
+        ...waybackNews.map((h: any) => String(h?.title ?? '')),
+      ]
+      const dossierBlok = buildDossierPromptBlock(matchDossiers(dagKoppen, datum))
+
       const datumVolledig = new Date(datum).toLocaleDateString('nl-NL', {
         weekday: 'long',
         year: 'numeric',
@@ -215,7 +225,7 @@ ${isDecember ? `SPECIFIEK VOOR DAGEN IN DECEMBER:
 - Focus op de meest recente headlines
 - Denk kritisch na: Is dit nieuws van de geboortedag of een terugblik op eerder in het jaar?
 
-` : ''}HEADLINE KWALITEIT:
+` : ''}${dossierBlok}HEADLINE KWALITEIT:
 - Test begrijpelijkheid: Zou iemand over 2-3 jaar nog direct snappen waar dit over gaat?
 - Te cryptisch of abstract? Skip het item en kies iets duidelijkers
 - Geef altijd genoeg context: volledige namen, functie/rol, wat er precies gebeurde
