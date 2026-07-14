@@ -2,15 +2,18 @@
 // Centraal versiebestand - update dit bij elke release
 // Dit is de single source of truth voor de applicatie versie
 
-export const APP_VERSION = 'v3.4.0'
-export const APP_VERSION_FULL = 'v3.4.0 - Dossiercontext in nieuwssectie'
+export const APP_VERSION = 'v4.0.0'
+export const APP_VERSION_FULL = 'v4.0.0 - Herbouw: Supabase pipeline, Blob-foto\'s, één AI-call'
 export const RELEASE_DATE = '2026-07-14'
 export const RELEASE_NOTES = {
-  major: 'Nieuwssectie herkent langlopende dossiers en geeft context',
+  major: 'Grote herbouw: dagelijkse datapipeline in Supabase, persistentie en beveiliging',
   features: [
-    'Referentielijst van 18 langlopende nieuwsdossiers (data/dossiers.json)',
-    'Deterministische dossiermatcher met periode-filter (lib/dossierMatcher.ts)',
-    'Nieuwsprompt krijgt dossierachtergrond bij koppen van de geboortedag',
-    'Geverifieerde bronnenlijst topic-indexpagina\'s (scripts/verificatie-resultaten.md)'
+    'Supabase gekoppeld: schema, cache-on-read laag en krant-persistentie (generated_papers)',
+    'Dagelijkse scrape-pipeline: 6 Edge Functions + pg_cron (tv, kijkcijfers, streaming, Google News, Top 40, dossiers)',
+    'Nieuwsartikel in twee blokken met dossier-matching op de geboortedag',
+    'Foto-upload naar Vercel Blob — foto\'s overleven refresh en localStorage',
+    'Model-upgrade naar Haiku 4.5 en alle 8 secties in één gestructureerde call',
+    'Server-side rate limiting op IP, TLS-hack verwijderd, debugroutes achter env-flag',
+    'Parser-tests met HTML-fixtures in CI'
   ]
 }
