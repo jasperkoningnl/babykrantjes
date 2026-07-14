@@ -1,14 +1,16 @@
 // app/api/top40/route.ts
-// @version 2.0.0
+// @version 2.0.1
 // Server-side scraper voor Top40.nl
 // FIXED v2.0.0: NODE_TLS_REJECT_UNAUTHORIZED-hack verwijderd. Die schakelde
 // TLS-verificatie proces-breed uit tijdens de fetch en kon door de async
 // race "aan" blijven staan voor al het andere verkeer (Anthropic, betalen).
 // Nu: gewone fetch eerst; alleen bij een certificaatfout van top40.nl een
 // undici-dispatcher die uitsluitend voor die ene request soepeler valideert.
+// FIXED v2.0.1: undici wordt lazy geïmporteerd; een top-level import
+// crasht de build op Node 20 (util.markAsUncloneable bestaat pas in 22).
 
 import { NextRequest, NextResponse } from 'next/server'
-import { Agent, fetch as undiciFetch } from 'undici'
+import type { Agent } from 'undici'
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase'
 
 interface ChartEntry {
@@ -31,11 +33,13 @@ interface Top40Result {
 // Dispatcher die alleen voor top40.nl gebruikt wordt als de normale fetch
 // op een certificaatfout stukloopt (de site serveert een onvolledige
 // certificaatketen). De verificatie wordt dus nooit proces-breed geraakt.
+// undici wordt pas geladen op het moment dat de fallback echt nodig is.
 let top40FallbackAgent: Agent | null = null
 
-function getTop40FallbackAgent(): Agent {
+async function getTop40FallbackAgent(): Promise<Agent> {
   if (!top40FallbackAgent) {
-    top40FallbackAgent = new Agent({
+    const { Agent: UndiciAgent } = await import('undici')
+    top40FallbackAgent = new UndiciAgent({
       connect: { rejectUnauthorized: false },
     })
   }
@@ -70,9 +74,10 @@ async function fetchWithRetry(
       if (isTlsError(error)) {
         console.warn('[Top40] Certificaatfout — fallback via scoped undici-dispatcher')
         try {
+          const { fetch: undiciFetch } = await import('undici')
           return await undiciFetch(url, {
             headers,
-            dispatcher: getTop40FallbackAgent(),
+            dispatcher: await getTop40FallbackAgent(),
           }) as unknown as { ok: boolean; status: number; text: () => Promise<string> }
         } catch (fallbackError) {
           lastError = fallbackError as Error

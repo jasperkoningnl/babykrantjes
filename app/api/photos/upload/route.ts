@@ -18,14 +18,19 @@ const ALLOWED_TYPES: Record<string, string> = {
   'image/webp': 'webp',
 }
 
+// Vercel Blob kent twee koppelvormen:
+// - klassiek: BLOB_READ_WRITE_TOKEN (statisch token)
+// - OIDC (nieuwe standaard): BLOB_STORE_ID + het VERCEL_OIDC_TOKEN dat
+//   Vercel tijdens runtime injecteert; de @vercel/blob SDK wisselt die
+//   zelf om. Beide vormen zijn hier geldig.
 function blobConfigured(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN)
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID)
 }
 
 export async function POST(request: NextRequest) {
   if (!blobConfigured()) {
     return NextResponse.json(
-      { error: 'Foto-opslag is niet geconfigureerd (BLOB_READ_WRITE_TOKEN ontbreekt)' },
+      { error: 'Foto-opslag is niet geconfigureerd (BLOB_READ_WRITE_TOKEN of BLOB_STORE_ID ontbreekt)' },
       { status: 503 }
     )
   }
@@ -106,7 +111,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   if (!blobConfigured()) {
     return NextResponse.json(
-      { error: 'Foto-opslag is niet geconfigureerd (BLOB_READ_WRITE_TOKEN ontbreekt)' },
+      { error: 'Foto-opslag is niet geconfigureerd (BLOB_READ_WRITE_TOKEN of BLOB_STORE_ID ontbreekt)' },
       { status: 503 }
     )
   }
