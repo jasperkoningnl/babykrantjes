@@ -1,21 +1,27 @@
 {
   "name": "babykrant-claude",
-  "version": "3.3.1",
+  "version": "4.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "version:patch": "node scripts/bump-version.js patch",
     "version:minor": "node scripts/bump-version.js minor",
     "version:major": "node scripts/bump-version.js major"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.5",
+    "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.35.8",
+    "@vercel/blob": "^2.6.1",
     "next": "^14.2.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "undici": "^8.7.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -27,6 +33,7 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "tsx": "^4.21.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.10"
   }
 }

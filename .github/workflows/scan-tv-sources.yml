@@ -1,3 +1,7 @@
+# LET OP: archive.org blokkeert/throttlet GitHub Actions datacenter-IP's.
+# De scanner heeft een sanity-check die de run dan laat falen in plaats van
+# een vals 0%-rapport te committen. Draai de scan bij voorkeur lokaal
+# (residentieel IP): npx tsx scripts/scan-tv-sources.ts
 name: Scan TV bronnen (Wayback Machine dekking)
 
 on:

@@ -1,10 +1,11 @@
 // app/wizard/page.tsx
-// @version 3.0.0
-// UPDATED: Nieuwe initiële state voor ExtraVragen v3.0
+// @version 4.0.0
+// UPDATED v4.0.0: Foto's gaan direct naar Vercel Blob; wizard maakt bij de
+// eerste upload een concept-krant (generated_papers) aan via /api/papers
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Step1BasisGegevens from '@/components/Step1BasisGegevens'
 import Step2ExtraVragen from '@/components/Step2ExtraVragen'
 import Step3Fotos from '@/components/Step3Fotos'
@@ -56,7 +57,39 @@ export default function WizardPage() {
       foto3: null,
       foto4: null,
     },
+    paperId: null,
   })
+
+  // Concept-krant aanmaken (één keer), zodat foto-uploads gekoppeld kunnen
+  // worden aan generated_papers. De ref voorkomt dubbele aanmaak bij twee
+  // snel opeenvolgende uploads.
+  const paperPromiseRef = useRef<Promise<string | null> | null>(null)
+  const ensurePaper = (): Promise<string | null> => {
+    if (data.paperId) return Promise.resolve(data.paperId)
+    if (!paperPromiseRef.current) {
+      paperPromiseRef.current = (async () => {
+        try {
+          const response = await fetch('/api/papers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              basisGegevens: data.basisGegevens,
+              extraVragen: data.extraVragen,
+            }),
+          })
+          if (!response.ok) return null
+          const result = await response.json()
+          const id: string | null = result?.id ?? null
+          if (id) setData(prev => ({ ...prev, paperId: id }))
+          return id
+        } catch (err) {
+          console.error('[Wizard] Kon concept-krant niet aanmaken:', err)
+          return null
+        }
+      })()
+    }
+    return paperPromiseRef.current
+  }
 
   const updateBasisGegevens = (newData: Partial<BasisGegevens>) => {
     setData(prev => ({
@@ -136,6 +169,7 @@ export default function WizardPage() {
             <Step3Fotos
               data={data.fotos}
               updateData={updateFotos}
+              ensurePaper={ensurePaper}
               onNext={nextStep}
               onBack={prevStep}
             />

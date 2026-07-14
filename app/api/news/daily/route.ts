@@ -7,8 +7,9 @@
 // - Categorieën: <div class="current-events-content-heading">, <p><b>, of geen
 
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiCache } from '@/lib/apiCache'
 
-const API_VERSION = '2.0.0'
+const API_VERSION = '2.1.0'
 
 const MONTHS_EN = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
     apiVersion: API_VERSION
   }
 
-  try {
+  const fetchFromWikipedia = async (): Promise<DailyNewsResult> => {
     console.log(`[NewsDaily v${API_VERSION}] Fetching: ${webUrl} (${urlType})`)
 
     const response = await fetch(webUrl, {
@@ -122,25 +123,19 @@ export async function GET(request: NextRequest) {
 
     if (response.status === 404) {
       console.log(`[NewsDaily] Page not found for ${dateParam}`)
-      return NextResponse.json({
-        ...emptyResult,
-        error: `No news page found for ${dateParam}`
-      })
+      return { ...emptyResult, error: `No news page found for ${dateParam}` }
     }
 
     if (!response.ok) {
       console.error(`[NewsDaily] HTTP ${response.status}`)
-      return NextResponse.json({
-        ...emptyResult,
-        error: `Wikipedia returned ${response.status}`
-      })
+      return { ...emptyResult, error: `Wikipedia returned ${response.status}` }
     }
 
     const html = await response.text()
-    
+
     // Parse content afhankelijk van URL type
     let parseResult: { events: NewsEvent[], categoriesFound: string[], parseMethod: string }
-    
+
     if (useMonthPage) {
       // Extract content voor specifieke dag uit maand-pagina
       parseResult = parseMonthPageForDay(html, year, month, day, monthName)
@@ -153,7 +148,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`[NewsDaily v${API_VERSION}] Found ${events.length} events in ${categoriesFound.length} categories for ${dateParam} (method: ${parseMethod})`)
 
-    return NextResponse.json({
+    return {
       date: dateParam,
       events,
       totalEvents: events.length,
@@ -165,8 +160,21 @@ export async function GET(request: NextRequest) {
         urlType,
         parseMethod
       }
+    }
+  }
+
+  try {
+    // Supabase cache-laag: dagnieuws is historisch en verandert niet meer,
+    // dus een succesvol resultaat wordt permanent gecachet.
+    const { data } = await withApiCache({
+      endpoint: 'news_daily',
+      key: dateParam,
+      date: dateParam,
+      fetcher: fetchFromWikipedia,
+      shouldCache: (result) => !result.error && result.totalEvents > 0,
     })
 
+    return NextResponse.json(data)
   } catch (error) {
     console.error('[NewsDaily] Error:', error)
     return NextResponse.json({

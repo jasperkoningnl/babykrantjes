@@ -223,15 +223,12 @@ export default function Step4Review({ data, onBack }: Props) {
             <div key={idx}>
               {foto ? (
                 <div className="text-center">
-                  <div className="bg-green-100 border border-green-300 rounded-lg p-4 h-32 flex items-center justify-center">
-                    <div>
-                      <svg className="w-8 h-8 text-green-600 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <p className="text-xs text-green-700 font-medium">Foto {idx + 1}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1 truncate">{foto.name}</p>
+                  <img
+                    src={foto.url}
+                    alt={`Foto ${idx + 1}`}
+                    className="w-full h-32 object-cover rounded-lg border border-green-300"
+                  />
+                  <p className="text-xs text-gray-600 mt-1 truncate">{foto.fileName || `Foto ${idx + 1}`}</p>
                 </div>
               ) : (
                 <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 h-32 flex items-center justify-center">
