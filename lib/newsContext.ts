@@ -110,3 +110,33 @@ export function matchDossiersToHeadlines(
   }
   return matched
 }
+
+/**
+ * Verrijkt de generatie-data voor de nieuwssectie met Supabase-context:
+ * Google News koppen van de geboortedag en dossiers die toen actief waren
+ * (gematchte dossiers eerst). Muteert en retourneert hetzelfde data-object.
+ * Wordt gebruikt door zowel de per-sectie route als de gecombineerde call.
+ */
+export async function enrichNewsData(data: any): Promise<any> {
+  const geboorteDatum = data?.basisGegevens?.geboorteDatum
+  if (!geboorteDatum || !/^\d{4}-\d{2}-\d{2}$/.test(geboorteDatum)) return data
+
+  const [googleNews, allActiveDossiers] = await Promise.all([
+    getGoogleNewsForDate(geboorteDatum),
+    getActiveDossiersForDate(geboorteDatum),
+  ])
+
+  const koppen: string[] = [
+    ...(data.dailyNews?.events || []).map((e: any) => String(e?.text ?? '')),
+    ...(data.waybackNews?.headlines || []).map((h: any) => String(h?.title ?? '')),
+    ...googleNews.map((g) => g.title),
+  ]
+  const matched = matchDossiersToHeadlines(allActiveDossiers, koppen)
+  const matchedNames = new Set(matched.map((d) => d.name))
+  const rest = allActiveDossiers.filter((d) => !matchedNames.has(d.name))
+
+  data.googleNews = googleNews
+  data.activeDossiers = [...matched, ...rest]
+  console.log(`[NewsContext] Nieuws verrijkt: ${googleNews.length} Google News items, ${matched.length}/${allActiveDossiers.length} dossiers gematcht op dagkoppen`)
+  return data
+}
