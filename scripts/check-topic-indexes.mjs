@@ -11,7 +11,7 @@
 // Gebruik: node scripts/check-topic-indexes.mjs
 
 import { writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -116,6 +116,40 @@ const TOPIC_PATH_HINTS = [
   '/specials/', '/special/', '/news/topic', '/portal:current_events',
 ];
 
+// Navigatie-/footer-/account-/juridische linkteksten die GEEN nieuws-topic zijn.
+// Gebruikt om voorbeeldtopics te schonen (exacte match op de kleine-letter tekst,
+// of de tekst begint met een van deze woorden).
+const NAV_DENY = new Set([
+  'home', 'homepage', 'startseite', 'accueil', 'inicio', 'etusivu', 'startpagina',
+  'latest', 'latest news', 'latest videos', 'latest audio', 'most popular',
+  'subscribe', 'subscription', 'subscriptions', 'print subscriptions', 'subscriber only',
+  'sign in', 'signin', 'log in', 'login', 'register', 'my profile', 'profile',
+  'account', 'account overview', 'billing', 'settings', 'saved articles',
+  'newsletter', 'newsletters', 'video', 'videos', 'audio', 'podcast', 'podcasts',
+  'privacy', 'privacy policy', 'privacy policy.', 'terms', 'terms of use',
+  'terms and conditions', 'cookie', 'cookies', 'cookie policy', 'contact', 'contact us',
+  'about', 'about us', 'advertise', 'help', 'faq', 'sitemap', 'menu', 'search',
+  'skip to content', 'today', "today's paper", 'todays paper', 'read', 'edit',
+  'view history', 'talk', 'what links here', 'related changes', 'portal',
+  'nyheter', 'lokalt', 'nrk tv', 'nrk radio', 'nrk super', 'yr', 'exklusive artikel',
+  'politik', 'politics', 'opinions', 'style', 'sport', 'sports', 'weather', 'news',
+  'iplayer', 'guida ai contenuti', 'ultima ora', 'torna alla homepage', 'contattaci',
+  'ansa.it', 'my profile', 'usersign in', 'user sign in', 'newsletters',
+  'abonnez-vous', 'soyez alerté', 'rechercher', 'todos os sites',
+  'política de privacidade', 'politica de privacidade',
+]);
+
+// Slug uit een sitemap die geen topic is maar een datum-/archief-/sub-sitemapbucket.
+// Bijv. "2026 07 article", "ap sitemap 200602", "sitemap news 3".
+function isArchiveSlug(s) {
+  const t = s.toLowerCase().trim();
+  if (/\bsitemap\b/.test(t)) return true;
+  if (/^\d{4}[\s_/-]?\d{2}\b/.test(t)) return true; // begint met jaar+maand
+  if (/^\d{6,}$/.test(t.replace(/\s+/g, ''))) return true; // puur cijfers (datum-id)
+  if (/^(article|video|audio|poll|page)\s*\d*$/.test(t)) return true;
+  return false;
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function detectType(contentType, body) {
@@ -142,10 +176,33 @@ function isEgressBlocked(status, body) {
   );
 }
 
-function isBlocked(status, body) {
+// Site-blokkade. Statuscodes zijn hard. Tekstmarkers tellen ALLEEN op korte,
+// linkarme pagina's — een echte anti-bot-challenge is klein en heeft nauwelijks
+// links. Een volledig gerenderde 200-pagina met honderden links die toevallig
+// het woord "captcha" bevat is geen blokkade (voorkomt valse positieven op o.a.
+// SCMP en Wikipedia).
+function isBlocked(status, body, linkCount) {
   if (status === 401 || status === 403 || status === 429) return true;
-  const head = firstKb(body);
-  return BLOCK_MARKERS.some((m) => head.includes(m));
+  if (body.length < 15000 && linkCount < 30) {
+    const head = firstKb(body);
+    return BLOCK_MARKERS.some((m) => head.includes(m));
+  }
+  return false;
+}
+
+// Analyseer een XML-sitemap: is het een sitemapindex (lijst van sub-sitemaps)
+// of bevat het overwegend datum-/archiefbuckets in plaats van topics?
+function analyzeXml(body) {
+  const isSitemapIndex = /<sitemapindex[\s>]/i.test(body);
+  const locs = [...body.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => m[1]);
+  const total = locs.length;
+  const xmlLocs = locs.filter((l) => /\.xml($|\?)/i.test(l)).length;
+  const archiveLocs = locs.filter((l) => isArchiveSlug(slugToTopic(l))).length;
+  const mostlyXml = total > 0 && xmlLocs / total > 0.7;
+  const mostlyArchive = total > 0 && archiveLocs / total > 0.7;
+  // Geen bruikbare topic-index als het puur sub-sitemaps of datumbuckets zijn.
+  const noTopics = isSitemapIndex || mostlyXml || mostlyArchive;
+  return { isSitemapIndex, mostlyXml, mostlyArchive, noTopics, total };
 }
 
 function hasJsMarkers(body) {
@@ -183,7 +240,8 @@ function slugToTopic(u) {
 
 function extractXmlTopics(body, limit = 5) {
   const locs = [...body.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => m[1]);
-  const usable = locs.filter((l) => !/\.xml($|\?)/i.test(l));
+  // Filter sub-sitemaps (.xml) en datum-/archiefbuckets uit de voorbeelden.
+  const usable = locs.filter((l) => !/\.xml($|\?)/i.test(l) && !isArchiveSlug(slugToTopic(l)));
   const pool = usable.length ? usable : locs;
   const out = [];
   const seen = new Set();
@@ -241,14 +299,29 @@ function extractHtmlAnchors(body) {
   return anchors;
 }
 
+function isNavText(text) {
+  const t = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (NAV_DENY.has(t)) return true;
+  // alfabet-navigatie zoals "A Pfeil rechts" (A→), losse letters, pijltjes
+  if (/pfeil|»|›|→|arrow/i.test(text)) return true;
+  if (/^[a-z]$/i.test(t)) return true;
+  if (/^[a-z]\s*(pfeil|›|»|→)/i.test(t)) return true;
+  // begint met een duidelijk nav-woord
+  const firstWord = t.split(' ')[0];
+  if (['home', 'subscribe', 'sign', 'login', 'log', 'privacy', 'terms', 'cookie',
+    'account', 'newsletter', 'menu', 'search'].includes(firstWord)) return true;
+  return false;
+}
+
 function extractHtmlTopics(body, baseUrl, limit = 5) {
   const anchors = extractHtmlAnchors(body);
   const clean = anchors.filter(
     (a) =>
-      a.text.length >= 2 &&
+      a.text.length >= 3 &&
       a.text.length <= 90 &&
       !/^#/.test(a.href) &&
-      !/^(javascript:|mailto:|tel:)/i.test(a.href)
+      !/^(javascript:|mailto:|tel:)/i.test(a.href) &&
+      !isNavText(a.text)
   );
   const lowerHint = (href) => {
     let path = href;
@@ -323,12 +396,14 @@ async function measure(url) {
 
   const egressBlocked = isEgressBlocked(r.status, r.body);
   const type = detectType(r.contentType, r.body);
-  const blocked = isBlocked(r.status, r.body);
   let count = 0;
   let topics = [];
+  let noTopics = false; // sitemapindex/datumbuckets: bereikbaar maar geen topics
 
   if (type === 'XML') {
-    count = countSitemapEntries(r.body);
+    const xa = analyzeXml(r.body);
+    count = xa.total;
+    noTopics = xa.noTopics;
     topics = extractXmlTopics(r.body);
   } else if (type === 'JSON') {
     const j = extractJsonTopics(r.body);
@@ -339,6 +414,10 @@ async function measure(url) {
     topics = extractHtmlTopics(r.body, r.finalUrl);
   }
 
+  // Blokkade pas beoordelen met kennis van het aantal links (voorkomt valse
+  // positieven op grote 200-pagina's).
+  const blocked = isBlocked(r.status, r.body, count);
+
   // redirect naar homepage?
   let redirectedHome = false;
   try {
@@ -347,8 +426,10 @@ async function measure(url) {
     redirectedHome = reqPath !== '' && (finPath === '' || finPath === '/');
   } catch {}
 
-  const jsOnly =
-    type === 'HTML' && count < 10 && hasJsMarkers(r.body) && r.body.length < 200000;
+  // Serverside (vrijwel) leeg + JS-app-markers => client-side gerenderd.
+  const jsOnly = type === 'HTML' && count < 10 && hasJsMarkers(r.body);
+  // Serverside helemaal leeg zonder herkenbare JS-markers: ook onbruikbaar.
+  const emptyHtml = type === 'HTML' && count === 0 && !jsOnly;
 
   return {
     requested: url,
@@ -361,6 +442,8 @@ async function measure(url) {
     egressBlocked,
     redirectedHome,
     jsOnly,
+    emptyHtml,
+    noTopics,
     bodyLen: r.body.length,
   };
 }
@@ -372,15 +455,12 @@ function verdictFor(m) {
   if (m.status === 404 || m.redirectedHome) return 'NIET-GEVONDEN';
   if (m.status >= 400) return 'FOUT';
   if (m.jsOnly) return 'ONBRUIKBAAR-JS';
+  // XML-sitemapindex of datum-/archiefbuckets: bereikbaar maar geen topics.
+  if (m.noTopics) return 'GEEN-TOPICS';
+  if (m.count === 0) return m.emptyHtml ? 'ONBRUIKBAAR-JS' : 'NIET-GEVONDEN';
   if (m.count > 50) return 'BRUIKBAAR';
   if (m.count >= 10) return 'MAGER';
-  // < 10 items
-  if (m.type === 'HTML' && hasJsMarkersLen(m)) return 'ONBRUIKBAAR-JS';
-  return 'MAGER';
-}
-
-function hasJsMarkersLen(m) {
-  return m.jsOnly;
+  return 'MAGER'; // 1-9 items
 }
 
 // Alternatieve paden proberen bij NIET-GEVONDEN. Max 3.
@@ -485,6 +565,8 @@ function buildRow(cand, testedUrl, m, verdict, altTried) {
     egressBlocked: !!m.egressBlocked,
     redirectedHome: !!m.redirectedHome,
     jsOnly: !!m.jsOnly,
+    emptyHtml: !!m.emptyHtml,
+    noTopics: !!m.noTopics,
     blocked: !!m.blocked,
     bodyLen: m.bodyLen || 0,
     altTried: altTried || null,
@@ -497,7 +579,8 @@ function writeReport(results) {
   md += `Gegenereerd: ${now}\n`;
   md += `Script: \`scripts/check-topic-indexes.mjs\` — Node ${process.version}, gewone fetch, timeout 15s, ~1s pauze.\n`;
   md += `User-Agent: \`${UA}\`\n\n`;
-  md += `Oordeel: BRUIKBAAR (>50 items) · MAGER (10-50) · ONBRUIKBAAR-JS · GEBLOKKEERD · NIET-GEVONDEN · FOUT · EGRESS-GEBLOKKEERD (omgeving, niet gemeten).\n\n`;
+  md += `Oordeel: BRUIKBAAR (>50 items) · MAGER (10-50) · ONBRUIKBAAR-JS · GEBLOKKEERD · NIET-GEVONDEN · FOUT · ` +
+    `GEEN-TOPICS (sitemapindex/datum-archief, bereikbaar maar geen topics) · EGRESS-GEBLOKKEERD (omgeving, niet gemeten).\n\n`;
 
   // Validiteitscontrole: de controlegroep MOET BRUIKBAAR scoren. Zo niet, dan is
   // de run ongeldig (meestal omdat de omgeving uitgaand verkeer blokkeert).
@@ -536,11 +619,15 @@ function writeReport(results) {
     if (r.finalUrl && r.finalUrl !== r.testedUrl) notes.push(`redirect naar ${r.finalUrl}`);
     if (r.redirectedHome) notes.push('redirect naar homepage');
     if (r.blocked) notes.push('blokkade gedetecteerd (status of captcha/cloudflare-tekst)');
+    if (r.noTopics) notes.push('sitemapindex/datum-archief: bevat sub-sitemaps of datumbuckets, geen directe topics');
     if (r.jsOnly) notes.push('client-side gerenderd, serverside vrijwel leeg');
+    if (r.emptyHtml) notes.push('serverside 0 links (waarschijnlijk client-side gerenderd)');
+    if (r.note) notes.push(r.note);
     if (r.altTried && r.altTried.length) {
       notes.push('alternatieve paden: ' + r.altTried.map((t) => `${t.path} (${t.note})`).join(' | '));
     }
-    if (notes.length) md += `- **${r.name}**: ${notes.join('; ')}\n`;
+    const uniq = [...new Set(notes)];
+    if (uniq.length) md += `- **${r.name}**: ${uniq.join('; ')}\n`;
   }
 
   // Lijst 1: bruikbaar gesorteerd op aantal items
@@ -563,6 +650,7 @@ function writeReport(results) {
     else if (r.verdict === 'GEBLOKKEERD') reason = `GEBLOKKEERD (status ${r.status}${r.blocked ? ', blokkadetekst' : ''})`;
     else if (r.verdict === 'ONBRUIKBAAR-JS') reason = `ONBRUIKBAAR-JS (${r.count} links serverside)`;
     else if (r.verdict === 'NIET-GEVONDEN') reason = `NIET-GEVONDEN (na alternatieve paden)`;
+    else if (r.verdict === 'GEEN-TOPICS') reason = `GEEN-TOPICS (${r.count} entries, sitemapindex/datum-archief — geen directe topics)`;
     else if (r.verdict === 'EGRESS-GEBLOKKEERD') reason = `EGRESS-GEBLOKKEERD (omgeving-allowlist, host nooit bereikt — niet gemeten)`;
     else if (r.verdict === 'FOUT') reason = `FOUT (${r.error || 'status ' + r.status})`;
     md += `- **${r.name}** — ${reason} — \`${r.testedUrl}\`\n`;
@@ -571,7 +659,28 @@ function writeReport(results) {
   writeFileSync(join(__dirname, 'verificatie-resultaten.md'), md);
 }
 
-main().catch((e) => {
-  console.error('Fataal:', e);
-  process.exit(1);
-});
+// Alleen draaien wanneer direct aangeroepen (node check-topic-indexes.mjs),
+// niet wanneer geïmporteerd voor tests.
+const invokedDirectly =
+  process.argv[1] && fileURLToPath(import.meta.url) === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  main().catch((e) => {
+    console.error('Fataal:', e);
+    process.exit(1);
+  });
+}
+
+// Export van pure helpers t.b.v. tests.
+export {
+  analyzeXml,
+  isArchiveSlug,
+  isNavText,
+  isBlocked,
+  isEgressBlocked,
+  verdictFor,
+  slugToTopic,
+  extractXmlTopics,
+  extractHtmlTopics,
+  extractJsonTopics,
+  writeReport,
+};
