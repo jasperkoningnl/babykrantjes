@@ -6,6 +6,7 @@ import type { ArticleGenerationRequest, ArticleGenerationResponse, UsageStats } 
 import { USAGE_LIMITS, CLAUDE_PRICING } from '@/lib/articleTypes'
 import { getSterrenbeeld, getChineesJaar } from '@/lib/calculations'
 import { matchDossiers, buildDossierPromptBlock } from '@/lib/dossierMatcher'
+import { getGoogleNewsForDate, getActiveDossiersForDate, matchDossiersToHeadlines } from '@/lib/newsContext'
 
 const dailyUsage = new Map<string, UsageStats>()
 
@@ -174,20 +175,36 @@ Schrijf de tekst:`
       const dailyNews = data.dailyNews?.events || []
       const waybackNews = data.waybackNews?.headlines || []
       const monthNews = data.monthlyNews?.items || []
+      // Server-side verrijkt in POST (uit Supabase): Google News van de dag
+      // en dossiers die op de geboortedatum actief waren.
+      const googleNews = data.googleNews || []
+      const activeDossiers = data.activeDossiers || []
 
       // Geen limiet meer - toon ALLE beschikbare headlines zodat AI een goede selectie kan maken
       const topDaily = dailyNews.map((e: any) => `[${e.category}] ${e.text}`).join('\n')
       const topWayback = waybackNews.map((h: any) => `${h.title}`).join('\n')
       const topMonth = monthNews.map((m: any) => `${m.day}: ${m.text}`).join('\n')
+      const topGoogle = googleNews
+        .map((g: any) => `[${g.topicCategory}] ${g.title}${g.sourceName ? ` (${g.sourceName})` : ''}`)
+        .join('\n')
 
-      // Dossiercontext: match koppen van de geboortedag zelf (niet het
-      // maandoverzicht) tegen langlopende dossiers die toen actief waren.
-      // Geen match => lege string => prompt blijft zoals hij was.
+      // Dossiercontext, twee lagen:
+      // 1. Gecureerde dossiers (data/dossiers.json) met achtergrondtekst,
+      //    gematcht tegen de dagkoppen
+      // 2. Gescrapete dossiers (news_dossiers via VRT/Al Jazeera) die op de
+      //    geboortedatum actief waren
       const dagKoppen: string[] = [
         ...dailyNews.map((e: any) => String(e?.text ?? '')),
         ...waybackNews.map((h: any) => String(h?.title ?? '')),
+        ...googleNews.map((g: any) => String(g?.title ?? '')),
       ]
-      const dossierBlok = buildDossierPromptBlock(matchDossiers(dagKoppen, datum))
+      const curatedMatches = matchDossiers(dagKoppen, datum)
+      const dossierBlok = buildDossierPromptBlock(curatedMatches)
+
+      const scrapedDossierLijst = activeDossiers
+        .slice(0, 15)
+        .map((d: any) => `- ${d.name}${d.category ? ` (${d.category})` : ''}`)
+        .join('\n')
 
       const datumVolledig = new Date(datum).toLocaleDateString('nl-NL', {
         weekday: 'long',
@@ -199,54 +216,70 @@ Schrijf de tekst:`
       // Check of het december is
       const isDecember = new Date(datum).getMonth() === 11
 
-      return `Schrijf een nieuwsoverzicht (120-150 woorden) voor een babykrant over ${datumVolledig} en baseer je op het beschikbare nieuws.
+      return `Schrijf een nieuwsoverzicht (150-200 woorden totaal) voor een babykrant over ${datumVolledig}, gebaseerd op het beschikbare nieuws hieronder.
 
-STRUCTUUR:
+OUTPUT: precies twee blokken, elk met dit kopje op een eigen regel:
+
+Het nieuws van de dag
+[80-120 woorden over specifieke gebeurtenissen van ${datumVolledig} zelf]
+
+Dit speelde er in de wereld
+[50-80 woorden over de 2-3 grootste lopende nieuwsdossiers die op deze datum actief waren]
+
+FEITELIJKE BASIS — STRIKT:
+- Gebruik UITSLUITEND gebeurtenissen en dossiers die in de bronnen hieronder staan
+- Verzin NOOIT feiten, namen, aantallen of gebeurtenissen die niet in de input staan
+- Te weinig bronmateriaal voor een blok? Houd dat blok korter in plaats van aan te vullen met eigen kennis
+
+BLOK 1 — Het nieuws van de dag:
 1. Intro: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag." Of een variatie hierop.
-2. Selecteer 4-5 beschikbare nieuwsitems uit onderstaande bronnen:
+2. Selecteer 3-5 nieuwsitems van de dag zelf:
    - Bij voorkeur mix van: politiek/economie, cultuur/entertainment, sport/wetenschap
    - Binnenland én buitenland waar mogelijk
-   - Niet melden als er geen nieuws in een categorie is.
+   - Prioriteer: Nederlandse headlines + grote internationale gebeurtenissen
+   - Terugkerend in meerdere bronnen = belangrijk (gebruik maandoverzicht voor context)
+   - Balanceer: mix zwaar nieuws (oorlog, ziekte) met luchtig (cultuur, sport, opmerkelijk)
+   - Vermijd: saai bureaucratisch nieuws
+
+BLOK 2 — Dit speelde er in de wereld:
+- Kies de 2-3 grootste lopende dossiers uit de dossier-bronnen hieronder
+- Beschrijf per dossier in 1-2 zinnen wat er speelde (alleen op basis van de meegegeven achtergrond en koppen)
+- Dit blok gaat over de bredere periode, niet alleen deze ene dag
+- Geen dossier-bronnen beschikbaar? Laat dit blok dan weg (schrijf alleen blok 1, inclusief het kopje weglaten)
 
 REDACTIONELE AANPAK:
-- Herken patronen: Als onderwerp vaak terugkomt → inleidende zin + specifieke ontwikkeling
-- Contextualiseer: Leg altijd uit wat dingen zijn (welke film? welk team? wat is het?)
-- Interpreteer: Gebruik redactionele kennis om te bepalen wat in de krant hoort
-
-SELECTIE:
-- Prioriteer: Nederlandse headlines + grote internationale gebeurtenissen
-- Terugkerend in meerdere bronnen = belangrijk (gebruik maandoverzicht voor context)
-- Balanceer: Mix zwaar nieuws (oorlog, ziekte) met luchtig (cultuur, sport, opmerkelijk)
-- Vermijd: saai bureaucratisch nieuws
+- Contextualiseer: leg altijd uit wat dingen zijn (welke film? welk team? wat is het?)
+- Test begrijpelijkheid: zou iemand over 2-3 jaar nog direct snappen waar dit over gaat?
+- Te cryptisch of abstract? Skip het item en kies iets duidelijkers
 
 ${isDecember ? `SPECIFIEK VOOR DAGEN IN DECEMBER:
 - Deze dagen kunnen terugblikken en jaaroverzicht bevatten
 - Selecteer actueel nieuws van de geboortedag
-- Focus op de meest recente headlines
-- Denk kritisch na: Is dit nieuws van de geboortedag of een terugblik op eerder in het jaar?
+- Denk kritisch na: is dit nieuws van de geboortedag of een terugblik op eerder in het jaar?
 
-` : ''}${dossierBlok}HEADLINE KWALITEIT:
-- Test begrijpelijkheid: Zou iemand over 2-3 jaar nog direct snappen waar dit over gaat?
-- Te cryptisch of abstract? Skip het item en kies iets duidelijkers
-- Geef altijd genoeg context: volledige namen, functie/rol, wat er precies gebeurde
-
-SCHRIJFSTIJL:
+` : ''}${dossierBlok}SCHRIJFSTIJL:
 - Begrijpelijk voor gemiddelde lezer, geef context waar nodig
 - Geen categorie-introducties. Schrijf direct over het nieuws zelf.
-- Begin direct met nieuws of gebruik natuurlijke overgangen tussen items
 - Behandel tragedies respectvol (niet "nieuwtje", wel "incident")
 - Zakelijk maar toegankelijk, korte beschrijvingen (1-2 zinnen per item)
+- Geen andere kopjes of opmaak dan de twee genoemde kopjes
 
-BESCHIKBAAR NIEUWS:
+BESCHIKBAAR NIEUWS VAN DE DAG:
 
 Nederlands (NOS/NU.nl) - PRIORITEIT:
 ${topWayback || 'Geen data'}
+
+Google News NL:
+${topGoogle || 'Geen data'}
 
 Internationaal (Wikipedia):
 ${topDaily || 'Geen data'}
 
 Maandcontext (alleen voor grote gebeurtenissen):
 ${topMonth || 'Geen data'}
+
+LOPENDE DOSSIERS ACTIEF OP DEZE DATUM (bron: VRT NWS / Al Jazeera):
+${scrapedDossierLijst || 'Geen data'}
 
 Schrijf de tekst:`
 
@@ -551,6 +584,33 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[API] Generating ${section} (session: ${sessionId})`)
+
+    // Voor de nieuwssectie: verrijk server-side met Supabase-data
+    // (Google News van de geboortedag + dossiers die toen actief waren).
+    if (section === 'nieuws') {
+      const geboorteDatum = data?.basisGegevens?.geboorteDatum
+      if (geboorteDatum && /^\d{4}-\d{2}-\d{2}$/.test(geboorteDatum)) {
+        const [googleNews, allActiveDossiers] = await Promise.all([
+          getGoogleNewsForDate(geboorteDatum),
+          getActiveDossiersForDate(geboorteDatum),
+        ])
+
+        // Dossiers die in de dagkoppen voorkomen eerst, daarna de overige
+        // actieve dossiers (samen gecapt in de prompt-builder).
+        const koppen: string[] = [
+          ...(data.dailyNews?.events || []).map((e: any) => String(e?.text ?? '')),
+          ...(data.waybackNews?.headlines || []).map((h: any) => String(h?.title ?? '')),
+          ...googleNews.map((g) => g.title),
+        ]
+        const matched = matchDossiersToHeadlines(allActiveDossiers, koppen)
+        const matchedNames = new Set(matched.map((d) => d.name))
+        const rest = allActiveDossiers.filter((d) => !matchedNames.has(d.name))
+
+        data.googleNews = googleNews
+        data.activeDossiers = [...matched, ...rest]
+        console.log(`[API] Nieuws verrijkt: ${googleNews.length} Google News items, ${matched.length}/${allActiveDossiers.length} dossiers gematcht op dagkoppen`)
+      }
+    }
 
     // Build prompt
     const userPrompt = buildPrompt(section, data)
