@@ -61,8 +61,8 @@ minimaal `ANTHROPIC_API_KEY`.
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable/anon key (client-side reads) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key — alleen server-side, nooit `NEXT_PUBLIC_` |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob (foto-uploads) |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Rate limiting + wayback-cache |
+| `BLOB_STORE_ID` (of `BLOB_READ_WRITE_TOKEN`) | Vercel Blob (foto-uploads); de OIDC-koppeling via het Storage-tabblad zet `BLOB_STORE_ID` automatisch |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Upstash Redis: rate limiting + wayback-cache (de Vercel-integratie zet deze automatisch; `UPSTASH_REDIS_REST_*` werkt ook) |
 | `CRON_SECRET` | Verplicht voor `/api/cron/*` |
 | `TMDB_API_KEY` | Films en series |
 | `ENABLE_TEST_PAGE` | `true` = debug/testroutes open (alleen previews) |

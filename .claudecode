@@ -63,8 +63,10 @@ Next.js API routes (Vercel)
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - publishable/anon key (client-side reads)
 - `SUPABASE_SERVICE_ROLE_KEY` - service role key (server-side writes; NOOIT
   met NEXT_PUBLIC_ prefix)
-- `BLOB_READ_WRITE_TOKEN` - Vercel Blob (foto-uploads)
-- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` - rate limiting + cache
+- `BLOB_STORE_ID` (of `BLOB_READ_WRITE_TOKEN`) - Vercel Blob; de OIDC-
+  koppeling via het Storage-tabblad zet `BLOB_STORE_ID` automatisch
+- `KV_REST_API_URL` + `KV_REST_API_TOKEN` - Upstash Redis (rate limiting +
+  cache); door de Vercel-integratie automatisch gezet
 - `CRON_SECRET` - verplicht voor /api/cron/* routes
 - `TMDB_API_KEY` - films/series
 - `ENABLE_TEST_PAGE` - zet debug/testroutes open (alleen op previews!)

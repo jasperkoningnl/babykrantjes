@@ -5,10 +5,12 @@
 // serverless niet werkte (reset bij cold start, per instance, en de
 // client kon zijn eigen limiet omzeilen door een nieuw sessionId te kiezen).
 //
-// Env vars: UPSTASH_REDIS_REST_URL en UPSTASH_REDIS_REST_TOKEN.
-// Zonder configuratie wordt er gewaarschuwd en doorgelaten (fail-open),
-// zodat een misconfiguratie de site niet platlegt — zet de env vars in
-// productie dus altijd.
+// Env vars: KV_REST_API_URL en KV_REST_API_TOKEN (de namen die de
+// Upstash/Vercel-integratie injecteert en die lib/waybackCache.ts al
+// gebruikt), met UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN als
+// alternatief. Zonder configuratie wordt er gewaarschuwd en doorgelaten
+// (fail-open), zodat een misconfiguratie de site niet platlegt — zet de
+// env vars in productie dus altijd.
 
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
@@ -18,16 +20,25 @@ let redis: Redis | null = null
 let articleLimiter: Ratelimit | null = null
 let paperLimiter: Ratelimit | null = null
 
+function redisCredentials(): { url: string; token: string } | null {
+  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    return { url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN }
+  }
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return { url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN }
+  }
+  return null
+}
+
 function isRedisConfigured(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+  return redisCredentials() !== null
 }
 
 function getRedis(): Redis {
   if (!redis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
+    const credentials = redisCredentials()
+    if (!credentials) throw new Error('Redis is niet geconfigureerd')
+    redis = new Redis(credentials)
   }
   return redis
 }
