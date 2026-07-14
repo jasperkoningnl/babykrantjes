@@ -76,10 +76,12 @@ create table if not exists daily_streaming (
   rank integer not null,
   title text not null,
   platform text not null, -- 'Netflix', 'Disney+', 'Prime Video', etc.
-  content_type text, -- 'film', 'serie'
+  content_type text not null default 'onbekend', -- 'film', 'serie', 'onbekend'
   scraped_at timestamptz default now(),
   source text not null, -- 'flixpatrol.com'
-  unique(date, rank, platform)
+  -- Films en series hebben elk een eigen top 10 per platform en delen dus
+  -- rangnummers; content_type hoort daarom bij de sleutel.
+  unique(date, rank, platform, content_type)
 );
 
 create index if not exists idx_daily_streaming_date on daily_streaming(date);
