@@ -12,6 +12,7 @@
     "version:major": "node scripts/bump-version.js major"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.5",
     "@upstash/redis": "^1.35.8",
     "next": "^14.2.0",
     "react": "^18.3.1",
