@@ -82,17 +82,28 @@ export interface ExtraVragen {
   bijzonderheden?: string  // Bijzonderheden of leuke details? Max 300 karakters
 }
 
+// UPDATED v4.0.0: Foto's worden direct bij selectie naar Vercel Blob
+// geüpload. De wizard-state bevat alleen nog URLs (die overleven
+// JSON.stringify naar localStorage, in tegenstelling tot File-objecten).
+export interface UploadedPhoto {
+  url: string            // Vercel Blob URL
+  photoId?: string | null // paper_photos.id in Supabase, indien gekoppeld
+  fileName?: string      // oorspronkelijke bestandsnaam (voor weergave)
+}
+
 export interface GeuploadeFotos {
-  foto1?: File | null
-  foto2?: File | null
-  foto3?: File | null
-  foto4?: File | null
+  foto1?: UploadedPhoto | null
+  foto2?: UploadedPhoto | null
+  foto3?: UploadedPhoto | null
+  foto4?: UploadedPhoto | null
 }
 
 export interface BabykrantData {
   basisGegevens: BasisGegevens
   extraVragen: ExtraVragen
   fotos: GeuploadeFotos
+  /** generated_papers.id in Supabase; gezet zodra de wizard een concept-krant heeft aangemaakt */
+  paperId?: string | null
 }
 
 // Berekende gegevens
