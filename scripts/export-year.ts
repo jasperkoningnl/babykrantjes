@@ -16,15 +16,17 @@ import path from 'path'
 import fs from 'fs/promises'
 
 // Laad .env.local als dat bestaat (voor lokaal gebruik)
-try {
-  const envPath = path.join(process.cwd(), '.env.local')
-  const envContent = await fs.readFile(envPath, 'utf-8')
-  for (const line of envContent.split('\n')) {
-    const match = line.match(/^([A-Z_]+)=(.+)$/)
-    if (match) process.env[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, '')
+async function loadEnvLocal() {
+  try {
+    const envPath = path.join(process.cwd(), '.env.local')
+    const envContent = await fs.readFile(envPath, 'utf-8')
+    for (const line of envContent.split('\n')) {
+      const match = line.match(/^([A-Z_]+)=(.+)$/)
+      if (match) process.env[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, '')
+    }
+  } catch {
+    // Geen .env.local — prima, env vars zijn dan al ingesteld
   }
-} catch {
-  // Geen .env.local — prima, env vars zijn dan al ingesteld
 }
 
 // =============================================================================
@@ -125,6 +127,7 @@ interface YearCache {
 // =============================================================================
 
 async function main() {
+  await loadEnvLocal()
   const { year, dryRun } = parseArgs()
 
   console.log(`\n=== Babykrant Year Export Script v1.0.0 ===`)

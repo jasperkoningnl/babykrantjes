@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "beschrijving": "Referentielijst van langlopende nieuwsdossiers voor de nieuwssectie van de babykrant. Een dossier levert context bij headlines van de geboortedag die erbij horen. Periodes bepalen wanneer een dossier 'actief' is; eind=null betekent lopend. Aliassen worden diakriet-ongevoelig en op woordgrens gematcht (zie lib/dossierMatcher.ts).",
+  "dossiers": [
+    {
+      "id": "kredietcrisis",
+      "naam": "Kredietcrisis",
+      "start": "2008-09-15",
+      "eind": "2009-12-31",
+      "aliassen": ["kredietcrisis", "bankencrisis", "lehman", "lehman brothers", "fortis", "icesave", "recessie", "financiele crisis"],
+      "context": "Met de val van de Amerikaanse zakenbank Lehman Brothers in september 2008 belandde de wereld in de zwaarste financiële crisis sinds de jaren dertig. Ook Nederlandse banken kwamen in de problemen: Fortis/ABN AMRO werd genationaliseerd en ING kreeg staatssteun."
+    },
+    {
+      "id": "eurocrisis",
+      "naam": "Eurocrisis",
+      "start": "2010-01-01",
+      "eind": "2012-12-31",
+      "aliassen": ["eurocrisis", "schuldencrisis", "grexit", "troika", "griekenland", "griekse"],
+      "context": "Vanaf 2010 dreigde Griekenland te bezwijken onder zijn staatsschuld en wankelde de euro. Europese steunpakketten en zware bezuinigingen beheersten jarenlang het nieuws; ook Ierland, Portugal en Spanje kwamen in de problemen."
+    },
+    {
+      "id": "arabische-lente",
+      "naam": "Arabische Lente",
+      "start": "2010-12-17",
+      "eind": "2012-12-31",
+      "aliassen": ["arabische lente", "tahrir", "tahrirplein", "moebarak", "mubarak", "kadhafi", "gaddafi", "khadaffi", "benghazi", "libie", "libische"],
+      "context": "Eind 2010 begon in Tunesië een golf van volksopstanden die zich over de Arabische wereld verspreidde. Langzittende leiders in Tunesië, Egypte en Libië werden verdreven; de 'Arabische Lente' veranderde het Midden-Oosten ingrijpend."
+    },
+    {
+      "id": "fukushima",
+      "naam": "Aardbeving en kernramp Japan",
+      "start": "2011-03-11",
+      "eind": "2011-12-31",
+      "aliassen": ["fukushima", "tsunami", "tepco", "kernramp"],
+      "context": "Op 11 maart 2011 werd Japan getroffen door een zware zeebeving en tsunami, die bijna 20.000 levens eisten en een kernramp veroorzaakten in de centrale van Fukushima. Het was de ernstigste nucleaire ramp sinds Tsjernobyl in 1986."
+    },
+    {
+      "id": "syrische-burgeroorlog",
+      "naam": "Burgeroorlog in Syrië",
+      "start": "2011-03-15",
+      "eind": "2024-12-31",
+      "aliassen": ["syrie", "syrische", "assad", "aleppo", "idlib", "damascus"],
+      "context": "In maart 2011 sloeg de Arabische Lente over naar Syrië, waar protesten tegen president Assad uitmondden in een burgeroorlog die meer dan tien jaar duurde. Miljoenen Syriërs sloegen op de vlucht; eind 2024 viel het regime van Assad."
+    },
+    {
+      "id": "krim-annexatie",
+      "naam": "Krim-annexatie en conflict Oost-Oekraïne",
+      "start": "2014-02-20",
+      "eind": "2015-12-31",
+      "aliassen": ["krim", "crimea", "oekraine", "oekraiense", "donetsk", "loehansk", "luhansk", "separatisten", "maidan", "porosjenko"],
+      "context": "Begin 2014 bezette en annexeerde Rusland het Oekraïense schiereiland de Krim, waarna in Oost-Oekraïne een gewapend conflict met pro-Russische separatisten ontstond. Het conflict bleek de voorbode van de grote Russische invasie van 2022."
+    },
+    {
+      "id": "mh17",
+      "naam": "Ramp met vlucht MH17",
+      "start": "2014-07-17",
+      "eind": "2022-12-31",
+      "aliassen": ["mh17", "rampvlucht", "buk-raket"],
+      "context": "Op 17 juli 2014 werd vlucht MH17 van Malaysia Airlines boven Oost-Oekraïne neergehaald met een Russische Buk-raket. Alle 298 inzittenden kwamen om, onder wie 196 Nederlanders. Het onderzoek en het strafproces hielden Nederland jarenlang bezig; in november 2022 werden drie daders veroordeeld."
+    },
+    {
+      "id": "opkomst-is",
+      "naam": "Opkomst Islamitische Staat en aanslagen in Europa",
+      "start": "2014-06-01",
+      "eind": "2017-12-31",
+      "aliassen": ["islamitische staat", "isis", "kalifaat", "mosul", "raqqa", "bataclan", "charlie hebdo", "jihadisten"],
+      "context": "In 2014 riep terreurgroep Islamitische Staat (IS) een 'kalifaat' uit in delen van Irak en Syrië. Er volgde een internationale strijd tegen IS en een reeks aanslagen in Europese steden, waaronder Parijs, Brussel en Berlijn."
+    },
+    {
+      "id": "vluchtelingencrisis",
+      "naam": "Europese vluchtelingencrisis",
+      "start": "2015-04-01",
+      "eind": "2016-12-31",
+      "aliassen": ["vluchtelingencrisis", "vluchtelingen", "asielzoekers", "lesbos", "lampedusa", "azc"],
+      "context": "In 2015 en 2016 bereikten ruim een miljoen vluchtelingen Europa, vooral uit Syrië. Beelden van overvolle boten op de Middellandse Zee en discussies over opvang beheersten het nieuws, ook in Nederland."
+    },
+    {
+      "id": "brexit",
+      "naam": "Brexit",
+      "start": "2016-06-23",
+      "eind": "2020-12-31",
+      "aliassen": ["brexit", "artikel 50", "brits eu-referendum"],
+      "context": "Op 23 juni 2016 stemde een meerderheid van de Britten voor vertrek uit de Europese Unie. Er volgden jaren van moeizame onderhandelingen tot het Verenigd Koninkrijk de EU op 31 januari 2020 verliet; eind 2020 eindigde de overgangsperiode."
+    },
+    {
+      "id": "stikstofcrisis",
+      "naam": "Stikstofcrisis",
+      "start": "2019-05-29",
+      "eind": null,
+      "aliassen": ["stikstof", "stikstofcrisis", "boerenprotest", "boerenprotesten"],
+      "context": "Sinds een uitspraak van de Raad van State in mei 2019 kampt Nederland met een stikstofprobleem dat woningbouw en landbouw raakt. Boerenprotesten met trekkers op snelwegen en het Malieveld werden een terugkerend beeld."
+    },
+    {
+      "id": "toeslagenaffaire",
+      "naam": "Toeslagenaffaire",
+      "start": "2019-01-01",
+      "eind": "2022-12-31",
+      "aliassen": ["toeslagenaffaire", "kinderopvangtoeslag", "toeslagenouders", "toeslagenschandaal"],
+      "context": "Duizenden ouders werden door de Belastingdienst jarenlang onterecht als fraudeur behandeld bij de kinderopvangtoeslag. De affaire leidde in januari 2021 tot de val van het kabinet-Rutte III."
+    },
+    {
+      "id": "coronapandemie",
+      "naam": "Coronapandemie",
+      "start": "2020-01-01",
+      "eind": "2023-05-05",
+      "aliassen": ["corona", "coronavirus", "covid", "lockdown", "mondkapje", "mondkapjes", "avondklok", "vaccinatie", "vaccin", "booster", "rivm", "quarantaine", "omikron", "pandemie", "wuhan"],
+      "context": "Begin 2020 verspreidde het coronavirus zich vanuit China over de wereld. Nederland ging meerdere keren in lockdown, scholen en horeca sloten en er kwamen grootschalige vaccinatiecampagnes. In mei 2023 verklaarde de Wereldgezondheidsorganisatie de internationale noodsituatie voorbij."
+    },
+    {
+      "id": "machtsovername-taliban",
+      "naam": "Machtsovername taliban in Afghanistan",
+      "start": "2021-04-14",
+      "eind": "2021-12-31",
+      "aliassen": ["taliban", "afghanistan", "kabul"],
+      "context": "Na het vertrek van westerse troepen veroverden de taliban in de zomer van 2021 razendsnel Afghanistan. De chaotische evacuatie vanaf het vliegveld van Kabul in augustus 2021 ging de hele wereld over."
+    },
+    {
+      "id": "oorlog-rusland-oekraine",
+      "naam": "Oorlog Rusland–Oekraïne",
+      "start": "2022-02-24",
+      "eind": null,
+      "aliassen": ["oekraine", "oekraiense", "ukraine", "kyiv", "kiev", "kharkiv", "charkov", "cherson", "kherson", "mariupol", "zaporizja", "donbas", "donetsk", "loehansk", "zelensky", "zelenski", "poetin", "putin", "russische invasie", "russische aanval", "russisch offensief", "krim"],
+      "context": "Op 24 februari 2022 viel Rusland buurland Oekraïne binnen: het begin van de grootste oorlog in Europa sinds de Tweede Wereldoorlog. Miljoenen Oekraïners sloegen op de vlucht en westerse landen, waaronder Nederland, steunen Oekraïne sindsdien met geld en wapens."
+    },
+    {
+      "id": "aardbeving-turkije-syrie",
+      "naam": "Aardbeving Turkije en Syrië",
+      "start": "2023-02-06",
+      "eind": "2023-08-31",
+      "aliassen": ["aardbeving", "kahramanmaras", "gaziantep"],
+      "context": "Op 6 februari 2023 troffen twee zware aardbevingen het zuidoosten van Turkije en het noorden van Syrië. Meer dan 55.000 mensen kwamen om; het was een van de dodelijkste natuurrampen van deze eeuw."
+    },
+    {
+      "id": "oorlog-israel-gaza",
+      "naam": "Oorlog Israël–Gaza",
+      "start": "2023-10-07",
+      "eind": null,
+      "aliassen": ["gaza", "gazastrook", "hamas", "rafah", "khan younis"],
+      "context": "Op 7 oktober 2023 pleegde Hamas een grootschalige aanval op Israël, waarna Israël een langdurig offensief in de Gazastrook begon. De oorlog kostte tienduizenden mensen het leven en leidde wereldwijd tot protesten en diplomatieke spanningen."
+    },
+    {
+      "id": "conflict-israel-iran",
+      "naam": "Conflict Israël–Iran",
+      "start": "2025-06-13",
+      "eind": null,
+      "aliassen": ["iran", "iraanse", "teheran", "atoomprogramma"],
+      "context": "In juni 2025 liepen de jarenlange spanningen tussen Israël en Iran uit op directe aanvallen over en weer, waarbij ook de Verenigde Staten betrokken raakten. De strijd rond het Iraanse atoomprogramma houdt het Midden-Oosten sindsdien in zijn greep."
+    }
+  ]
+}
