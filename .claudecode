@@ -1,136 +1,127 @@
 # Claude Code Instructions - Babykrant Project
 
 ## 🎯 Project Overview
-Baby newspaper generator that creates personalized birth announcements with AI-generated articles based on birth date data (weather, news, astrology, name meanings, etc.)
+Babykrant-generator: bezoekers stellen een gepersonaliseerde babykrant samen
+op basis van de geboortedatum (nieuws, weer, tv, muziek, naambetekenis, etc.).
+AI-artikelen worden gegenereerd met Claude Haiku 4.5. Data wordt dagelijks
+opgebouwd in Supabase via een scrape-pipeline (Edge Functions + pg_cron).
 
-## 👥 Team Workflow
-**IMPORTANT:** We work with two Claudes:
-- **Claude Chat (claude.ai):** Strategy, planning, research, feature design, roadmap decisions
-- **Claude Code (you!):** Implementation, code changes, testing, debugging, commits
+## 🏗️ Architectuur (sinds de herbouw van juli 2026)
 
-**Your role:** Execute tasks defined by Claude Chat. When stuck or need decisions, ask the user to consult Claude Chat.
+```
+pg_cron (scheduler, in Supabase)
+  → roept Edge Functions aan via pg_net
+    → Edge Function scrapt bron (tvgids, kijkcijfers, flixpatrol,
+      Google News RSS, top40, VRT/Al Jazeera dossiers)
+      → schrijft naar Supabase tabellen (daily_tv, daily_ratings,
+        daily_streaming, daily_google_news, weekly_music, news_dossiers)
+
+Next.js API routes (Vercel)
+  → lezen eerst uit Supabase (cache), scrapen anders on-the-fly
+    en schrijven het resultaat terug (cache-on-read)
+```
+
+- **Database schema:** `supabase/migrations/0001_schema.sql`
+- **Cron jobs:** `supabase/migrations/0002_cron.sql`
+- **Edge Functions:** `supabase/functions/` (Deno; pure parsers in
+  `_shared/parsers/` zodat vitest ze ook kan testen)
+- **Cache-laag:** `lib/apiCache.ts` (generiek) + tabellen `daily_headlines`
+  en `weekly_music` voor specifieke bronnen
 
 ## 📁 Key Files & Structure
-- `/app/wizard/page.tsx` - Main wizard (3 steps: basis, extra vragen, fotos)
-- `/app/test-results/page.tsx` - Data display & testing page
-- `/app/generate-articles/page.tsx` - AI article generation UI
-- `/app/api/generate-article/route.ts` - Claude Haiku API integration
-- `/lib/types.ts` - Data type definitions
-- `/lib/articleTypes.ts` - Article generation types & config
-- `/lib/version.ts` - Centralized version management
+- `/app/wizard/page.tsx` - Wizard (4 stappen: basis, extra vragen, foto's, review)
+- `/app/generate-articles/page.tsx` - AI artikelgeneratie UI (stuurt alleen data)
+- `/app/api/generate-paper/route.ts` - Complete krant in één gestructureerde call
+- `/app/api/generate-article/route.ts` - Per-sectie (re)generatie
+- `/app/api/photos/upload/route.ts` - Foto-upload naar Vercel Blob
+- `/app/api/papers/route.ts` - Concept-krant aanmaken (generated_papers)
+- `/lib/prompts.ts` - ALLE prompts (system + 8 secties + gecombineerde call)
+- `/lib/claude.ts` - Claude API-aanroepen (incl. structured output)
+- `/lib/supabase.ts` - Public (anon) en admin (service role) clients
+- `/lib/rateLimit.ts` - Server-side rate limiting op IP (Upstash)
+- `/lib/newsContext.ts` - Google News + dossier-matching voor de nieuwssectie
+- `/lib/types.ts` - Datamodellen (foto's zijn Blob-URLs, geen File-objecten)
+- `/supabase/README.md` - Pipeline deployen en monitoren
 
 ## 🔧 Git Workflow
-**CRITICAL:** Always work directly on `main` branch
-- ❌ NEVER create `claude/*` feature branches
-- ✅ Pull latest from main before starting
-- ✅ Commit directly to main
-- ✅ Push immediately after committing
-- Format: `feat: description` or `fix: description` or `refactor: description`
-
-**If git blocks you:** Don't create workarounds. Tell the user to fix git config.
+- Sessies werken op een `claude/*` branch; de auto-merge workflow
+  (`.github/workflows/claude-auto-merge.yml`) draait lint + build + tests
+  en merget de PR automatisch naar `main`.
+- Jasper werkt alleen online, nooit lokaal: alle wijzigingen moeten via
+  commits en Vercel-deployments testbaar zijn.
+- Commit na elke werkende stap. Format: `feat:` / `fix:` / `refactor:` / `docs:`
+- Lever altijd complete bestanden, nooit placeholders.
 
 ## 🚀 Deployment
-- Main branch auto-deploys to Vercel production
-- Always test locally on `http://localhost:3000/test-results` before pushing
-- Check Vercel deployment logs after each push
-- Live site: babykrant-claude.vercel.app
+- `main` auto-deployt naar Vercel productie
+- Edge Functions apart deployen met de Supabase CLI (zie `supabase/README.md`)
+- SQL-migraties voert Jasper uit in de Supabase SQL editor
 
 ## 🔑 Environment Variables (in Vercel)
-- `ANTHROPIC_API_KEY` - Claude 3.5 Haiku (current, primary)
-- `GEMINI_API_KEY` - Gemini 2.5 Flash (backup, not actively used)
+- `ANTHROPIC_API_KEY` - Claude Haiku 4.5
+- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - publishable/anon key (client-side reads)
+- `SUPABASE_SERVICE_ROLE_KEY` - service role key (server-side writes; NOOIT
+  met NEXT_PUBLIC_ prefix)
+- `BLOB_READ_WRITE_TOKEN` - Vercel Blob (foto-uploads)
+- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` - rate limiting + cache
+- `CRON_SECRET` - verplicht voor /api/cron/* routes
+- `TMDB_API_KEY` - films/series
+- `ENABLE_TEST_PAGE` - zet debug/testroutes open (alleen op previews!)
 
-**Never hardcode API keys!** Always use `process.env.ANTHROPIC_API_KEY`
+**Never hardcode API keys!**
 
-## 🤖 AI Article Generation (Current Implementation)
-- **Model:** Claude 3.5 Haiku (`claude-3-5-haiku-20241022`)
-- **Endpoint:** Anthropic Messages API (`https://api.anthropic.com/v1/messages`)
-- **Rate limiting:** 50 requests/day, $1.00 budget cap (currently DISABLED for testing)
-- **Max tokens:** 1000 per section (to prevent truncation)
-- **Temperature:** 0.7 (balance between creative and consistent)
-- **Pricing:** ~$0.04 per complete babykrant (8 articles)
+## 🤖 AI Article Generation
+- **Model:** `claude-haiku-4-5-20251001` (zie `lib/prompts.ts` → CLAUDE_MODEL)
+- **Standaardpad:** `/api/generate-paper` — alle 8 secties in ÉÉN
+  gestructureerde call (forced tool use, JSON-schema in PAPER_TOOL)
+- **Per-sectie:** `/api/generate-article` — voor de "opnieuw"-knop
+- **Prompts:** uitsluitend in `lib/prompts.ts`; de frontend stuurt alleen data
+- **Nieuwssectie:** twee blokken ("Het nieuws van de dag" + "Dit speelde er
+  in de wereld"), gevoed door dagkoppen, Google News en actieve dossiers;
+  nooit feiten verzinnen die niet in de input staan
+- **Rate limiting:** per IP via Upstash (50/dag per-sectie, 10/dag complete
+  krant) + globaal dagbudget
 
 ## 📝 Code Standards
-- TypeScript strict mode enabled
-- All new files need version comment at top: `// @version X.X.X`
-- Update version in `lib/version.ts` when making releases
-- Dutch language in UI, English in code/comments
-- Consistent formatting: 2 spaces, semicolons
-- Always provide COMPLETE files, never use placeholders like "// rest remains the same"
+- TypeScript strict mode
+- Versie-comment bovenin nieuwe bestanden: `// @version X.X.X`
+- Nederlands in UI en prompts, Nederlands/Engels gemengd in code-comments
+- Datums altijd als kalenderdatum-string (YYYY-MM-DD) behandelen; geen
+  `new Date('YYYY-MM-DD')` mixen met lokale tijd (tijdzone-bug)
+- Scrapers: geef altijd een error-status door (geen silent catch → leeg
+  resultaat); een lege krantsectie moet herleidbaar zijn tot de oorzaak
+- Lever altijd complete bestanden, nooit placeholders
 
-## 🧪 Testing Workflow
-1. User fills wizard at `/wizard` with test data
-2. Check data collection at `/test-results`
-3. Generate articles at `/generate-articles`
-4. Review output quality
-5. If issues: report to user → Claude Chat decides next steps
+## 🧪 Testing
+- `npm test` — vitest, parser-tests met HTML-fixtures in `tests/`
+- Breekt een bron zijn HTML, dan faalt de bijbehorende parser-test in CI
+- `npm run build` + `npm run lint` draaien in de auto-merge workflow
+- Handmatige flow: `/wizard` → `/generate-articles`
+
+## ⚠️ Bekende beperkingen
+- `scripts/scan-tv-sources.ts` moet vanaf een residentieel IP draaien;
+  archive.org blokkeert datacenter-IP's (GitHub Actions). Het script weigert
+  zelf een rapport weg te schrijven als de sanity-check faalt.
+- TV-gids data vóór de start van de pipeline heeft een gat van 21-02-2024
+  tot ~8 dagen geleden (zie ANALYSE.md §3); backfill via Wayback kan pas na
+  een geslaagde bron-scan.
 
 ## 🎨 Article Sections (8 total)
-1. **hoofdartikel** (~250 words) - Birth story, warm & personal
-2. **sterrenbeeld** (~180 words) - Zodiac & Chinese year
-3. **nieuws** (~140 words) - News on birth date
-4. **weer** (~80 words) - Weather report
-5. **cultuur** (~130 words) - Music & TV highlights
-6. **naam_betekenis** (~150 words) - Name etymology
-7. **beroemde_namen** (~100 words) - Famous namesakes
-8. **geboren_op_dag** (~100 words) - Born on this day
+1. **hoofdartikel** (~250 woorden) - Geboorteverhaal
+2. **sterrenbeeld** (~180 woorden) - Sterrenbeeld & Chinees jaar
+3. **nieuws** (~150-200 woorden) - Twee blokken: dag + lopende dossiers
+4. **weer** (~80 woorden) - Weerbericht
+5. **cultuur** (~130 woorden) - Muziek, film & tv
+6. **naam_betekenis** (~150 woorden) - Etymologie
+7. **beroemde_namen** (~100 woorden) - Naamgenoten
+8. **geboren_op_dag** (~100 woorden) - Geboren op deze dag
 
-**Tone-of-voice for all sections:**
-- Warm but not overly sentimental
-- Informative without being boring
-- Balance between positive and realistic
-- Dutch language, proper grammar
-- No markdown formatting in output (no **, ##, etc.)
-
-## 🚨 Common Issues & Solutions
-- **Articles truncated:** Check `maxOutputTokens` in API route (should be 1000)
-- **Rate limit errors:** Check Anthropic Console usage
-- **Missing data:** Ensure all API calls in test-results completed
-- **Build errors:** Run `npm run build` locally before pushing
-- **API 404 errors:** Check model name is exact: `claude-3-5-haiku-20241022`
-- **Empty responses:** Check API key in Vercel env vars
-
-## 📊 Current Status (December 2024)
-- ✅ Wizard data collection working
-- ✅ Test-results showing all APIs
-- ✅ Article generation UI built
-- ✅ Claude Haiku integration complete
-- ⚠️ Prompt quality needs refinement
-- 🎯 Next: Golden dataset creation for prompt testing
-
-## 🎯 How to Work With User
-1. **User comes with task** (defined by Claude Chat)
-2. **You implement** the specific changes
-3. **You test** locally if possible
-4. **You commit & push** to main
-5. **If stuck or need decisions:** Tell user to consult Claude Chat
-6. **If task unclear:** Ask user for clarification from Claude Chat
-
-**Example good workflow:**
-```
-User: "Claude Chat says to add export function for wizard data"
-You: "I'll implement the export function. Where should it be placed?"
-User: "In test-results page, as a download button"
-You: [implements, tests, commits, pushes]
-```
-
-**Example when to escalate:**
-```
-User: "Make the articles better"
-You: "That's too vague. Please ask Claude Chat to define:
-     - Which sections need improvement?
-     - What specific quality issues?
-     - What's the target output?"
-```
-
-## 🔄 Version Management
-- Current version tracked in `lib/version.ts`
-- Version displayed in footer of all pages via `<VersionFooter />`
-- Bump version when:
-  - Major features: X.0.0
-  - New functionality: 0.X.0
-  - Bug fixes: 0.0.X
-
-## 📚 Additional Resources
-- Anthropic Console: https://console.anthropic.com
-- Vercel Dashboard: https://vercel.com/dashboard
-- Project Strategy & Roadmap: Ask user to check Claude Chat
+## 📊 Status (juli 2026)
+- ✅ Supabase gekoppeld: schema, cache-laag, persistentie (generated_papers)
+- ✅ Dagelijkse pipeline: 6 Edge Functions + pg_cron migratie
+- ✅ Foto's naar Vercel Blob (overleven refresh/localStorage)
+- ✅ Eén gestructureerde generatie-call; prompts alleen backend
+- ✅ Rate limiting op IP; TLS-hack weg; debugroutes dicht
+- 🔜 Niet in scope (bewust later): krant-layout/PDF, bestelflow/betaling,
+  print-on-demand, AVG/juridisch, scrape-health dashboard

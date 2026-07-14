@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:media="http://search.yahoo.com/mrss/" version="2.0">
+  <channel>
+    <generator>NFE/5.0</generator>
+    <title>Voorpaginanieuws - Google Nieuws</title>
+    <language>nl</language>
+    <lastBuildDate>Mon, 13 Jul 2026 08:00:00 GMT</lastBuildDate>
+    <item>
+      <title>Kabinet presenteert nieuwe klimaatplannen - NOS</title>
+      <link>https://news.google.com/rss/articles/CBMiXyJodHRwczovL25vcy5ubC9hcnRpa2VsLzEyMzQ1Njc</link>
+      <guid isPermaLink="false">CBMiXyJodHRwczovL25vcy5ubC9hcnRpa2VsLzEyMzQ1Njc</guid>
+      <pubDate>Mon, 13 Jul 2026 06:12:00 GMT</pubDate>
+      <description>&lt;a href="https://nos.nl/artikel/1234567"&gt;Kabinet presenteert nieuwe klimaatplannen&lt;/a&gt;</description>
+      <source url="https://nos.nl">NOS</source>
+    </item>
+    <item>
+      <title><![CDATA[Hittegolf verwacht: KNMI geeft code oranje af - NU.nl]]></title>
+      <link>https://news.google.com/rss/articles/CBMiXyJodHRwczovL3d3dy5udS5ubC9iaW5uZW5sYW5k</link>
+      <guid isPermaLink="false">CBMiXyJodHRwczovL3d3dy5udS5ubC9iaW5uZW5sYW5k</guid>
+      <pubDate>Mon, 13 Jul 2026 07:30:00 GMT</pubDate>
+      <source url="https://www.nu.nl">NU.nl</source>
+    </item>
+    <item>
+      <title>Ajax wint oefenduel met 3-1 &amp; verrast fans - RTL Nieuws</title>
+      <link>https://news.google.com/rss/articles/CBMiXyJodHRwczovL3d3dy5ydGxuaWV1d3Mubmw</link>
+      <guid isPermaLink="false">CBMiXyJodHRwczovL3d3dy5ydGxuaWV1d3Mubmw</guid>
+      <pubDate>Sun, 12 Jul 2026 20:45:00 GMT</pubDate>
+      <source url="https://www.rtlnieuws.nl">RTL Nieuws</source>
+    </item>
+  </channel>
+</rss>
