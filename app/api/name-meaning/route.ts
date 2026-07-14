@@ -5,6 +5,7 @@
 // Fix: ondersteunt nu zowel prose-pink (meisjes) als prose-blue (jongens)
 
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiCache } from '@/lib/apiCache'
 
 export interface NameMeaningData {
   firstName: string
@@ -40,20 +41,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(emptyResult)
   }
 
-  // Probeer naamdokter.nl eerst
-  const naamdokterResult = await tryNaamdokter(firstName)
-  if (naamdokterResult.meaning) {
-    return NextResponse.json(naamdokterResult)
-  }
+  // Supabase cache-laag: naambetekenis is statisch per naam.
+  const { data } = await withApiCache({
+    endpoint: 'name_meaning',
+    key: firstName.toLowerCase(),
+    fetcher: async (): Promise<NameMeaningData> => {
+      // Probeer naamdokter.nl eerst
+      const naamdokterResult = await tryNaamdokter(firstName)
+      if (naamdokterResult.meaning) {
+        return naamdokterResult
+      }
 
-  // Fallback naar betekenisnamen.nl
-  const betekenisResult = await tryBetekenisNamen(firstName)
-  if (betekenisResult.meaning) {
-    return NextResponse.json(betekenisResult)
-  }
+      // Fallback naar betekenisnamen.nl
+      const betekenisResult = await tryBetekenisNamen(firstName)
+      if (betekenisResult.meaning) {
+        return betekenisResult
+      }
 
-  // Geen resultaat gevonden
-  return NextResponse.json(emptyResult)
+      // Geen resultaat gevonden
+      return emptyResult
+    },
+    shouldCache: (result) => Boolean(result.meaning),
+  })
+
+  return NextResponse.json(data)
 }
 
 /**

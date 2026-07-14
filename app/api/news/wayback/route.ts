@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { checkCache, updateCache } from '@/lib/waybackCache'
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase'
 import {
   findSnapshot,
   fetchSnapshotContent,
@@ -28,7 +29,61 @@ import {
   type Headline,
 } from '@/lib/waybackScraper'
 
-const API_VERSION = '1.9.0'
+const API_VERSION = '2.0.0'
+
+// =============================================================================
+// Supabase cache-laag (daily_headlines) — bovenop de bestaande
+// Redis/bestand-cache. Rijen per (datum, bron) met de headlines als jsonb.
+// =============================================================================
+
+interface HeadlineRow {
+  date: string
+  source: string
+  headlines: Headline[]
+  snapshot_timestamp: string | null
+}
+
+async function readSupabaseHeadlines(date: string): Promise<HeadlineRow[] | null> {
+  if (!isSupabaseAdminConfigured()) return null
+  try {
+    const { data, error } = await getSupabaseAdmin()
+      .from('daily_headlines')
+      .select('date, source, headlines, snapshot_timestamp')
+      .eq('date', date)
+
+    if (error || !data || data.length === 0) return null
+    return data as HeadlineRow[]
+  } catch (err) {
+    console.error('[Wayback] Supabase leesfout:', err)
+    return null
+  }
+}
+
+async function writeSupabaseHeadlines(
+  date: string,
+  headlines: Headline[],
+  sources: string[],
+  timestamp: string | null
+): Promise<void> {
+  if (!isSupabaseAdminConfigured() || headlines.length === 0) return
+  try {
+    const rows = sources.map((source) => ({
+      date,
+      source,
+      headlines: headlines.filter((h) => h.source === source),
+      snapshot_timestamp: timestamp,
+    })).filter((row) => row.headlines.length > 0)
+
+    if (rows.length === 0) return
+
+    const { error } = await getSupabaseAdmin()
+      .from('daily_headlines')
+      .upsert(rows, { onConflict: 'date,source' })
+    if (error) console.error('[Wayback] Supabase schrijffout:', error.message)
+  } catch (err) {
+    console.error('[Wayback] Supabase schrijffout:', err)
+  }
+}
 
 interface WaybackNewsResult {
   date: string
@@ -111,11 +166,34 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // === SUPABASE CACHE CHECK (laag 0) ===
+    const supabaseRows = await readSupabaseHeadlines(dateParam)
+    if (supabaseRows && supabaseRows.length > 0) {
+      const headlines = supabaseRows.flatMap((row) => row.headlines)
+      if (headlines.length > 0) {
+        const sources = supabaseRows.map((row) => row.source)
+        const timestamp = supabaseRows.find((row) => row.snapshot_timestamp)?.snapshot_timestamp || null
+        console.log(`[Wayback] ⚡ Supabase cache hit: ${headlines.length} headlines`)
+        return NextResponse.json({
+          date: dateParam,
+          headlines,
+          totalHeadlines: headlines.length,
+          sources,
+          sourceUrl: timestamp ? getWaybackUrl(timestamp, sources[0]) : '',
+          snapshotTimestamp: timestamp,
+          apiVersion: API_VERSION,
+          cacheHit: true
+        } as WaybackNewsResult)
+      }
+    }
+
     // === CACHE CHECK ===
     const cached = await checkCache(dateParam)
 
     if (cached && cached.status === 'found' && cached.headlines && cached.headlines.length > 0) {
       console.log(`[Wayback] ⚡ Cache hit! Returning ${cached.headlines.length} headlines (instant)`)
+      // Backfill naar Supabase zodat volgende requests laag 0 raken
+      await writeSupabaseHeadlines(dateParam, cached.headlines, cached.sources || [], cached.timestamp || null)
       return NextResponse.json({
         date: dateParam,
         headlines: cached.headlines,
@@ -141,6 +219,8 @@ export async function GET(request: NextRequest) {
         headlineCount: result.headlines.length,
         sources: result.sources
       })
+
+      await writeSupabaseHeadlines(dateParam, result.headlines, result.sources, result.timestamp)
 
       return NextResponse.json({
         date: dateParam,

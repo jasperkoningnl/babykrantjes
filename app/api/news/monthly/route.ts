@@ -6,8 +6,9 @@
 // FIX v1.2.0: Correcte parsing van <h3> datum headers + <ul><li> items
 
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiCache } from '@/lib/apiCache'
 
-const API_VERSION = '1.2.1'
+const API_VERSION = '1.3.0'
 
 const MONTHS_NL = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
     apiVersion: API_VERSION
   }
 
-  try {
+  const fetchFromWikipedia = async (): Promise<MonthNewsResult> => {
     console.log(`[NewsMonthly v${API_VERSION}] Fetching: ${webUrl}`)
 
     const response = await fetch(webUrl, {
@@ -100,18 +101,12 @@ export async function GET(request: NextRequest) {
 
     if (response.status === 404) {
       console.log(`[NewsMonthly] Page not found for ${monthName} ${year}`)
-      return NextResponse.json({
-        ...emptyResult,
-        error: `No news page found for ${monthName} ${year}`
-      })
+      return { ...emptyResult, error: `No news page found for ${monthName} ${year}` }
     }
 
     if (!response.ok) {
       console.error(`[NewsMonthly] HTTP ${response.status}`)
-      return NextResponse.json({
-        ...emptyResult,
-        error: `Wikipedia returned ${response.status}`
-      })
+      return { ...emptyResult, error: `Wikipedia returned ${response.status}` }
     }
 
     const html = await response.text()
@@ -119,7 +114,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`[NewsMonthly v${API_VERSION}] Found ${items.length} items for ${datesFound.length} dates in ${monthName} ${year}`)
 
-    return NextResponse.json({
+    return {
       year,
       month,
       monthName: MONTHS_NL[month - 1],
@@ -132,8 +127,25 @@ export async function GET(request: NextRequest) {
         datesFound,
         rawItemCount: items.length
       }
+    }
+  }
+
+  try {
+    // Supabase cache-laag per maand. Alleen afgesloten maanden zijn stabiel;
+    // de lopende maand groeit nog en wordt daarom niet gecachet.
+    const now = new Date()
+    const isPastMonth = year < now.getFullYear() ||
+      (year === now.getFullYear() && month < now.getMonth() + 1)
+
+    const { data } = await withApiCache({
+      endpoint: 'news_monthly',
+      key: `${year}-${String(month).padStart(2, '0')}`,
+      date: `${year}-${String(month).padStart(2, '0')}-01`,
+      fetcher: fetchFromWikipedia,
+      shouldCache: (result) => !result.error && result.totalItems > 0 && isPastMonth,
     })
 
+    return NextResponse.json(data)
   } catch (error) {
     console.error('[NewsMonthly] Error:', error)
     return NextResponse.json({

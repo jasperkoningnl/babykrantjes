@@ -4,8 +4,9 @@
 // Verbergt API key en handelt requests af
 
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiCache } from '@/lib/apiCache'
 
-const API_VERSION = '1.1.0'
+const API_VERSION = '1.2.0'
 
 interface TMDBMovie {
   id: number
@@ -130,70 +131,84 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    console.log(`[TMDB] Fetching ${type}: ${url.replace(TMDB_API_KEY, '***')}`)
+    const fetchFromTmdb = async () => {
+      console.log(`[TMDB] Fetching ${type}: ${url.replace(TMDB_API_KEY, '***')}`)
 
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json'
-      },
-      next: { revalidate: 86400 } // Cache 24 uur
-    })
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json'
+        },
+        next: { revalidate: 86400 } // Cache 24 uur
+      })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`[TMDB] API error: ${response.status} - ${errorText}`)
-      return NextResponse.json(
-        { error: `TMDB API error: ${response.status}` },
-        { status: response.status }
-      )
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`[TMDB] API error: ${response.status} - ${errorText}`)
+        return { error: `TMDB API error: ${response.status}`, status: response.status }
+      }
+
+      const data: TMDBResponse = await response.json()
+
+      // Transform naar onze interface en limiteer resultaten
+      let items: any[]
+
+      if (type === 'movies') {
+        items = (data.results as TMDBMovie[]).slice(0, limit).map(movie => ({
+          id: movie.id,
+          title: movie.title,
+          originalTitle: movie.original_title,
+          releaseDate: movie.release_date,
+          posterPath: movie.poster_path,
+          backdropPath: movie.backdrop_path,
+          overview: movie.overview,
+          popularity: movie.popularity,
+          voteAverage: movie.vote_average,
+          voteCount: movie.vote_count,
+          genreIds: movie.genre_ids
+        }))
+      } else {
+        items = (data.results as TMDBSeries[]).slice(0, limit).map(series => ({
+          id: series.id,
+          title: series.name,
+          originalTitle: series.original_name,
+          releaseDate: series.first_air_date,
+          posterPath: series.poster_path,
+          backdropPath: series.backdrop_path,
+          overview: series.overview,
+          popularity: series.popularity,
+          voteAverage: series.vote_average,
+          voteCount: series.vote_count,
+          genreIds: series.genre_ids
+        }))
+      }
+
+      console.log(`[TMDB] Found ${data.total_results} ${type}, returning ${items.length}`)
+
+      // Gebruik 'movies' als key voor backwards compatibility, ook voor series
+      return {
+        movies: items,
+        type,
+        totalResults: data.total_results,
+        page: data.page,
+        totalPages: data.total_pages,
+        apiVersion: API_VERSION
+      }
     }
 
-    const data: TMDBResponse = await response.json()
+    // Supabase cache-laag: historische periodes veranderen niet meer.
+    const { data: payload } = await withApiCache({
+      endpoint: 'tmdb',
+      key: `${type}:${year ?? `${from}_${to}`}:${limit}`,
+      date: from ?? (year ? `${year}-01-01` : null),
+      fetcher: fetchFromTmdb,
+      shouldCache: (result) => !('error' in result) && result.movies.length > 0,
+    })
 
-    // Transform naar onze interface en limiteer resultaten
-    let items: any[]
-    
-    if (type === 'movies') {
-      items = (data.results as TMDBMovie[]).slice(0, limit).map(movie => ({
-        id: movie.id,
-        title: movie.title,
-        originalTitle: movie.original_title,
-        releaseDate: movie.release_date,
-        posterPath: movie.poster_path,
-        backdropPath: movie.backdrop_path,
-        overview: movie.overview,
-        popularity: movie.popularity,
-        voteAverage: movie.vote_average,
-        voteCount: movie.vote_count,
-        genreIds: movie.genre_ids
-      }))
-    } else {
-      items = (data.results as TMDBSeries[]).slice(0, limit).map(series => ({
-        id: series.id,
-        title: series.name,
-        originalTitle: series.original_name,
-        releaseDate: series.first_air_date,
-        posterPath: series.poster_path,
-        backdropPath: series.backdrop_path,
-        overview: series.overview,
-        popularity: series.popularity,
-        voteAverage: series.vote_average,
-        voteCount: series.vote_count,
-        genreIds: series.genre_ids
-      }))
+    if ('error' in payload) {
+      return NextResponse.json({ error: payload.error }, { status: payload.status ?? 500 })
     }
 
-    console.log(`[TMDB] Found ${data.total_results} ${type}, returning ${items.length}`)
-
-    // Gebruik 'movies' als key voor backwards compatibility, ook voor series
-    return NextResponse.json({
-      movies: items,
-      type,
-      totalResults: data.total_results,
-      page: data.page,
-      totalPages: data.total_pages,
-      apiVersion: API_VERSION
-    })
+    return NextResponse.json(payload)
 
   } catch (error) {
     console.error('[TMDB] Error:', error)

@@ -5,6 +5,7 @@
 // FIXED: SSL certificate verification issues with NODE_TLS_REJECT_UNAUTHORIZED
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase'
 
 interface ChartEntry {
   position: number
@@ -110,6 +111,40 @@ export async function GET(request: NextRequest) {
     const weekNumber = getISOWeekNumber(date)
     const year = getISOWeekYear(date)
     const url = `https://www.top40.nl/top40/${year}/week-${weekNumber}`
+    const weekStart = getMondayOfWeek(date)
+
+    // === Supabase cache check (weekly_music) ===
+    // Gevuld door de wekelijkse pipeline (scrape-music) en door eerdere
+    // requests voor dezelfde week.
+    if (isSupabaseAdminConfigured()) {
+      try {
+        const { data: cachedRows, error } = await getSupabaseAdmin()
+          .from('weekly_music')
+          .select('rank, title, artist')
+          .eq('week_start', weekStart)
+          .order('rank', { ascending: true })
+
+        if (!error && cachedRows && cachedRows.length > 0) {
+          const entries: ChartEntry[] = cachedRows.map((row) => ({
+            position: row.rank,
+            title: row.title,
+            artist: row.artist,
+          }))
+          console.log(`[Top40] ⚡ Supabase cache hit: ${entries.length} entries voor week ${weekStart}`)
+          return NextResponse.json({
+            numberOne: entries[0] ?? null,
+            topTen: entries.slice(0, 10),
+            chartDate: dateParam,
+            weekNumber,
+            year,
+            source: 'Top40.nl',
+            sourceUrl: url,
+          } as Top40Result)
+        }
+      } catch (err) {
+        console.error('[Top40] Supabase leesfout:', err)
+      }
+    }
 
     console.log(`[Top40] Fetching: ${url}`)
 
@@ -134,6 +169,25 @@ export async function GET(request: NextRequest) {
     const result = parseTop40Html(html, dateParam, weekNumber, year, url)
 
     console.log(`[Top40] Found ${result.topTen.length} entries, #1: ${result.numberOne?.artist} - ${result.numberOne?.title}`)
+
+    // === Supabase cache write (weekly_music) ===
+    if (isSupabaseAdminConfigured() && result.topTen.length > 0) {
+      try {
+        const rows = result.topTen.map((entry) => ({
+          week_start: weekStart,
+          rank: entry.position,
+          title: entry.title,
+          artist: entry.artist,
+          source: 'top40.nl',
+        }))
+        const { error } = await getSupabaseAdmin()
+          .from('weekly_music')
+          .upsert(rows, { onConflict: 'week_start,rank' })
+        if (error) console.error('[Top40] Supabase schrijffout:', error.message)
+      } catch (err) {
+        console.error('[Top40] Supabase schrijffout:', err)
+      }
+    }
 
     return NextResponse.json(result)
 
@@ -301,6 +355,17 @@ function parseTop40Html(
   }
 
   return result
+}
+
+/**
+ * Maandag van de ISO-week waar de datum in valt, als YYYY-MM-DD.
+ * Sleutel voor de weekly_music cache-tabel.
+ */
+function getMondayOfWeek(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() - (dayNum - 1))
+  return d.toISOString().slice(0, 10)
 }
 
 function getISOWeekNumber(date: Date): number {

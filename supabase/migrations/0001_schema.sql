@@ -144,8 +144,9 @@ create index if not exists idx_weekly_music_week on weekly_music(week_start);
 create table if not exists daily_headlines (
   id uuid primary key default gen_random_uuid(),
   date date not null,
-  source text not null, -- 'nos.nl', 'nu.nl'
+  source text not null, -- 'www.nos.nl', 'www.nu.nl'
   headlines jsonb not null,
+  snapshot_timestamp text, -- Wayback timestamp (YYYYMMDDhhmmss), indien via archive.org
   scraped_at timestamptz default now(),
   unique(date, source)
 );
