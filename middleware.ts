@@ -20,5 +20,6 @@ export const config = {
     '/api/test/:path*',
     '/test-results',
     '/test-patterns',
+    '/test-pipeline',
   ],
 }

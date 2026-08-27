@@ -5,7 +5,7 @@
 // Gebruik:
 //   npx tsx scripts/test-pipeline.ts
 //
-// Vereiste env vars: OPENAI_API_KEY, GOOGLE_GEMINI_API_KEY, ANTHROPIC_API_KEY
+// Vereiste env vars: OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY
 
 import fs from 'fs/promises'
 import path from 'path'
@@ -206,7 +206,7 @@ async function callOpenAI(prompt: string): Promise<StepResult> {
 // ---------------------------------------------------------------------------
 
 async function callGemini(prompt: string): Promise<StepResult> {
-  const apiKey = requireEnv('GOOGLE_GEMINI_API_KEY')
+  const apiKey = requireEnv('GEMINI_API_KEY')
   const start = Date.now()
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`
 
@@ -376,13 +376,13 @@ function printResults(results: PipelineResult[]) {
 
   let totalCost = 0
 
-  for (const [key, items] of grouped) {
+  grouped.forEach((items, key) => {
     console.log(`\n${'─'.repeat(80)}`)
     console.log(`${key}`)
     console.log('─'.repeat(80))
 
     for (const sectie of ['nieuws', 'cultuur'] as Sectie[]) {
-      const sectionItems = items.filter(i => i.sectie === sectie)
+      const sectionItems = items.filter((i: PipelineResult) => i.sectie === sectie)
       if (sectionItems.length === 0) continue
 
       console.log(`\n  ▸ ${sectie.toUpperCase()}`)
@@ -413,7 +413,7 @@ function printResults(results: PipelineResult[]) {
         console.log(indent(item.stap2.text || '(geen output)', 4))
       }
     }
-  }
+  })
 
   console.log(`\n${'='.repeat(80)}`)
   console.log(`TOTALE KOSTEN: ${formatCost(totalCost)}`)
