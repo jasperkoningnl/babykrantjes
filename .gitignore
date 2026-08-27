@@ -29,6 +29,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# test pipeline output
+scripts/output/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
