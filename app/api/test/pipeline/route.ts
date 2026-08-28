@@ -6,9 +6,9 @@ import { NextRequest } from 'next/server'
 
 export const maxDuration = 120
 
-const CLAUDE_MODEL = 'claude-haiku-4-5-20250901'
+const CLAUDE_MODEL = 'claude-haiku-4-5'
 const OPENAI_MODEL = 'gpt-4o-mini'
-const GEMINI_MODEL = 'gemini-2.0-flash'
+const GEMINI_MODEL = 'gemini-3.6-flash'
 
 type Sectie = 'nieuws' | 'cultuur'
 type Variant = 'chatgpt' | 'gemini'
@@ -46,7 +46,7 @@ function calculateCost(model: string, inputTokens: number, outputTokens: number)
   const pricing: Record<string, [number, number]> = {
     [OPENAI_MODEL]: [0.15, 0.60],
     [GEMINI_MODEL]: [0.10, 0.40],
-    [CLAUDE_MODEL]: [0.80, 4.00],
+    [CLAUDE_MODEL]: [1.00, 5.00],
   }
   const [inp, outp] = pricing[model] ?? [0, 0]
   return {

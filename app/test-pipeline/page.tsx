@@ -27,11 +27,19 @@ interface PipelineResult {
   stap2: StepResult
 }
 
-const PRESETS = [
-  { datum: 'dinsdag 14 januari 2025', roepnaam: 'Emma' },
-  { datum: 'vrijdag 21 augustus 2026', roepnaam: 'Lena' },
-  { datum: 'woensdag 12 maart 2014', roepnaam: 'Sem' },
-]
+const DAGEN = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag']
+const MAANDEN = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+
+function dateToLabel(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  return `${DAGEN[d.getDay()]} ${d.getDate()} ${MAANDEN[d.getMonth()]} ${d.getFullYear()}`
+}
+
+function todayISO(): string {
+  return new Date().toISOString().split('T')[0]
+}
+
+const ROEPNAAM = 'Lena'
 
 function formatDuration(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
@@ -127,18 +135,31 @@ function ComparisonView({ results, sectie }: { results: PipelineResult[]; sectie
 }
 
 export default function TestPipelinePage() {
-  const [datum, setDatum] = useState(PRESETS[0].datum)
-  const [roepnaam, setRoepnaam] = useState(PRESETS[0].roepnaam)
+  const [dateInput, setDateInput] = useState(todayISO())
+  const [testDates, setTestDates] = useState<string[]>(['2025-01-14', '2026-08-21', '2014-03-12'])
   const [running, setRunning] = useState(false)
+  const [runningLabel, setRunningLabel] = useState('')
   const [progress, setProgress] = useState<string>('')
   const [stepsDone, setStepsDone] = useState(0)
   const [totalSteps, setTotalSteps] = useState(0)
   const [results, setResults] = useState<PipelineResult[]>([])
   const [totalCost, setTotalCost] = useState<number | null>(null)
-  const [allRuns, setAllRuns] = useState<Array<{ datum: string; roepnaam: string; results: PipelineResult[]; totalCost: number; timestamp: string }>>([])
+  const [allRuns, setAllRuns] = useState<Array<{ datum: string; results: PipelineResult[]; totalCost: number }>>([])
 
-  const runPipeline = useCallback(async (d: string, r: string) => {
+  const addDate = useCallback(() => {
+    if (dateInput && !testDates.includes(dateInput)) {
+      setTestDates(prev => [...prev, dateInput])
+    }
+  }, [dateInput, testDates])
+
+  const removeDate = useCallback((d: string) => {
+    setTestDates(prev => prev.filter(x => x !== d))
+  }, [])
+
+  const runPipeline = useCallback(async (isoDate: string) => {
+    const datum = dateToLabel(isoDate)
     setRunning(true)
+    setRunningLabel(datum)
     setResults([])
     setTotalCost(null)
     setStepsDone(0)
@@ -149,7 +170,7 @@ export default function TestPipelinePage() {
       const res = await fetch('/api/test/pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ datum: d, roepnaam: r }),
+        body: JSON.stringify({ datum, roepnaam: ROEPNAAM }),
       })
 
       if (!res.ok) {
@@ -189,7 +210,7 @@ export default function TestPipelinePage() {
               setResults(prev => [...prev, data as PipelineResult])
             } else if (currentEvent === 'done') {
               setTotalCost(data.totalCost)
-              setAllRuns(prev => [...prev, { datum: d, roepnaam: r, results: data.results, totalCost: data.totalCost, timestamp: new Date().toISOString() }])
+              setAllRuns(prev => [...prev, { datum, results: data.results, totalCost: data.totalCost }])
             }
             currentEvent = ''
           }
@@ -200,16 +221,15 @@ export default function TestPipelinePage() {
     }
 
     setRunning(false)
+    setRunningLabel('')
     setProgress('')
   }, [])
 
   const runAll = useCallback(async () => {
-    for (const preset of PRESETS) {
-      setDatum(preset.datum)
-      setRoepnaam(preset.roepnaam)
-      await runPipeline(preset.datum, preset.roepnaam)
+    for (const d of testDates) {
+      await runPipeline(d)
     }
-  }, [runPipeline])
+  }, [testDates, runPipeline])
 
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb', padding: '24px 16px' }}>
@@ -219,71 +239,75 @@ export default function TestPipelinePage() {
           ChatGPT / Gemini feitenverzameling → Claude artikelgeneratie
         </p>
 
-        {/* Input */}
+        {/* Date management */}
         <div style={{ background: 'white', borderRadius: 12, padding: 20, border: '1px solid #e5e7eb', marginBottom: 20 }}>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-            <div style={{ flex: 2 }}>
-              <label style={{ fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Datum</label>
-              <input
-                type="text"
-                value={datum}
-                onChange={e => setDatum(e.target.value)}
-                placeholder="bijv. dinsdag 14 januari 2025"
-                disabled={running}
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Roepnaam</label>
-              <input
-                type="text"
-                value={roepnaam}
-                onChange={e => setRoepnaam(e.target.value)}
-                placeholder="bijv. Emma"
-                disabled={running}
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
-              />
-            </div>
-          </div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 8 }}>Testdatums</div>
 
-          {/* Presets */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-            {PRESETS.map((p, i) => (
-              <button
-                key={i}
-                onClick={() => { setDatum(p.datum); setRoepnaam(p.roepnaam) }}
-                disabled={running}
+          {/* Date chips */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            {testDates.map(d => (
+              <div
+                key={d}
                 style={{
-                  padding: '4px 10px', fontSize: 13, borderRadius: 6, border: '1px solid #d1d5db', background: datum === p.datum ? '#eff6ff' : 'white',
-                  color: datum === p.datum ? '#2563eb' : '#374151', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '5px 10px', fontSize: 13, borderRadius: 6,
+                  border: '1px solid #d1d5db', background: '#f9fafb',
                 }}
               >
-                {p.roepnaam} — {p.datum}
-              </button>
+                <span>{dateToLabel(d)}</span>
+                <button
+                  onClick={() => removeDate(d)}
+                  disabled={running}
+                  style={{
+                    background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer',
+                    fontSize: 14, lineHeight: 1, padding: 0,
+                  }}
+                  title="Verwijder"
+                >
+                  ×
+                </button>
+              </div>
             ))}
+            {testDates.length === 0 && (
+              <span style={{ fontSize: 13, color: '#9ca3af' }}>Geen datums — voeg er hieronder een toe</span>
+            )}
           </div>
 
-          {/* Buttons */}
+          {/* Add date */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 16 }}>
+            <div>
+              <label style={{ fontSize: 12, color: '#6b7280', display: 'block', marginBottom: 2 }}>Datum toevoegen</label>
+              <input
+                type="date"
+                value={dateInput}
+                onChange={e => setDateInput(e.target.value)}
+                disabled={running}
+                style={{ padding: '7px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+              />
+            </div>
+            <button
+              onClick={addDate}
+              disabled={running || !dateInput || testDates.includes(dateInput)}
+              style={{
+                padding: '8px 14px', fontSize: 13, fontWeight: 500, borderRadius: 8,
+                background: 'white', color: '#374151', border: '1px solid #d1d5db', cursor: 'pointer',
+              }}
+            >
+              + Toevoegen
+            </button>
+          </div>
+
+          {/* Run buttons */}
           <div style={{ display: 'flex', gap: 8 }}>
             <button
-              onClick={() => runPipeline(datum, roepnaam)}
-              disabled={running || !datum || !roepnaam}
+              onClick={runAll}
+              disabled={running || testDates.length === 0}
               style={{
                 padding: '10px 20px', fontSize: 14, fontWeight: 600, borderRadius: 8,
                 background: running ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', cursor: 'pointer',
               }}
             >
-              {running ? 'Bezig...' : 'Start pipeline'}
-            </button>
-            <button
-              onClick={runAll}
-              disabled={running}
-              style={{
-                padding: '10px 20px', fontSize: 14, fontWeight: 500, borderRadius: 8,
-                background: 'white', color: '#374151', border: '1px solid #d1d5db', cursor: 'pointer',
-              }}
-            >
-              Alle 3 testdatums draaien
+              {running ? 'Bezig...' : testDates.length === 1 ? 'Start pipeline' : `Alle ${testDates.length} datums draaien`}
             </button>
           </div>
         </div>
@@ -291,10 +315,11 @@ export default function TestPipelinePage() {
         {/* Progress */}
         {running && (
           <div style={{ background: '#eff6ff', borderRadius: 12, padding: 16, marginBottom: 20, border: '1px solid #bfdbfe' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 500 }}>{progress}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{runningLabel}</span>
               <span style={{ fontSize: 13, color: '#6b7280' }}>{stepsDone}/{totalSteps}</span>
             </div>
+            <div style={{ fontSize: 13, color: '#4b5563', marginBottom: 8 }}>{progress}</div>
             <div style={{ width: '100%', height: 6, background: '#dbeafe', borderRadius: 3, overflow: 'hidden' }}>
               <div style={{ width: `${totalSteps ? (stepsDone / totalSteps) * 100 : 0}%`, height: '100%', background: '#2563eb', borderRadius: 3, transition: 'width 0.3s' }} />
             </div>
@@ -306,7 +331,7 @@ export default function TestPipelinePage() {
           <div>
             {totalCost !== null && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Resultaten — {results[0]?.roepnaam}, {results[0]?.datum}</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Resultaten — {results[0]?.datum}</h2>
                 <span style={{ fontSize: 14, fontWeight: 500, color: '#6b7280' }}>Totaal: {formatCost(totalCost)}</span>
               </div>
             )}
@@ -343,7 +368,7 @@ export default function TestPipelinePage() {
             {allRuns.map((run, i) => (
               <details key={i} style={{ background: 'white', borderRadius: 12, padding: 16, border: '1px solid #e5e7eb', marginBottom: 8 }}>
                 <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-                  {run.roepnaam} — {run.datum} ({formatCost(run.totalCost)})
+                  {run.datum} ({formatCost(run.totalCost)})
                 </summary>
                 <div style={{ marginTop: 12 }}>
                   <ComparisonView results={run.results} sectie="nieuws" />
