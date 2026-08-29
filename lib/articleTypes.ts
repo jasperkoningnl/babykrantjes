@@ -66,7 +66,7 @@ export const ARTICLE_SECTIONS: Record<ArticleSection, ArticleSectionConfig> = {
     id: 'nieuws',
     title: 'Nieuws op de Geboortedag',
     description: 'Wat er gebeurde op de geboortedag',
-    targetWordCount: 140,
+    targetWordCount: 240,
     icon: '📰',
     priority: 3
   },
@@ -82,7 +82,7 @@ export const ARTICLE_SECTIONS: Record<ArticleSection, ArticleSectionConfig> = {
     id: 'cultuur',
     title: 'Muziek, Radio & Televisie',
     description: 'Entertainment op de geboortedag',
-    targetWordCount: 130,
+    targetWordCount: 170,
     icon: '🎵',
     priority: 5
   },

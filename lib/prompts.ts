@@ -153,26 +153,35 @@ Schrijf de tekst:`
         day: 'numeric'
       })
 
-      return `Hieronder staan feiten over het nieuws op ${datumVolledig}, verzameld uit meerdere bronnen. Schrijf hier één doorlopend nieuwsverhaal van 120-180 woorden voor een babykrant over de geboorte van ${roepnaam}.
+      return `Hieronder staan feiten over het nieuws op ${datumVolledig}, verzameld uit meerdere bronnen. Schrijf een nieuwsartikel van 200-280 woorden voor een babykrant over de geboorte van ${roepnaam}.
 
 STRUCTUUR:
-- Open met: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer."
-- Begin met een pakkend maar niet deprimerend nieuwsitem. Geen ongelukken, rampen of doden als opening.
-- Maak thematische bruggetjes tussen de onderwerpen. Spring niet willekeurig van item naar item, maar zoek verbindingen.
-- Selecteer 4-6 items uit de aangeleverde feiten. Kies op basis van:
-  * Tijdsbeeld: de grote verhaallijnen die dit jaar definiëren
-  * Nederlands en persoonlijk: minister-president, unieke Nederlandse momenten
-  * Over 3 jaar nog herkenbaar, geen eendagsvliegen
-- Verwerk lopende internationale dossiers niet als apart blok, maar verweven in het verhaal via een logisch bruggetje
-- Sluit af met iets lichts: sport, cultuur, of een grappig nieuwsfeit
-- Geen hele specifieke details over aantallen gewonden of doden
+Het artikel heeft drie delen:
+
+1. INTRO-ALINEA (2-3 zinnen):
+   - Open met een variant van: "De geboorte van ${roepnaam} is natuurlijk het belangrijkste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag."
+   - Noem direct 1-2 grote nieuwsitems als teaser, zodat de lezer wil doorlezen.
+
+2. SUBKOP + UITGEBREIDE ALINEA'S:
+   - Schrijf na de intro een subkop in de stijl: "HILVERSUM - door onze verslaggevers" (kies een Nederlandse mediastad: Utrecht, Hilversum, Amsterdam).
+   - Schrijf daarna 2-4 alinea's met gedetailleerde berichtgeving.
+   - Elke alinea behandelt 1-2 gerelateerde onderwerpen met echte details: namen, plaatsen, context.
+   - Maak natuurlijke overgangen tussen alinea's.
+
+3. SELECTIE:
+   - Kies 5-8 nieuwsitems. Meer dan de intro, en behandel ze met diepgang.
+   - Mix: Nederlands nieuws, internationale politiek, sport, wetenschap, bijzondere gebeurtenissen.
+   - Kies op tijdsbeeld: de grote verhaallijnen die dit jaar definiëren.
+   - Sluit bij voorkeur af met iets lichts of opvallends (sport, ruimtevaart, een grappig feit).
+   - Geen ongelukken, rampen of doden als opening. Specifieke dodentallen vermijden.
 
 REGELS:
 - Gebruik ALLEEN feiten uit de aangeleverde lijst hieronder. Verzin niets.
 - Feiten die in meerdere bronnen voorkomen zijn waarschijnlijk betrouwbaarder.
-- Geen kopjes, geen blokken, geen opsommingen. Eén doorlopend stuk tekst.
-- Geen categorie-introducties zoals "In de sportwereld..."
-- Schrijf zakelijk maar toegankelijk, in het Nederlands
+- Schrijf als een echte krant: feitelijk, specifiek, met namen en plaatsen. Geen vage samenvattingen.
+- Geen categorie-introducties zoals "In de sportwereld..." of "Op internationaal vlak..."
+- De subkop "STAD - door onze verslaggevers" is het enige kopje. Verder doorlopende tekst.
+- Schrijf zakelijk maar toegankelijk, in het Nederlands.
 
 FEITEN:
 ${gatheredNewsFacts || 'Geen feiten beschikbaar'}
@@ -214,29 +223,31 @@ Schrijf de tekst:`
 
     case 'cultuur':
       const gatheredCultuurFacts = data.gatheredFacts?.cultuur || ''
+      const geboortejaar = new Date(datum).getFullYear()
+      const heeftStreaming = geboortejaar >= 2015
 
-      return `Hieronder staan feiten over de cultuurwereld rond ${datum}, verzameld uit meerdere bronnen. Schrijf een vloeiend overzicht van 120-160 woorden voor een babykrant over de geboorte van ${roepnaam}.
+      return `Hieronder staan feiten over de cultuurwereld rond ${datum}, verzameld uit meerdere bronnen. Schrijf een vlot overzicht van 140-200 woorden voor een babykrant over de geboorte van ${roepnaam}.
 
-INHOUD (in deze volgorde):
-1. De nummer 1-hit in de Top 40
-2. Andere populaire muziek in die periode
-3. Populaire bioscoopfilms waar iedereen het over had
-4. De 2-3 populairste nieuwe series/seizoenen op streamingdiensten
-5. Opvallende TV-programma's op de Nederlandse televisie
+STRUCTUUR EN INHOUD:
+Schrijf doorlopende tekst in alinea's. Behandel deze onderwerpen in een natuurlijke volgorde:
 
-SELECTIECRITERIA:
-- Bij films: kies de titels die cultureel impact hadden, niet elke actiefilm die toevallig draaide
-- Bij series: focus op titels die trending waren, niet obscure releases
-- Bij TV: kies programma's die het nationale gesprek bepaalden
-- Geen kijkcijfers noemen
+1. MUZIEK: Begin met de nummer 1-hit in de Top 40 of Mega Top 50. Noem artiest EN songtitel. Noem daarna 2-3 andere populaire artiesten/nummers uit de hitlijsten.
+2. TV: Welke programma's draaiden er op de Nederlandse televisie? Gebruik zinnen als "Op TV zijn programma's als..." of "De kijker kan kiezen uit...". Noem zowel amusement als actualiteit.${heeftStreaming ? '\n3. STREAMING: Welke series waren trending op Netflix, Disney+, Apple TV+ of andere diensten?' : ''}
+${heeftStreaming ? '4' : '3'}. FILM: Welke films draaiden er in de bioscoop? Kies titels die cultureel impact hadden.
+${heeftStreaming ? '5' : '4'}. RADIO: Sluit af met radioprogramma's als die beschikbaar zijn ("Op radio kun je luisteren naar...").
+
+STIJL:
+- Schrijf toegankelijk en luchtig, als een cultuurpagina in een echte krant.
+- Noem concrete titels, namen en programma's. Geen vage omschrijvingen.
+- Maak het een momentopname: de lezer moet het tijdsbeeld herkennen.
+- Noem bij muziek artiest EN songtitel.
+- Noem bij films eventueel de regisseur als die algemeen bekend is.
 
 REGELS:
 - Gebruik ALLEEN feiten uit de aangeleverde lijst hieronder. Verzin niets.
 - Feiten die in meerdere bronnen voorkomen zijn waarschijnlijk betrouwbaarder.
-- Noem bij muziek de artiest EN de songtitel
-- Noem bij films eventueel de regisseur als die algemeen bekend is
-- Geen Markdown, geen waardeoordelen, geen overbodige intro- of slotzinnen
-- Schrijf vlot en journalistiek, in het Nederlands
+- Geen Markdown, geen kopjes, geen kijkcijfers.
+- Schrijf in het Nederlands.
 
 FEITEN:
 ${gatheredCultuurFacts || 'Geen feiten beschikbaar'}
