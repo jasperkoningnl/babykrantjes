@@ -9,7 +9,6 @@
 //   alle acht secties in één keer genereert (/api/generate-paper)
 
 import { getSterrenbeeld, getChineesJaar } from './calculations'
-import { matchDossiers, buildDossierPromptBlock } from './dossierMatcher'
 import { ARTICLE_SECTIONS, type ArticleSection } from './articleTypes'
 
 /** Het model voor alle artikelgeneratie. */
@@ -146,40 +145,7 @@ TONE: Informatief, beschrijvend, gebruik derde persoon ("De stier is...")
 Schrijf de tekst:`
 
     case 'nieuws':
-      const dailyNews = data.dailyNews?.events || []
-      const waybackNews = data.waybackNews?.headlines || []
-      const monthNews = data.monthlyNews?.items || []
-      // Server-side verrijkt in POST (uit Supabase): Google News van de dag
-      // en dossiers die op de geboortedatum actief waren.
-      const googleNews = data.googleNews || []
-      const activeDossiers = data.activeDossiers || []
-
-      // Geen limiet meer - toon ALLE beschikbare headlines zodat AI een goede selectie kan maken
-      const topDaily = dailyNews.map((e: any) => `[${e.category}] ${e.text}`).join('\n')
-      const topWayback = waybackNews.map((h: any) => `${h.title}`).join('\n')
-      const topMonth = monthNews.map((m: any) => `${m.day}: ${m.text}`).join('\n')
-      const topGoogle = googleNews
-        .map((g: any) => `[${g.topicCategory}] ${g.title}${g.sourceName ? ` (${g.sourceName})` : ''}`)
-        .join('\n')
-
-      // Dossiercontext, twee lagen:
-      // 1. Gecureerde dossiers (data/dossiers.json) met achtergrondtekst,
-      //    gematcht tegen de dagkoppen
-      // 2. Gescrapete dossiers (news_dossiers via VRT/Al Jazeera) die op de
-      //    geboortedatum actief waren
-      const dagKoppen: string[] = [
-        ...dailyNews.map((e: any) => String(e?.text ?? '')),
-        ...waybackNews.map((h: any) => String(h?.title ?? '')),
-        ...googleNews.map((g: any) => String(g?.title ?? '')),
-      ]
-      const curatedMatches = matchDossiers(dagKoppen, datum)
-      const dossierBlok = buildDossierPromptBlock(curatedMatches)
-
-      const scrapedDossierLijst = activeDossiers
-        .slice(0, 15)
-        .map((d: any) => `- ${d.name}${d.category ? ` (${d.category})` : ''}`)
-        .join('\n')
-
+      const gatheredNewsFacts = data.gatheredFacts?.nieuws || ''
       const datumVolledig = new Date(datum).toLocaleDateString('nl-NL', {
         weekday: 'long',
         year: 'numeric',
@@ -187,73 +153,29 @@ Schrijf de tekst:`
         day: 'numeric'
       })
 
-      // Check of het december is
-      const isDecember = new Date(datum).getMonth() === 11
+      return `Hieronder staan feiten over het nieuws op ${datumVolledig}, verzameld uit meerdere bronnen. Schrijf hier één doorlopend nieuwsverhaal van 120-180 woorden voor een babykrant over de geboorte van ${roepnaam}.
 
-      return `Schrijf een nieuwsoverzicht (150-200 woorden totaal) voor een babykrant over ${datumVolledig}, gebaseerd op het beschikbare nieuws hieronder.
+STRUCTUUR:
+- Open met: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer."
+- Begin met een pakkend maar niet deprimerend nieuwsitem. Geen ongelukken, rampen of doden als opening.
+- Maak thematische bruggetjes tussen de onderwerpen. Spring niet willekeurig van item naar item, maar zoek verbindingen.
+- Selecteer 4-6 items uit de aangeleverde feiten. Kies op basis van:
+  * Tijdsbeeld: de grote verhaallijnen die dit jaar definiëren
+  * Nederlands en persoonlijk: minister-president, unieke Nederlandse momenten
+  * Over 3 jaar nog herkenbaar, geen eendagsvliegen
+- Verwerk lopende internationale dossiers niet als apart blok, maar verweven in het verhaal via een logisch bruggetje
+- Sluit af met iets lichts: sport, cultuur, of een grappig nieuwsfeit
+- Geen hele specifieke details over aantallen gewonden of doden
 
-OUTPUT: precies twee blokken, elk met dit kopje op een eigen regel:
+REGELS:
+- Gebruik ALLEEN feiten uit de aangeleverde lijst hieronder. Verzin niets.
+- Feiten die in meerdere bronnen voorkomen zijn waarschijnlijk betrouwbaarder.
+- Geen kopjes, geen blokken, geen opsommingen. Eén doorlopend stuk tekst.
+- Geen categorie-introducties zoals "In de sportwereld..."
+- Schrijf zakelijk maar toegankelijk, in het Nederlands
 
-Het nieuws van de dag
-[80-120 woorden over specifieke gebeurtenissen van ${datumVolledig} zelf]
-
-Dit speelde er in de wereld
-[50-80 woorden over de 2-3 grootste lopende nieuwsdossiers die op deze datum actief waren]
-
-FEITELIJKE BASIS — STRIKT:
-- Gebruik UITSLUITEND gebeurtenissen en dossiers die in de bronnen hieronder staan
-- Verzin NOOIT feiten, namen, aantallen of gebeurtenissen die niet in de input staan
-- Te weinig bronmateriaal voor een blok? Houd dat blok korter in plaats van aan te vullen met eigen kennis
-
-BLOK 1 — Het nieuws van de dag:
-1. Intro: "De geboorte van ${roepnaam} was het grootste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag." Of een variatie hierop.
-2. Selecteer 3-5 nieuwsitems van de dag zelf:
-   - Bij voorkeur mix van: politiek/economie, cultuur/entertainment, sport/wetenschap
-   - Binnenland én buitenland waar mogelijk
-   - Prioriteer: Nederlandse headlines + grote internationale gebeurtenissen
-   - Terugkerend in meerdere bronnen = belangrijk (gebruik maandoverzicht voor context)
-   - Balanceer: mix zwaar nieuws (oorlog, ziekte) met luchtig (cultuur, sport, opmerkelijk)
-   - Vermijd: saai bureaucratisch nieuws
-
-BLOK 2 — Dit speelde er in de wereld:
-- Kies de 2-3 grootste lopende dossiers uit de dossier-bronnen hieronder
-- Beschrijf per dossier in 1-2 zinnen wat er speelde (alleen op basis van de meegegeven achtergrond en koppen)
-- Dit blok gaat over de bredere periode, niet alleen deze ene dag
-- Geen dossier-bronnen beschikbaar? Laat dit blok dan weg (schrijf alleen blok 1, inclusief het kopje weglaten)
-
-REDACTIONELE AANPAK:
-- Contextualiseer: leg altijd uit wat dingen zijn (welke film? welk team? wat is het?)
-- Test begrijpelijkheid: zou iemand over 2-3 jaar nog direct snappen waar dit over gaat?
-- Te cryptisch of abstract? Skip het item en kies iets duidelijkers
-
-${isDecember ? `SPECIFIEK VOOR DAGEN IN DECEMBER:
-- Deze dagen kunnen terugblikken en jaaroverzicht bevatten
-- Selecteer actueel nieuws van de geboortedag
-- Denk kritisch na: is dit nieuws van de geboortedag of een terugblik op eerder in het jaar?
-
-` : ''}${dossierBlok}SCHRIJFSTIJL:
-- Begrijpelijk voor gemiddelde lezer, geef context waar nodig
-- Geen categorie-introducties. Schrijf direct over het nieuws zelf.
-- Behandel tragedies respectvol (niet "nieuwtje", wel "incident")
-- Zakelijk maar toegankelijk, korte beschrijvingen (1-2 zinnen per item)
-- Geen andere kopjes of opmaak dan de twee genoemde kopjes
-
-BESCHIKBAAR NIEUWS VAN DE DAG:
-
-Nederlands (NOS/NU.nl) - PRIORITEIT:
-${topWayback || 'Geen data'}
-
-Google News NL:
-${topGoogle || 'Geen data'}
-
-Internationaal (Wikipedia):
-${topDaily || 'Geen data'}
-
-Maandcontext (alleen voor grote gebeurtenissen):
-${topMonth || 'Geen data'}
-
-LOPENDE DOSSIERS ACTIEF OP DEZE DATUM (bron: VRT NWS / Al Jazeera):
-${scrapedDossierLijst || 'Geen data'}
+FEITEN:
+${gatheredNewsFacts || 'Geen feiten beschikbaar'}
 
 Schrijf de tekst:`
 
@@ -291,70 +213,33 @@ TONE: Beschrijvend, luchtig, toegankelijk
 Schrijf de tekst:`
 
     case 'cultuur':
-      const top40 = data.top40
-      const yearChart = data.yearChart
-      const tvPrograms = data.tvPrograms?.programs || []
-      const wikipediaTV = data.wikipediaTV
-      const movies = data.movies?.movies || []
-      const topMovies = data.topMovies?.movies || []
-      const series = data.series?.movies || []
+      const gatheredCultuurFacts = data.gatheredFacts?.cultuur || ''
 
-      const nummer1 = top40?.numberOne ? `${top40.numberOne.artist} - ${top40.numberOne.title}` : null
-      const topYear = yearChart?.entries?.slice(0, 5) || []
-      // Alle prime time programma's (al gefilterd door API op 20:00-22:00 + belangrijkste zenders)
-      const tvToday = tvPrograms.map((p: any) => `${p.title}${p.channel ? ` (${p.channel})` : ''}`).join('\n')
-      const tvEvents = wikipediaTV?.events?.slice(0, 3) || []
+      return `Hieronder staan feiten over de cultuurwereld rond ${datum}, verzameld uit meerdere bronnen. Schrijf een vloeiend overzicht van 120-160 woorden voor een babykrant over de geboorte van ${roepnaam}.
 
-      // Format films rond geboortedatum
-      const moviesAround = movies.slice(0, 8).map((m: any) =>
-        `${m.title} (${m.releaseDate?.split('-')[0] || '?'})`
-      ).join('\n')
+INHOUD (in deze volgorde):
+1. De nummer 1-hit in de Top 40
+2. Andere populaire muziek in die periode
+3. Populaire bioscoopfilms waar iedereen het over had
+4. De 2-3 populairste nieuwe series/seizoenen op streamingdiensten
+5. Opvallende TV-programma's op de Nederlandse televisie
 
-      // Format top films van het jaar
-      const topMoviesYear = topMovies.slice(0, 5).map((m: any) =>
-        `${m.title} (${m.voteAverage?.toFixed(1) || '?'}/10)`
-      ).join('\n')
+SELECTIECRITERIA:
+- Bij films: kies de titels die cultureel impact hadden, niet elke actiefilm die toevallig draaide
+- Bij series: focus op titels die trending waren, niet obscure releases
+- Bij TV: kies programma's die het nationale gesprek bepaalden
+- Geen kijkcijfers noemen
 
-      // Format populaire series
-      const popularSeries = series.slice(0, 5).map((s: any) =>
-        `${s.title || s.name}`
-      ).join('\n')
+REGELS:
+- Gebruik ALLEEN feiten uit de aangeleverde lijst hieronder. Verzin niets.
+- Feiten die in meerdere bronnen voorkomen zijn waarschijnlijk betrouwbaarder.
+- Noem bij muziek de artiest EN de songtitel
+- Noem bij films eventueel de regisseur als die algemeen bekend is
+- Geen Markdown, geen waardeoordelen, geen overbodige intro- of slotzinnen
+- Schrijf vlot en journalistiek, in het Nederlands
 
-      return `Schrijf een overzicht van muziek, film en televisie voor de babykrant (100-140 woorden).
-
-STRUCTUUR:
-1. Open met de #1 hit (als beschikbaar)
-2. Noem andere populaire muzikanten/hits van dat moment
-3. Bespreek grote filmreleases in de bioscoop (blockbusters, bekende films)
-4. Noem andere populaire films en series rond die periode
-5. Sluit af met TV programma's op de geboortedag
-6. Vul aan met TV hoogtepunten uit dat jaar (als beschikbaar)
-
-SCHRIJFSTIJL:
-- Vlot en journalistiek
-- Direct en feitelijk
-- Geen overbodige intro- of slotzinnen
-- Geen interpretatie of waardeoordelen
-- Korte, pakkende beschrijvingen
-
-BESCHIKBARE DATA:
-
-MUZIEK:
-${nummer1 ? `#1 Hit: ${nummer1}` : 'Geen Top 40 data'}
-${topYear.length > 0 ? `\nTop hits van het jaar:\n${topYear.map((e: any) => `${e.position}. ${e.artist} - ${e.title}`).join('\n')}` : ''}
-
-FILMS IN DE BIOSCOOP (rond geboorteperiode):
-${moviesAround || 'Geen filmdata'}
-
-TOP FILMS VAN HET JAAR:
-${topMoviesYear || 'Geen filmdata'}
-
-POPULAIRE SERIES:
-${popularSeries || 'Geen seriedata'}
-
-TELEVISIE:
-${tvToday ? `Op TV die dag:\n${tvToday}` : 'Geen TV data'}
-${tvEvents.length > 0 ? `\nTV hoogtepunten dat jaar:\n${tvEvents.map((e: any) => e.description).join('\n')}` : ''}
+FEITEN:
+${gatheredCultuurFacts || 'Geen feiten beschikbaar'}
 
 Schrijf de tekst:`
 

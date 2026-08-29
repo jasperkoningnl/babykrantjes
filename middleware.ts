@@ -17,9 +17,7 @@ export function middleware(_request: NextRequest) {
 export const config = {
   matcher: [
     '/api/debug/:path*',
-    '/api/test/:path*',
     '/test-results',
     '/test-patterns',
-    '/test-pipeline',
   ],
 }
