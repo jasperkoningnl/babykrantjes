@@ -10,9 +10,11 @@ import { CLAUDE_PRICING } from '@/lib/articleTypes'
 import type { ArticleSection } from '@/lib/articleTypes'
 import { SYSTEM_PROMPT, buildFullPaperPrompt, PAPER_TOOL } from '@/lib/prompts'
 import { callClaudeStructured } from '@/lib/claude'
-import { enrichNewsData } from '@/lib/newsContext'
+import { gatherNewsFacts, gatherCultuurFacts } from '@/lib/factGathering'
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase'
 import { checkRateLimit, addDailyCost, getDailyCost, DAILY_COST_BUDGET } from '@/lib/rateLimit'
+
+export const maxDuration = 120
 
 export interface PaperGenerationResponse {
   success: boolean
@@ -65,11 +67,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Nieuws-context (Google News + actieve dossiers) server-side toevoegen
-    await enrichNewsData(data)
+    // Feiten verzamelen voor nieuws en cultuur via AI-modellen (parallel)
+    const geboorteDatum = data.basisGegevens?.geboorteDatum || ''
+    console.log(`[GeneratePaper] Feiten verzamelen voor ${geboorteDatum}...`)
+    const [nieuwsFacts, cultuurFacts] = await Promise.all([
+      gatherNewsFacts(geboorteDatum),
+      gatherCultuurFacts(geboorteDatum),
+    ])
+    data.gatheredFacts = {
+      nieuws: nieuwsFacts.combined,
+      cultuur: cultuurFacts.combined,
+    }
 
     const userPrompt = buildFullPaperPrompt(data)
-    console.log(`[GeneratePaper] Eén gestructureerde call voor ${data.basisGegevens?.volledigeNaam || 'onbekend'}`)
+    console.log(`[GeneratePaper] Feiten verzameld, artikel genereren voor ${data.basisGegevens?.volledigeNaam || 'onbekend'}`)
 
     const result = await callClaudeStructured<Record<ArticleSection, string>>(
       userPrompt,

@@ -11,12 +11,6 @@ import { getHistoricalWeather, type WeatherData } from '@/lib/weatherAPI'
 import { getBornOnThisDay, type BornPerson } from '@/lib/bornOnThisDayAPI'
 import { getNameMeaning, type NameMeaningData } from '@/lib/nameMeaningAPI'
 import { getFamousNamesakes, type FamousNamesakesData } from '@/lib/famousNamesakesAPI'
-import { getMoviesAroundDate, getTopMoviesOfYear, getSeriesOfYear, type TMDBMoviesResult } from '@/lib/tmdbAPI'
-import { getTop40ByDate, type Top40Result } from '@/lib/top40API'
-import { getYearOverview, type DutchChartsYearResult } from '@/lib/dutchChartsAPI'
-import { getTVProgramsOnDate, type TVOnDateResult } from '@/lib/tvOnDateAPI'
-import { getWikipediaTVByYear, type WikipediaTVResult } from '@/lib/wikipediaTVAPI'
-import { getDailyNews, getMonthlyNews, getWaybackNews, type DailyNewsResult, type MonthNewsResult, type WaybackNewsResult } from '@/lib/newsAPI'
 
 interface LoadingStatus {
   task: string
@@ -81,31 +75,22 @@ export default function LoadingScreenPage() {
     hasStarted.current = true
 
     const birthDate = data.basisGegevens.geboorteDatum
-    const birthYear = birthDate ? new Date(birthDate).getFullYear() : null
     const birthPlace = data.basisGegevens.geboorteplaats
     const fullName = data.basisGegevens.volledigeNaam
 
     // Initialiseer alle taken met categorieën
+    // Nieuws en cultuur worden nu server-side verzameld via AI-modellen
     const tasks: LoadingStatus[] = [
       { task: 'Ingevulde gegevens', category: 'Ingevulde gegevens', status: 'pending' },
       { task: 'Historisch weerbericht', category: 'Weerbericht', status: 'pending' },
       { task: 'Naambetekenis', category: 'Betekenis naam', status: 'pending' },
       { task: 'Beroemde naamgenoten', category: 'Personen', status: 'pending' },
       { task: 'Geboren op deze dag', category: 'Personen', status: 'pending' },
-      { task: 'Films in de bioscoop', category: 'Cultuur', status: 'pending' },
-      { task: 'Populairste films & series', category: 'Cultuur', status: 'pending' },
-      { task: 'TV programma\'s op geboortedag', category: 'Cultuur', status: 'pending' },
-      { task: 'TV hoogtepunten van het jaar', category: 'Cultuur', status: 'pending' },
-      { task: 'Nr. 1 hit op geboortedag', category: 'Cultuur', status: 'pending' },
-      { task: 'Jaaroverzicht muziek', category: 'Cultuur', status: 'pending' },
-      { task: 'Internationaal nieuws', category: 'Nieuws', status: 'pending' },
-      { task: 'Maandoverzicht nieuws', category: 'Nieuws', status: 'pending' },
-      { task: 'Nederlands nieuws', category: 'Nieuws', status: 'pending' },
     ]
     setLoadingStatuses(tasks)
 
     // Start alle data verzameling
-    collectAllData(data, birthDate, birthYear, birthPlace, fullName)
+    collectAllData(data, birthDate, birthPlace, fullName)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
 
@@ -127,7 +112,6 @@ export default function LoadingScreenPage() {
   const collectAllData = async (
     data: BabykrantData,
     birthDate: string,
-    birthYear: number | null,
     birthPlace: string,
     fullName: string
   ) => {
@@ -206,142 +190,6 @@ export default function LoadingScreenPage() {
       updateTaskStatus('Geboren op deze dag', 'error')
     }
 
-    // 6. Films in de bioscoop
-    if (birthDate) {
-      updateTaskStatus('Films in de bioscoop', 'loading')
-      try {
-        const movies = await getMoviesAroundDate(birthDate, 30)
-        enrichedData.movies = movies
-        updateTaskStatus('Films in de bioscoop', 'completed')
-      } catch {
-        updateTaskStatus('Films in de bioscoop', 'error')
-      }
-    } else {
-      updateTaskStatus('Films in de bioscoop', 'error')
-    }
-
-    // 7. Populairste films & series
-    if (birthYear) {
-      updateTaskStatus('Populairste films & series', 'loading')
-      try {
-        const [topMovies, series] = await Promise.all([
-          getTopMoviesOfYear(birthYear, 5),
-          getSeriesOfYear(birthYear, 10)
-        ])
-        enrichedData.topMovies = topMovies
-        enrichedData.series = series
-        updateTaskStatus('Populairste films & series', 'completed')
-      } catch {
-        updateTaskStatus('Populairste films & series', 'error')
-      }
-    } else {
-      updateTaskStatus('Populairste films & series', 'error')
-    }
-
-    // 8. TV programma's op geboortedag
-    if (birthDate) {
-      updateTaskStatus('TV programma\'s op geboortedag', 'loading')
-      try {
-        const tvPrograms = await getTVProgramsOnDate(birthDate)
-        enrichedData.tvPrograms = tvPrograms
-        updateTaskStatus('TV programma\'s op geboortedag', 'completed')
-      } catch {
-        updateTaskStatus('TV programma\'s op geboortedag', 'error')
-      }
-    } else {
-      updateTaskStatus('TV programma\'s op geboortedag', 'error')
-    }
-
-    // 9. TV hoogtepunten van het jaar
-    if (birthYear) {
-      updateTaskStatus('TV hoogtepunten van het jaar', 'loading')
-      try {
-        const wikipediaTV = await getWikipediaTVByYear(birthYear)
-        enrichedData.wikipediaTV = wikipediaTV
-        updateTaskStatus('TV hoogtepunten van het jaar', 'completed')
-      } catch {
-        updateTaskStatus('TV hoogtepunten van het jaar', 'error')
-      }
-    } else {
-      updateTaskStatus('TV hoogtepunten van het jaar', 'error')
-    }
-
-    // 10. Nr. 1 hit op geboortedag
-    if (birthDate) {
-      updateTaskStatus('Nr. 1 hit op geboortedag', 'loading')
-      try {
-        const top40 = await getTop40ByDate(birthDate)
-        enrichedData.top40 = top40
-        updateTaskStatus('Nr. 1 hit op geboortedag', 'completed')
-      } catch {
-        updateTaskStatus('Nr. 1 hit op geboortedag', 'error')
-      }
-    } else {
-      updateTaskStatus('Nr. 1 hit op geboortedag', 'error')
-    }
-
-    // 11. Jaaroverzicht muziek
-    if (birthYear) {
-      updateTaskStatus('Jaaroverzicht muziek', 'loading')
-      try {
-        const yearChart = await getYearOverview(birthYear, 10)
-        enrichedData.yearChart = yearChart
-        updateTaskStatus('Jaaroverzicht muziek', 'completed')
-      } catch {
-        updateTaskStatus('Jaaroverzicht muziek', 'error')
-      }
-    } else {
-      updateTaskStatus('Jaaroverzicht muziek', 'error')
-    }
-
-    // 12. Internationaal nieuws
-    if (birthDate) {
-      updateTaskStatus('Internationaal nieuws', 'loading')
-      try {
-        const dailyNews = await getDailyNews(birthDate)
-        enrichedData.dailyNews = dailyNews
-        updateTaskStatus('Internationaal nieuws', 'completed')
-      } catch {
-        updateTaskStatus('Internationaal nieuws', 'error')
-      }
-    } else {
-      updateTaskStatus('Internationaal nieuws', 'error')
-    }
-
-    // 13. Maandoverzicht nieuws
-    if (birthDate) {
-      updateTaskStatus('Maandoverzicht nieuws', 'loading')
-      try {
-        const monthlyNews = await getMonthlyNews(birthDate)
-        enrichedData.monthlyNews = monthlyNews
-        updateTaskStatus('Maandoverzicht nieuws', 'completed')
-      } catch {
-        updateTaskStatus('Maandoverzicht nieuws', 'error')
-      }
-    } else {
-      updateTaskStatus('Maandoverzicht nieuws', 'error')
-    }
-
-    // 14. Nederlands nieuws (alleen voor data vanaf 2005)
-    if (birthDate) {
-      const birthDateObj = new Date(birthDate)
-      const earliestDate = new Date('2005-01-01')
-      if (birthDateObj >= earliestDate) {
-        updateTaskStatus('Nederlands nieuws', 'loading')
-        try {
-          const waybackNews = await getWaybackNews(birthDate)
-          enrichedData.waybackNews = waybackNews
-          updateTaskStatus('Nederlands nieuws', 'completed')
-        } catch {
-          updateTaskStatus('Nederlands nieuws', 'error')
-        }
-      } else {
-        updateTaskStatus('Nederlands nieuws', 'completed') // Skip voor oude data
-      }
-    } else {
-      updateTaskStatus('Nederlands nieuws', 'error')
-    }
-
     // Sla alle verrijkte data op
     localStorage.setItem('babykrant_test_data', JSON.stringify(enrichedData))
     console.log('[Babykrant] ✅ Alle data verzameld en opgeslagen')
@@ -358,8 +206,6 @@ export default function LoadingScreenPage() {
     'Weerbericht',
     'Betekenis naam',
     'Personen',
-    'Cultuur',
-    'Nieuws'
   ].map(categoryName => ({
     name: categoryName,
     tasks: loadingStatuses.filter(t => t.category === categoryName)

@@ -10,8 +10,10 @@ import type { ArticleGenerationRequest, ArticleGenerationResponse } from '@/lib/
 import { USAGE_LIMITS, CLAUDE_PRICING } from '@/lib/articleTypes'
 import { SYSTEM_PROMPT, buildPrompt } from '@/lib/prompts'
 import { callClaude } from '@/lib/claude'
-import { enrichNewsData } from '@/lib/newsContext'
+import { gatherNewsFacts, gatherCultuurFacts } from '@/lib/factGathering'
 import { checkRateLimit, addDailyCost, getDailyCost, DAILY_COST_BUDGET } from '@/lib/rateLimit'
+
+export const maxDuration = 120
 
 function calculateCost(inputTokens: number, outputTokens: number): number {
   return ((inputTokens / 1_000_000) * CLAUDE_PRICING.inputCostPer1MTokens) +
@@ -59,10 +61,14 @@ export async function POST(request: NextRequest) {
 
     console.log(`[API] Generating ${section}`)
 
-    // Voor de nieuwssectie: verrijk server-side met Supabase-data
-    // (Google News van de geboortedag + dossiers die toen actief waren).
-    if (section === 'nieuws') {
-      await enrichNewsData(data)
+    // Voor nieuws en cultuur: verzamel feiten via AI-modellen
+    if (section === 'nieuws' || section === 'cultuur') {
+      const geboorteDatum = data.basisGegevens?.geboorteDatum || ''
+      console.log(`[API] Feiten verzamelen voor ${section} (${geboorteDatum})...`)
+      const facts = section === 'nieuws'
+        ? await gatherNewsFacts(geboorteDatum)
+        : await gatherCultuurFacts(geboorteDatum)
+      data.gatheredFacts = { ...data.gatheredFacts, [section]: facts.combined }
     }
 
     // Build prompt
