@@ -1,4 +1,75 @@
 import Link from 'next/link'
+import Voorpagina, { type VoorpaginaProps } from '@/components/Voorpagina'
+
+const voorbeeldSalie: VoorpaginaProps = {
+  band: '#8FA88A', tint: '#F6DFD1',
+  mastheadA: 'De Sem', mastheadB: 'krant',
+  volledigeNaam: 'Sem van den Berg',
+  datumLang: 'Woensdag 12 maart 2025',
+  plaats: 'Amersfoort',
+  kop: 'Sem is geboren!',
+  lead: 'AMERSFOORT — Op woensdag 12 maart 2025 zijn Thomas en Lisa de trotse ouders geworden van Sem.',
+  feiten: [
+    { k: 'Volledige naam', v: 'Sem van den Berg' },
+    { k: 'Geboren op', v: '12 maart 2025' },
+    { k: 'Tijdstip', v: '14:32 uur' },
+    { k: 'Gewicht', v: '3480 gram' },
+    { k: 'Lengte', v: '51 cm' },
+    { k: 'Sterrenbeeld', v: 'Vissen' },
+    { k: 'Chinees teken', v: 'Slang' },
+    { k: 'Geboortebloem', v: 'Narcis' },
+    { k: 'Geboortesteen', v: 'Aquamarijn' },
+  ],
+  horoscoopKop: 'Vissen en Slang',
+  horoscoop: ['Sem is een echte Vissen — gevoelig, creatief en met een rijke fantasie. In het Chinese systeem valt hij onder het teken Slang: wijs, charmant en vastberaden.'],
+  hoofdartikel: ['Het was even spannend, maar om kwart over twee was het zover: Sem liet voor het eerst van zich horen.', 'Vader Thomas stond erbij met tranen in zijn ogen. "Ik wist niet dat ik zo hard kon huilen," zei hij later.'],
+  naamKop: 'De betekenis van Sem',
+  naamBetekenis: ['De naam Sem komt uit het Hebreeuws en betekent "naam" of "faam". In de Bijbel is Sem de oudste zoon van Noach.'],
+  naamgenoten: ['Sem Schilt (kickbokser), Sem Verbeek (tennisser)'],
+  geborenKop: 'Ook geboren op deze dag',
+  geborenOp: ['Liza Minnelli (1946), Jack Kerouac (1922), en Raoul Wallenberg (1912).'],
+  nieuwsKop: 'Het nieuws van die dag',
+  nieuws: ['De Eerste Kamer debatteerde vandaag over de nieuwe Woningwet. Het KNMI waarschuwde voor gladheid in het noorden.'],
+  weerKop: 'Het weer',
+  weer: ['In Amersfoort was het overwegend bewolkt met af en toe een zonnetje. De temperatuur lag rond de 9 graden.'],
+  cultuur: ['In de Top 40 stond Rosalía op nummer 1 met "DESPECHÁ". In de bioscoop draaide Captain America: Brave New World.'],
+  watermerk: false,
+}
+
+const voorbeeldTerracotta: VoorpaginaProps = {
+  band: '#B5563A', tint: '#FDE8D8',
+  mastheadA: 'De Olivia', mastheadB: 'krant',
+  volledigeNaam: 'Olivia de Groot',
+  datumLang: 'Vrijdag 6 juni 2025',
+  plaats: 'Utrecht',
+  kop: 'Olivia is geboren!',
+  lead: 'UTRECHT — Op vrijdag 6 juni 2025 zijn Mark en Sophie de trotse ouders geworden van Olivia.',
+  feiten: [
+    { k: 'Volledige naam', v: 'Olivia de Groot' },
+    { k: 'Geboren op', v: '6 juni 2025' },
+    { k: 'Tijdstip', v: '09:17 uur' },
+    { k: 'Gewicht', v: '3120 gram' },
+    { k: 'Lengte', v: '49 cm' },
+    { k: 'Sterrenbeeld', v: 'Tweelingen' },
+    { k: 'Chinees teken', v: 'Slang' },
+    { k: 'Geboortebloem', v: 'Roos' },
+    { k: 'Geboortesteen', v: 'Parel' },
+  ],
+  horoscoopKop: 'Tweelingen en Slang',
+  horoscoop: ['Olivia is een Tweeling — nieuwsgierig, sociaal en altijd in beweging. In het Chinese systeem valt ze onder het teken Slang: intuïtief en vastberaden.'],
+  hoofdartikel: ['Om kwart over negen was het moment daar: Olivia kwam met een flinke schreeuw de wereld in.', 'Moeder Sophie was opgelucht en gelukkig. "Ze is perfect," fluisterde ze terwijl ze Olivia voor het eerst vasthield.'],
+  naamKop: 'De betekenis van Olivia',
+  naamBetekenis: ['De naam Olivia komt van het Latijnse "oliva" en betekent "olijfboom". De naam staat symbool voor vrede en wijsheid.'],
+  naamgenoten: ['Olivia Colman (actrice), Olivia Rodrigo (zangeres)'],
+  geborenKop: 'Ook geboren op deze dag',
+  geborenOp: ['Diego Velázquez (1599), Thomas Mann (1875), en Björn Borg (1956).'],
+  nieuwsKop: 'Het nieuws van die dag',
+  nieuws: ['Het was D-Day-herdenking in Normandië. In Den Haag werd gestemd over het nieuwe klimaatakkoord.'],
+  weerKop: 'Het weer',
+  weer: ['In Utrecht was het zonnig met temperaturen tot 24 graden. Een perfecte zomerdag om geboren te worden.'],
+  cultuur: ['In de Top 40 stond Sabrina Carpenter op nummer 1 met "Espresso". In de bioscoop draaide Inside Out 2.'],
+  watermerk: false,
+}
 
 const secties = [
   { tag: 'de voorpagina', titel: 'Persoonlijk openingsartikel', tekst: 'Jullie geboorteverhaal, geschreven als een echt krantenbericht — met kop, lead en jullie eigen details.' },
@@ -63,8 +134,8 @@ export default function Home() {
         <div className="flex justify-center relative">
           <div className="absolute w-[420px] h-[420px] rounded-full bg-[#EDE7DA] blur-[2px] top-5" />
           <div className="w-[380px] h-[537px] overflow-hidden relative -rotate-3 shadow-[0_40px_70px_-30px_rgba(35,35,31,.4)] bg-white rounded-sm">
-            <div className="flex items-center justify-center h-full text-muted font-serif italic text-lg">
-              Voorpagina voorbeeld
+            <div style={{ transform: 'scale(.5)', transformOrigin: 'top left', width: '760px', height: '1075px' }}>
+              <Voorpagina {...voorbeeldSalie} />
             </div>
           </div>
         </div>
@@ -95,12 +166,14 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
             {[
-              { naam: 'Salie', beschrijving: 'zacht, modern, veel wit' },
-              { naam: 'Terracotta', beschrijving: 'warm, klassiek, kop in kapitalen' },
+              { naam: 'Salie', beschrijving: 'zacht, modern, veel wit', props: voorbeeldSalie },
+              { naam: 'Terracotta', beschrijving: 'warm, klassiek, kop in kapitalen', props: voorbeeldTerracotta },
             ].map((stijl) => (
               <div key={stijl.naam}>
-                <div className="w-full max-w-[532px] h-[400px] md:h-[550px] overflow-hidden bg-white shadow-[0_24px_50px_-26px_rgba(35,35,31,.5)] flex items-center justify-center">
-                  <div className="text-muted font-serif italic text-lg">Voorpagina — {stijl.naam}</div>
+                <div className="w-full max-w-[532px] h-[400px] md:h-[550px] overflow-hidden bg-white shadow-[0_24px_50px_-26px_rgba(35,35,31,.5)]">
+                  <div style={{ transform: 'scale(.7)', transformOrigin: 'top left', width: '760px', height: '1075px' }}>
+                    <Voorpagina {...stijl.props} />
+                  </div>
                 </div>
                 <div className="flex justify-between items-baseline mt-3.5">
                   <div className="font-bold text-lg">{stijl.naam}</div>
