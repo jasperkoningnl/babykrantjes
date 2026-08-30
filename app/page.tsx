@@ -164,14 +164,14 @@ export default function Home() {
               <p className="font-serif text-lg text-subtle max-w-[34em]">Dezelfde inhoud, een ander jasje. Je kiest je stijl in de laatste stap — en past hem aan tot hij bij de kinderkamer past.</p>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-7 justify-items-center">
             {[
               { naam: 'Salie', beschrijving: 'zacht, modern, veel wit', props: voorbeeldSalie },
               { naam: 'Terracotta', beschrijving: 'warm, klassiek, kop in kapitalen', props: voorbeeldTerracotta },
             ].map((stijl) => (
-              <div key={stijl.naam}>
-                <div className="w-full max-w-[532px] h-[400px] md:h-[550px] overflow-hidden bg-white shadow-[0_24px_50px_-26px_rgba(35,35,31,.5)]">
-                  <div style={{ transform: 'scale(.7)', transformOrigin: 'top left', width: '760px', height: '1075px' }}>
+              <div key={stijl.naam} className="w-full max-w-[456px]">
+                <div className="bg-white shadow-[0_24px_50px_-26px_rgba(35,35,31,.5)]" style={{ width: 456, height: 645 }}>
+                  <div style={{ transform: 'scale(.6)', transformOrigin: 'top left', width: 760, height: 1075 }}>
                     <Voorpagina {...stijl.props} />
                   </div>
                 </div>
