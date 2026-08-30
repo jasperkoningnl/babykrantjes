@@ -1,19 +1,19 @@
-// app/wizard/page.tsx
-// @version 4.0.0
-// UPDATED v4.0.0: Foto's gaan direct naar Vercel Blob; wizard maakt bij de
-// eerste upload een concept-krant (generated_papers) aan via /api/papers
-
 'use client'
 
 import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Step1BasisGegevens from '@/components/Step1BasisGegevens'
 import Step2ExtraVragen from '@/components/Step2ExtraVragen'
 import Step3Fotos from '@/components/Step3Fotos'
 import Step4Review from '@/components/Step4Review'
-import VersionFooter from '@/components/VersionFooter'
 import type { BabykrantData, BasisGegevens, ExtraVragen, GeuploadeFotos } from '@/lib/types'
 
+const stapNamen = ['Basisgegevens', 'Het verhaal', "Foto's", 'Controle']
+const stapTijden = ['± 2 minuten', '± 6 minuten', '± 1 minuut', 'Bijna klaar']
+
 export default function WizardPage() {
+  const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [data, setData] = useState<BabykrantData>({
     basisGegevens: {
@@ -28,27 +28,18 @@ export default function WizardPage() {
       alleenstaand: false,
     },
     extraVragen: {
-      // SECTIE 1: Bevalling (MOVED van BasisGegevens)
       geboorteLocatie: 'ziekenhuis',
       geboorteLocatieNaam: undefined,
       bevallingVerloop: undefined,
       bevallingAndersOmschrijving: undefined,
       wieWarenErbij: [],
-      
-      // SECTIE 2: Zwangerschap
       zwangerschapVerloop: undefined,
-      
-      // SECTIE 3: Naam
       voornaamReden: undefined,
       achternaamReden: undefined,
-      
-      // SECTIE 4: Familie
       heeftBroertjesZusjes: false,
       broertjesZusjes: [],
       reactieBroertjesZusjes: undefined,
       eersteKraamvisite: undefined,
-      
-      // SECTIE 5: Bijzonderheden
       bijzonderheden: undefined,
     },
     fotos: {
@@ -60,9 +51,6 @@ export default function WizardPage() {
     paperId: null,
   })
 
-  // Concept-krant aanmaken (één keer), zodat foto-uploads gekoppeld kunnen
-  // worden aan generated_papers. De ref voorkomt dubbele aanmaak bij twee
-  // snel opeenvolgende uploads.
   const paperPromiseRef = useRef<Promise<string | null> | null>(null)
   const ensurePaper = (): Promise<string | null> => {
     if (data.paperId) return Promise.resolve(data.paperId)
@@ -121,69 +109,69 @@ export default function WizardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-pink-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Progress bar */}
-        <div className="mb-8">
-          <div className="flex justify-between mb-2">
-            {['Basisgegevens', 'Geboorte verhaal', 'Foto\'s', 'Review'].map((label, idx) => (
-              <div 
-                key={idx}
-                className={`text-sm font-medium ${
-                  currentStep === idx + 1 ? 'text-blue-600' : 
-                  currentStep > idx + 1 ? 'text-green-600' : 'text-gray-400'
-                }`}
-              >
-                {label}
-              </div>
-            ))}
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(currentStep / 4) * 100}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          {currentStep === 1 && (
-            <Step1BasisGegevens 
-              data={data.basisGegevens}
-              updateData={updateBasisGegevens}
-              onNext={nextStep}
-            />
-          )}
-          
-          {currentStep === 2 && (
-            <Step2ExtraVragen
-              data={data.extraVragen}
-              updateData={updateExtraVragen}
-              onNext={nextStep}
-              onBack={prevStep}
-            />
-          )}
-          
-          {currentStep === 3 && (
-            <Step3Fotos
-              data={data.fotos}
-              updateData={updateFotos}
-              ensurePaper={ensurePaper}
-              onNext={nextStep}
-              onBack={prevStep}
-            />
-          )}
-          
-          {currentStep === 4 && (
-            <Step4Review
-              data={data}
-              onBack={prevStep}
-            />
-          )}
+    <div className="min-h-screen bg-cream text-dark font-sans">
+      {/* Header */}
+      <div className="sticky top-0 z-20 bg-cream/[.92] backdrop-blur-sm border-b border-dark/10">
+        <div className="max-w-container mx-auto px-7 py-3.5 flex items-center justify-between gap-6">
+          <Link href="/" className="flex items-center gap-2.5 no-underline">
+            <div className="w-[30px] h-[30px] rounded-full bg-sage flex items-center justify-center text-cream font-extrabold text-[15px]">b</div>
+            <div className="font-bold text-[19px] tracking-tight text-dark">babykrantje<span className="text-terracotta">.nl</span></div>
+          </Link>
         </div>
       </div>
-      <VersionFooter />
+
+      <div className="max-w-[880px] mx-auto px-7 pt-9 pb-[90px]">
+        {/* Progress bar */}
+        <div className="flex gap-2 mb-2.5">
+          {[1, 2, 3, 4].map((n) => (
+            <div
+              key={n}
+              className="flex-1 h-[5px] rounded-pill"
+              style={{ background: n <= currentStep ? '#8FA88A' : '#EAE2D5' }}
+            />
+          ))}
+        </div>
+        <div className="flex justify-between text-[13px] text-muted mb-8">
+          <span>Stap {currentStep} van 4 — {stapNamen[currentStep - 1]}</span>
+          <span>{stapTijden[currentStep - 1]}</span>
+        </div>
+
+        {/* Step content */}
+        {currentStep === 1 && (
+          <Step1BasisGegevens
+            data={data.basisGegevens}
+            updateData={updateBasisGegevens}
+            onNext={nextStep}
+            onBack={() => router.push('/')}
+          />
+        )}
+
+        {currentStep === 2 && (
+          <Step2ExtraVragen
+            data={data.extraVragen}
+            updateData={updateExtraVragen}
+            onNext={nextStep}
+            onBack={prevStep}
+          />
+        )}
+
+        {currentStep === 3 && (
+          <Step3Fotos
+            data={data.fotos}
+            updateData={updateFotos}
+            ensurePaper={ensurePaper}
+            onNext={nextStep}
+            onBack={prevStep}
+          />
+        )}
+
+        {currentStep === 4 && (
+          <Step4Review
+            data={data}
+            onBack={prevStep}
+          />
+        )}
+      </div>
     </div>
   )
 }

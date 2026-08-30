@@ -1,9 +1,3 @@
-// components/Step3Fotos.tsx
-// @version 2.0.0
-// UPDATED v2.0.0: Foto's worden direct bij selectie geüpload naar Vercel
-// Blob (via /api/photos/upload). De wizard-state bevat alleen nog URLs,
-// zodat foto's een refresh en localStorage-roundtrip overleven.
-
 'use client'
 
 import { useState } from 'react'
@@ -12,7 +6,6 @@ import type { GeuploadeFotos, UploadedPhoto } from '@/lib/types'
 interface Props {
   data: GeuploadeFotos
   updateData: (data: Partial<GeuploadeFotos>) => void
-  /** Maakt (één keer) de concept-krant aan en geeft het paper-id terug */
   ensurePaper: () => Promise<string | null>
   onNext: () => void
   onBack: () => void
@@ -40,42 +33,28 @@ export default function Step3Fotos({ data, updateData, ensurePaper, onNext, onBa
 
   const handleFileSelect = async (fotoKey: keyof GeuploadeFotos, file: File | null) => {
     setError(fotoKey, null)
-
     if (!file) {
       await handleRemove(fotoKey)
       return
     }
-
     if (file.size > 10 * 1024 * 1024) {
       setError(fotoKey, 'Bestand is te groot. Maximaal 10MB toegestaan.')
       return
     }
-
     setUploading(prev => ({ ...prev, [fotoKey]: true }))
     try {
       const paperId = await ensurePaper()
-
       const formData = new FormData()
       formData.append('file', file)
       formData.append('position', String(FOTO_POSITIONS[fotoKey]))
       if (paperId) formData.append('paperId', paperId)
-
-      const response = await fetch('/api/photos/upload', {
-        method: 'POST',
-        body: formData,
-      })
-
+      const response = await fetch('/api/photos/upload', { method: 'POST', body: formData })
       const result = await response.json()
       if (!response.ok) {
         setError(fotoKey, result?.error || 'Upload mislukt, probeer het opnieuw.')
         return
       }
-
-      const photo: UploadedPhoto = {
-        url: result.url,
-        photoId: result.photoId ?? null,
-        fileName: file.name,
-      }
+      const photo: UploadedPhoto = { url: result.url, photoId: result.photoId ?? null, fileName: file.name }
       updateData({ [fotoKey]: photo })
     } catch (err) {
       console.error('[Step3] Upload fout:', err)
@@ -89,7 +68,6 @@ export default function Step3Fotos({ data, updateData, ensurePaper, onNext, onBa
     const current = data[fotoKey]
     updateData({ [fotoKey]: null })
     setError(fotoKey, null)
-
     if (current?.url) {
       try {
         await fetch('/api/photos/upload', {
@@ -98,8 +76,6 @@ export default function Step3Fotos({ data, updateData, ensurePaper, onNext, onBa
           body: JSON.stringify({ url: current.url, photoId: current.photoId }),
         })
       } catch (err) {
-        // De foto is al uit de wizard-state; een mislukte blob-delete is
-        // geen blokkade voor de gebruiker.
         console.error('[Step3] Verwijderen uit Blob mislukt:', err)
       }
     }
@@ -110,118 +86,81 @@ export default function Step3Fotos({ data, updateData, ensurePaper, onNext, onBa
     onNext()
   }
 
-  const renderFotoUpload = (
-    fotoKey: keyof GeuploadeFotos,
-    label: string,
-    required: boolean = false
-  ) => {
+  const renderSlot = (fotoKey: keyof GeuploadeFotos, isMain: boolean) => {
     const currentPhoto = data[fotoKey]
     const isUploading = uploading[fotoKey]
     const error = errors[fotoKey]
+    const label = isMain ? 'Hoofdfoto' : `Foto ${FOTO_POSITIONS[fotoKey]}`
 
     return (
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-400 transition-colors">
-        <label className="block">
-          <div className="text-sm font-medium mb-2">
-            {label} {required && <span className="text-red-500">*</span>}
+      <label
+        key={fotoKey}
+        className={`cursor-pointer border-2 border-dashed border-dark/25 rounded-[14px] bg-cream-card flex flex-col items-center justify-center gap-2 hover:border-sage hover:bg-[#F7F3EA] transition-colors overflow-hidden ${isMain ? 'h-[300px]' : ''}`}
+      >
+        {currentPhoto ? (
+          <div className="relative w-full h-full">
+            <img src={currentPhoto.url} alt={label} className="w-full h-full object-cover" />
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); handleRemove(fotoKey) }}
+              className="absolute top-2 right-2 bg-dark/70 text-cream text-xs px-2 py-1 rounded-pill"
+            >
+              Verwijder
+            </button>
           </div>
-
-          {currentPhoto ? (
-            <div className="relative">
-              <img
-                src={currentPhoto.url}
-                alt={label}
-                className="w-full h-48 object-cover rounded-lg mb-2"
-              />
-              <button
-                type="button"
-                onClick={() => handleRemove(fotoKey)}
-                className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
-              >
-                Verwijder
-              </button>
+        ) : isUploading ? (
+          <div className="flex flex-col items-center gap-2 py-8">
+            <div className="w-8 h-8 border-2 border-sage border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-muted">Uploaden...</span>
+          </div>
+        ) : (
+          <>
+            <div className="font-bold text-lg">{currentPhoto ? `✓ ${label}` : `+ ${label}`}</div>
+            <div className="font-serif text-[15px] text-muted">
+              {isMain ? 'Hoofdfoto — sleep hierheen of klik' : 'Klik om te uploaden'}
             </div>
-          ) : isUploading ? (
-            <div className="flex flex-col items-center justify-center h-48 bg-gray-50 rounded-lg">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-2" />
-              <span className="text-sm text-gray-500">Uploaden...</span>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-48 bg-gray-50 rounded-lg cursor-pointer">
-              <svg className="w-12 h-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span className="text-sm text-gray-500">Klik om foto te uploaden</span>
-              <span className="text-xs text-gray-400 mt-1">JPG, PNG (max 10MB)</span>
-            </div>
-          )}
-
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/jpg,image/webp"
-            disabled={isUploading}
-            onChange={(e) => {
-              const file = e.target.files?.[0] || null
-              handleFileSelect(fotoKey, file)
-              // Reset zodat dezelfde file opnieuw gekozen kan worden
-              e.target.value = ''
-            }}
-            className="hidden"
-          />
-        </label>
-
-        {error && (
-          <div className="mt-2 text-xs text-red-600">{error}</div>
+          </>
         )}
-
-        {currentPhoto?.fileName && !error && (
-          <div className="mt-2 text-xs text-gray-600">{currentPhoto.fileName}</div>
-        )}
-      </div>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/jpg,image/webp"
+          disabled={isUploading}
+          onChange={(e) => {
+            const file = e.target.files?.[0] || null
+            handleFileSelect(fotoKey, file)
+            e.target.value = ''
+          }}
+          className="hidden"
+        />
+        {error && <div className="text-xs text-terracotta px-4 pb-2">{error}</div>}
+      </label>
     )
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">Foto&apos;s uploaden</h2>
-        <p className="text-gray-600 mb-6">
-          Upload maximaal 4 foto&apos;s voor het openingsartikel (optioneel voor testfase).
-          Deze foto&apos;s komen op de voorpagina van het babykrantje.
-        </p>
-      </div>
+    <div className="animate-bk-rise">
+      <h1 className="bk-heading">Vier foto&apos;s</h1>
+      <p className="bk-subtext">Eén grote voor op de voorpagina, drie kleintjes voor de fotostrip. Liggend werkt het mooist.</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {renderFotoUpload('foto1', 'Foto 1')}
-        {renderFotoUpload('foto2', 'Foto 2')}
-        {renderFotoUpload('foto3', 'Foto 3')}
-        {renderFotoUpload('foto4', 'Foto 4')}
-      </div>
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-[1.4fr_1fr] gap-4">
+          {renderSlot('foto1', true)}
+          <div className="grid grid-rows-3 gap-4">
+            {renderSlot('foto2', false)}
+            {renderSlot('foto3', false)}
+            {renderSlot('foto4', false)}
+          </div>
+        </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-800">
-          <strong>💡 Tip:</strong> Kies duidelijke, scherpe foto&apos;s met goede belichting.
-          Close-ups van het gezicht werken het beste voor een babykrantje.
-        </p>
-      </div>
+        <div className="bg-peach rounded-xl p-4 mt-[18px] font-serif text-[15.5px] leading-relaxed">
+          Geen foto bij de hand? Geen probleem — je kunt ze later toevoegen. De krant is ook zonder foto&apos;s compleet.
+        </div>
 
-      {/* Navigation buttons */}
-      <div className="flex justify-between pt-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-8 py-3 rounded-lg transition-colors"
-        >
-          ← Vorige stap
-        </button>
-
-        <button
-          type="submit"
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
-        >
-          Volgende stap →
-        </button>
-      </div>
-    </form>
+        <div className="flex justify-between items-center mt-6">
+          <button type="button" onClick={onBack} className="bk-btn-back">&larr; Terug</button>
+          <button type="submit" className="bk-btn-primary">Controleren &rarr;</button>
+        </div>
+      </form>
+    </div>
   )
 }
