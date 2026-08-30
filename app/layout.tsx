@@ -2,8 +2,18 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'babykrantje.nl — Een babykrantje, in een handomdraai',
-  description: 'Vertel het geboorteverhaal in tien minuten. Wij maken er een echte voorpagina van.',
+  title: 'Babykrantje.nl — het kraamcadeau dat je niet ontgroeit',
+  description: 'Een echte krant over de eerste dag van je kind. In tien minuten gemaakt, thuisbezorgd op krantenpapier.',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
+  other: {
+    'theme-color': '#8FA88A',
+  },
 }
 
 export default function RootLayout({
