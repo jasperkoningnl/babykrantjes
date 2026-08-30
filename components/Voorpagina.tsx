@@ -111,7 +111,7 @@ export default function Voorpagina(props: VoorpaginaProps) {
       display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
     }}>
       {/* Top band */}
-      <div style={{ padding: '22px 26px 16px', color: '#fffdf9', position: 'relative', background: band }}>
+      <div style={{ padding: '22px 30px 16px', color: '#fffdf9', position: 'relative', background: band }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between',
           fontFamily: "'Bricolage Grotesque',sans-serif", fontSize: 11,
@@ -141,7 +141,7 @@ export default function Voorpagina(props: VoorpaginaProps) {
 
       {/* Info bar */}
       <div style={{
-        display: 'flex', justifyContent: 'space-between', padding: '7px 26px',
+        display: 'flex', justifyContent: 'space-between', padding: '7px 30px',
         fontFamily: "'Bricolage Grotesque',sans-serif", fontSize: 11,
         letterSpacing: '.08em', textTransform: 'uppercase',
         borderBottom: '2px solid #23231f', color: '#23231f',
@@ -153,8 +153,8 @@ export default function Voorpagina(props: VoorpaginaProps) {
 
       {/* Main 3-column grid */}
       <div style={{
-        flex: 1, display: 'grid', gridTemplateColumns: '150px 380px 180px',
-        gap: 12, padding: '14px 26px 0', minHeight: 0,
+        flex: 1, display: 'grid', gridTemplateColumns: '148px 1fr 170px',
+        gap: 12, padding: '14px 30px 0', minHeight: 0,
       }}>
         {/* Left column: feiten + horoscoop */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'hidden' }}>
@@ -295,7 +295,7 @@ export default function Voorpagina(props: VoorpaginaProps) {
       {/* Bottom 3-column: nieuws, weer, cultuur */}
       <div style={{
         display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
-        gap: 12, padding: '12px 26px 20px', marginTop: 8,
+        gap: 12, padding: '12px 30px 20px', marginTop: 8,
         borderTop: '2px solid #23231f',
       }}>
         {/* Nieuws */}
