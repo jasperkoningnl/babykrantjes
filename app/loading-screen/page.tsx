@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { BabykrantData } from '@/lib/types'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen, getKleur } from '@/lib/calculations'
-import { getHistoricalWeather, type WeatherData } from '@/lib/weatherAPI'
-import { getBornOnThisDay, type BornPerson } from '@/lib/bornOnThisDayAPI'
-import { getNameMeaning, type NameMeaningData } from '@/lib/nameMeaningAPI'
-import { getFamousNamesakes, type FamousNamesakesData } from '@/lib/famousNamesakesAPI'
+import { getHistoricalWeather } from '@/lib/weatherAPI'
+import { getBornOnThisDay } from '@/lib/bornOnThisDayAPI'
+import { getNameMeaning } from '@/lib/nameMeaningAPI'
+import { getFamousNamesakes } from '@/lib/famousNamesakesAPI'
 
 const GEN_TAKEN = [
   'Geboortegegevens controleren',
@@ -23,6 +24,9 @@ export default function LoadingScreenPage() {
   const router = useRouter()
   const [data, setData] = useState<BabykrantData | null>(null)
   const [genStap, setGenStap] = useState(0)
+  const [email, setEmail] = useState('')
+  const [emailVerstuurd, setEmailVerstuurd] = useState(false)
+  const [klaar, setKlaar] = useState(false)
   const hasStarted = useRef(false)
 
   useEffect(() => {
@@ -98,9 +102,33 @@ export default function LoadingScreenPage() {
 
     localStorage.setItem('babykrant_test_data', JSON.stringify(enrichedData))
 
-    setTimeout(() => {
-      router.push('/generate-articles')
-    }, 1000)
+    // Generate articles
+    try {
+      const sessionId = localStorage.getItem('babykrant_session_id') || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      localStorage.setItem('babykrant_session_id', sessionId)
+
+      const res = await fetch('/api/generate-paper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: enrichedData, paperId: enrichedData.paperId ?? null, sessionId }),
+      })
+      const result = await res.json()
+      if (result.success && result.articles) {
+        enrichedData.generatedArticles = result.articles
+        enrichedData.wordCounts = result.wordCounts
+        localStorage.setItem('babykrant_test_data', JSON.stringify(enrichedData))
+      }
+    } catch (error) {
+      console.error('Article generation error:', error)
+    }
+
+    setKlaar(true)
+  }
+
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) return
+    setEmailVerstuurd(true)
   }
 
   const progress = Math.round((genStap / GEN_TAKEN.length) * 100)
@@ -108,6 +136,16 @@ export default function LoadingScreenPage() {
 
   return (
     <div className="min-h-screen bg-cream text-dark font-sans">
+      {/* Header */}
+      <div className="sticky top-0 z-20 bg-cream/[.92] backdrop-blur-sm border-b border-dark/10">
+        <div className="max-w-container mx-auto px-7 py-3.5 flex items-center justify-between gap-6">
+          <Link href="/" className="flex items-center gap-2.5 no-underline">
+            <div className="w-[30px] h-[30px] rounded-full bg-sage flex items-center justify-center text-cream font-extrabold text-[15px]">b</div>
+            <div className="font-bold text-[19px] tracking-tight text-dark">babykrantje<span className="text-terracotta">.nl</span></div>
+          </Link>
+        </div>
+      </div>
+
       <div className="max-w-[620px] mx-auto px-7 py-[90px] text-center">
         <div className="font-serif italic text-[19px] text-muted mb-2.5">De redactie is aan het werk</div>
         <h1 className="text-[44px] leading-[1.02] tracking-[-0.03em] font-extrabold mb-8">{genKop}</h1>
@@ -121,7 +159,7 @@ export default function LoadingScreenPage() {
         </div>
 
         {/* Task list */}
-        <div className="text-left flex flex-col gap-3">
+        <div className="text-left flex flex-col gap-3 mb-10">
           {GEN_TAKEN.map((label, i) => {
             const done = i < genStap
             const current = i === genStap
@@ -141,6 +179,55 @@ export default function LoadingScreenPage() {
             )
           })}
         </div>
+
+        {/* Email option / continue */}
+        {klaar ? (
+          <div className="animate-bk-rise">
+            <div className="bg-cream-card border border-dark/10 rounded-card p-6 text-center">
+              <div className="font-bold text-xl mb-2">Je krant is klaar!</div>
+              <p className="font-serif text-[15.5px] text-subtle mb-5">
+                Bekijk je krant en pas de teksten aan tot alles perfect is.
+              </p>
+              <button
+                onClick={() => router.push('/generate-articles')}
+                className="bk-btn-primary"
+              >
+                Bekijk mijn krant &rarr;
+              </button>
+            </div>
+          </div>
+        ) : !emailVerstuurd ? (
+          <div className="animate-bk-rise">
+            <div className="bg-cream-card border border-dark/10 rounded-card p-6 text-left">
+              <div className="font-bold text-[17px] mb-1.5">Je krant wordt nu gemaakt</div>
+              <p className="font-serif text-[15px] text-subtle mb-4">
+                Vul je mailadres in en krijg een link als de krant af is. Of blijf wachten.
+              </p>
+              <form onSubmit={handleEmailSubmit} className="flex gap-2.5">
+                <input
+                  type="email"
+                  placeholder="E-mailadres"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bk-input flex-1"
+                />
+                <button type="submit" className="bk-btn-primary whitespace-nowrap">
+                  Mail mij een link
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          <div className="animate-bk-rise">
+            <div className="bg-sage/10 border border-sage/20 rounded-card p-6 text-center">
+              <div className="font-bold text-[17px] text-[#4A6B47] mb-1">Genoteerd!</div>
+              <p className="font-serif text-[15px] text-subtle">
+                We sturen een link naar <strong>{email}</strong> zodra je krant klaar is.
+                Je kunt dit venster sluiten.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
