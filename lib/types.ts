@@ -80,6 +80,9 @@ export interface ExtraVragen {
   // ========================================================================
   
   bijzonderheden?: string  // Bijzonderheden of leuke details? Max 300 karakters
+
+  eersteIndruk?: string[]  // Eerste indruk chips (meervoudige selectie)
+  eersteIndrukOverig?: string  // Open invoerveld voor eerste indruk
 }
 
 // UPDATED v4.0.0: Foto's worden direct bij selectie naar Vercel Blob

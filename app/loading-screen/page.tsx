@@ -10,6 +10,32 @@ import { getBornOnThisDay } from '@/lib/bornOnThisDayAPI'
 import { getNameMeaning } from '@/lib/nameMeaningAPI'
 import { getFamousNamesakes } from '@/lib/famousNamesakesAPI'
 
+const FUN_FACTS = [
+  'Elke seconde worden er wereldwijd ongeveer 4,3 baby’s geboren!',
+  'De meeste baby’s worden geboren op dinsdag, de minste in het weekend.',
+  'De meeste geboortes vinden plaats tussen 8 en 12 uur ’s ochtends.',
+  'September is de maand met de meeste geboorten in Nederland.',
+  'Gemiddeld weegt een baby bij geboorte 3.400 gram.',
+  'Baby’s hebben ongeveer 300 botjes, volwassenen maar 206!',
+  'Pasgeboren baby’s kunnen alleen tot 20-30 cm scherp zien.',
+  'Newborns slapen gemiddeld 16-17 uur per dag.',
+  'Baby’s kunnen al in de baarmoeder muziek horen en herkennen.',
+  'Baby’s herkennen de geur van hun moeder binnen een paar dagen.',
+  'Een baby’s brein verdubbelt in grootte in het eerste jaar!',
+  'Voetafdrukken van baby’s zijn net zo uniek als vingerafdrukken.',
+  'Voorlezen aan baby’s helpt hun hersenontwikkeling enorm.',
+  'Baby’s kunnen al vanaf 3 maanden kleuren onderscheiden.',
+  'Baby’s beginnen met ‘brabbelen’ rond 4-6 maanden oud.',
+  'De eerste glimlach van een baby verschijnt meestal rond 6 weken.',
+  'Baby’s kunnen gezichtsuitdrukkingen imiteren vanaf hun geboorte.',
+  'De meeste ouders maken gemiddeld 1.000 foto’s in het eerste jaar!',
+  'De meeste baby’s krijgen hun eerste tand rond 6 maanden.',
+  'In Nederland worden jaarlijks ongeveer 170.000 baby’s geboren.',
+  'Baby’s hebben meer smaakpapillen dan volwassenen.',
+  'Het hartje van een baby klopt 2x zo snel als dat van een volwassene.',
+  'Elk kind is uniek — zelfs eeneiige tweelingen hebben verschillende vingerafdrukken!',
+]
+
 const GEN_TAKEN = [
   'Geboortegegevens controleren',
   'Nieuws van die dag ophalen',
@@ -27,6 +53,7 @@ export default function LoadingScreenPage() {
   const [email, setEmail] = useState('')
   const [emailVerstuurd, setEmailVerstuurd] = useState(false)
   const [klaar, setKlaar] = useState(false)
+  const [factIndex, setFactIndex] = useState(() => Math.floor(Math.random() * FUN_FACTS.length))
   const hasStarted = useRef(false)
 
   useEffect(() => {
@@ -63,6 +90,14 @@ export default function LoadingScreenPage() {
     }, 950)
     return () => clearInterval(timer)
   }, [data])
+
+  useEffect(() => {
+    if (!data || klaar) return
+    const factTimer = setInterval(() => {
+      setFactIndex(prev => (prev + 1) % FUN_FACTS.length)
+    }, 5000)
+    return () => clearInterval(factTimer)
+  }, [data, klaar])
 
   const collectAllData = async (
     data: BabykrantData,
@@ -187,6 +222,14 @@ export default function LoadingScreenPage() {
             )
           })}
         </div>
+
+        {/* Fun fact */}
+        {!klaar && (
+          <div className="bg-cream-card border border-dark/10 rounded-card p-5 mb-10 text-left">
+            <div className="font-bold text-[15px] text-sage mb-1.5">Wist je dat…</div>
+            <p className="font-serif text-[15px] text-subtle leading-relaxed">{FUN_FACTS[factIndex]}</p>
+          </div>
+        )}
 
         {/* Email option / redirect notice */}
         {klaar ? (
