@@ -116,10 +116,10 @@ export default function Home() {
         <div>
           <div className="inline-flex items-center gap-2 bg-peach px-3.5 py-1.5 rounded-pill text-[13px] font-semibold mb-5">Het origineelste kraamcadeau</div>
           <h1 className="text-[clamp(40px,5.2vw,66px)] leading-[0.96] tracking-[-0.04em] font-extrabold mb-5">
-            Een babykrantje,<br />in een handomdraai.
+            Het kraamcadeau<br />dat je niet ontgroeit.
           </h1>
           <p className="font-serif text-xl leading-relaxed text-[#4A4740] mb-7 max-w-[30em]" style={{ textWrap: 'pretty' as any }}>
-            Vertel het geboorteverhaal in tien minuten. Wij maken er een echte voorpagina van — mét het nieuws, het weer, de muziek en de films van precies die dag.
+            Een echte krant over de eerste dag van je kind. In tien minuten gemaakt, thuisbezorgd op krantenpapier — mét het nieuws, het weer, de muziek en de films van precies die dag.
           </p>
           <div className="flex items-center gap-4 flex-wrap">
             <Link href="/wizard" className="bk-btn-primary !text-[17px] !py-4 !px-7 no-underline">Begin met een naam en datum</Link>
