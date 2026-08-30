@@ -160,10 +160,35 @@ export default function LoadingScreenPage() {
     setKlaar(true)
   }
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const [emailError, setEmailError] = useState('')
+  const [emailVerzenden, setEmailVerzenden] = useState(false)
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email) return
-    setEmailVerstuurd(true)
+    if (!email || emailVerzenden) return
+    setEmailError('')
+    setEmailVerzenden(true)
+
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          babyNaam: data?.basisGegevens?.volledigeNaam,
+        }),
+      })
+      if (!res.ok) {
+        const result = await res.json()
+        setEmailError(result.error || 'Er ging iets mis')
+        setEmailVerzenden(false)
+        return
+      }
+      setEmailVerstuurd(true)
+    } catch {
+      setEmailError('Kon geen verbinding maken')
+      setEmailVerzenden(false)
+    }
   }
 
   useEffect(() => {
@@ -262,10 +287,13 @@ export default function LoadingScreenPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="bk-input flex-1"
                 />
-                <button type="submit" className="bk-btn-primary whitespace-nowrap">
-                  Mail mij een link
+                <button type="submit" disabled={emailVerzenden} className="bk-btn-primary whitespace-nowrap disabled:opacity-60">
+                  {emailVerzenden ? 'Versturen…' : 'Mail mij een link'}
                 </button>
               </form>
+              {emailError && (
+                <p className="text-sm text-red-600 mt-2">{emailError}</p>
+              )}
             </div>
           </div>
         ) : (
