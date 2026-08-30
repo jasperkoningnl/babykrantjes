@@ -131,6 +131,14 @@ export default function LoadingScreenPage() {
     setEmailVerstuurd(true)
   }
 
+  useEffect(() => {
+    if (!klaar) return
+    const timeout = setTimeout(() => {
+      router.push('/generate-articles')
+    }, 1500)
+    return () => clearTimeout(timeout)
+  }, [klaar, router])
+
   const progress = Math.round((genStap / GEN_TAKEN.length) * 100)
   const genKop = genStap >= GEN_TAKEN.length ? 'Klaar!' : `${GEN_TAKEN[genStap] || GEN_TAKEN[0]}…`
 
@@ -180,13 +188,13 @@ export default function LoadingScreenPage() {
           })}
         </div>
 
-        {/* Email option / continue */}
+        {/* Email option / redirect notice */}
         {klaar ? (
           <div className="animate-bk-rise">
             <div className="bg-cream-card border border-dark/10 rounded-card p-6 text-center">
               <div className="font-bold text-xl mb-2">Je krant is klaar!</div>
               <p className="font-serif text-[15.5px] text-subtle mb-5">
-                Bekijk je krant en pas de teksten aan tot alles perfect is.
+                Je wordt doorgestuurd…
               </p>
               <button
                 onClick={() => router.push('/generate-articles')}
@@ -223,7 +231,7 @@ export default function LoadingScreenPage() {
               <div className="font-bold text-[17px] text-[#4A6B47] mb-1">Genoteerd!</div>
               <p className="font-serif text-[15px] text-subtle">
                 We sturen een link naar <strong>{email}</strong> zodra je krant klaar is.
-                Je kunt dit venster sluiten.
+                Je kunt dit venster sluiten of blijven wachten.
               </p>
             </div>
           </div>
