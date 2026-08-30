@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 export async function POST(req: NextRequest) {
   try {
     const { email, babyNaam } = await req.json()
+
+    const resend = new Resend(process.env.RESEND_API_KEY)
 
     if (!email || typeof email !== 'string') {
       return NextResponse.json({ error: 'E-mailadres is verplicht' }, { status: 400 })
