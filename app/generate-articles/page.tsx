@@ -1,13 +1,25 @@
-// app/generate-articles/page.tsx
-// @version 2.0.0 - Prompts verplaatst naar de backend (lib/prompts.ts);
-// deze pagina stuurt alleen nog data. Nieuw: alle acht secties in één
-// gestructureerde call via /api/generate-paper.
 'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ARTICLE_SECTIONS, type ArticleSection, type GeneratedArticle, type ArticleGenerationResponse } from '@/lib/articleTypes'
-import VersionFooter from '@/components/VersionFooter'
+
+const ARTIKEL_TABS: { id: ArticleSection; label: string; titel: string }[] = [
+  { id: 'hoofdartikel', label: 'Openingsartikel', titel: 'Openingsartikel — het geboorteverhaal' },
+  { id: 'naam_betekenis', label: 'Naambetekenis', titel: 'De betekenis van de naam' },
+  { id: 'beroemde_namen', label: 'Naamgenoten', titel: 'Beroemde naamgenoten' },
+  { id: 'geboren_op_dag', label: 'Geboren op', titel: 'Ook geboren op deze dag' },
+  { id: 'sterrenbeeld', label: 'Horoscoop', titel: 'Sterrenbeeld & Chinees teken' },
+  { id: 'nieuws', label: 'Nieuws', titel: 'Het nieuws van die dag' },
+  { id: 'weer', label: 'Weer', titel: 'Het weer' },
+  { id: 'cultuur', label: 'Cultuur', titel: 'Muziek, films & series' },
+]
+
+const LIMIETEN: Record<string, number> = {
+  hoofdartikel: 470, naam_betekenis: 260, beroemde_namen: 210,
+  geboren_op_dag: 250, sterrenbeeld: 330, nieuws: 240, weer: 230, cultuur: 230,
+}
 
 function getSessionId(): string {
   if (typeof window === 'undefined') return ''
@@ -20,108 +32,71 @@ function getSessionId(): string {
 }
 
 export default function GenerateArticlesPage() {
+  const router = useRouter()
   const [sessionId, setSessionId] = useState('')
   const [testData, setTestData] = useState<any>(null)
-  const [devMode, setDevMode] = useState(false)
+  const [paneel, setPaneel] = useState<'teksten' | 'fotos'>('teksten')
+  const [actief, setActief] = useState<ArticleSection>('hoofdartikel')
+  const [regens, setRegens] = useState(0)
+  const [bewaard, setBewaard] = useState<string | null>(null)
   const [articles, setArticles] = useState<Record<ArticleSection, GeneratedArticle | null>>({
-    hoofdartikel: null,
-    sterrenbeeld: null,
-    nieuws: null,
-    weer: null,
-    cultuur: null,
-    naam_betekenis: null,
-    beroemde_namen: null,
-    geboren_op_dag: null
+    hoofdartikel: null, sterrenbeeld: null, nieuws: null, weer: null,
+    cultuur: null, naam_betekenis: null, beroemde_namen: null, geboren_op_dag: null,
   })
   const [loading, setLoading] = useState<Record<ArticleSection, boolean>>({
-    hoofdartikel: false,
-    sterrenbeeld: false,
-    nieuws: false,
-    weer: false,
-    cultuur: false,
-    naam_betekenis: false,
-    beroemde_namen: false,
-    geboren_op_dag: false
+    hoofdartikel: false, sterrenbeeld: false, nieuws: false, weer: false,
+    cultuur: false, naam_betekenis: false, beroemde_namen: false, geboren_op_dag: false,
   })
-  const [usageInfo, setUsageInfo] = useState({ remaining: 50, cost: 0 })
   const [generatingAll, setGeneratingAll] = useState(false)
 
   useEffect(() => {
     setSessionId(getSessionId())
     const stored = localStorage.getItem('babykrant_test_data')
-    if (stored) {
-      setTestData(JSON.parse(stored))
-    }
+    if (stored) setTestData(JSON.parse(stored))
   }, [])
 
+  // Auto-save
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const nu = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+      setBewaard(nu)
+    }, 700)
+    return () => clearTimeout(timer)
+  }, [articles])
+
   const generateArticle = async (section: ArticleSection) => {
-    if (!testData) {
-      alert('Geen test data gevonden. Ga eerst door de wizard.')
-      return
-    }
-
+    if (!testData) return
     setLoading(prev => ({ ...prev, [section]: true }))
-
     try {
       const res = await fetch('/api/generate-article', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          section,
-          data: testData,
-          sessionId
-        })
+        body: JSON.stringify({ section, data: testData, sessionId }),
       })
-
       const result: ArticleGenerationResponse = await res.json()
-
       if (result.success && result.text) {
         setArticles(prev => ({
           ...prev,
-          [section]: {
-            section,
-            text: result.text!,
-            generatedAt: new Date().toISOString(),
-            wordCount: result.wordCount || 0
-          }
+          [section]: { section, text: result.text!, generatedAt: new Date().toISOString(), wordCount: result.wordCount || 0 },
         }))
-        
-        if (result.remainingRequests !== undefined) {
-          setUsageInfo({
-            remaining: result.remainingRequests,
-            cost: result.dailyCost || 0
-          })
-        }
-      } else {
-        alert(result.error || 'Er ging iets mis')
+        setRegens(prev => prev + 1)
       }
     } catch (error) {
       console.error('Generate error:', error)
-      alert('Fout bij genereren')
     } finally {
       setLoading(prev => ({ ...prev, [section]: false }))
     }
   }
 
-  // Alle acht secties in één gestructureerde Claude-call
   const generateAll = async () => {
-    if (!testData) {
-      alert('Geen test data gevonden. Ga eerst door de wizard.')
-      return
-    }
-
+    if (!testData) return
     setGeneratingAll(true)
     try {
       const res = await fetch('/api/generate-paper', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: testData,
-          paperId: testData.paperId ?? null,
-          sessionId
-        })
+        body: JSON.stringify({ data: testData, paperId: testData.paperId ?? null, sessionId }),
       })
-
       const result = await res.json()
       if (result.success && result.articles) {
         const generatedAt = new Date().toISOString()
@@ -132,209 +107,262 @@ export default function GenerateArticlesPage() {
               section: section as ArticleSection,
               text: String(text),
               generatedAt,
-              wordCount: result.wordCounts?.[section] || 0
+              wordCount: result.wordCounts?.[section] || 0,
             }
           }
           return next
         })
-      } else {
-        alert(result.error || 'Er ging iets mis')
       }
     } catch (error) {
       console.error('Generate all error:', error)
-      alert('Fout bij genereren')
     } finally {
       setGeneratingAll(false)
     }
   }
 
+  const updateArticleText = (text: string) => {
+    setArticles(prev => {
+      const existing = prev[actief]
+      return {
+        ...prev,
+        [actief]: existing
+          ? { ...existing, text }
+          : { section: actief, text, generatedAt: new Date().toISOString(), wordCount: 0 },
+      }
+    })
+  }
+
   if (!testData) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-4xl mx-auto text-center">
+      <div className="min-h-screen bg-cream text-dark font-sans flex items-center justify-center">
+        <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Geen data gevonden</h1>
-          <p className="text-gray-600 mb-6">Ga eerst door de wizard om data op te halen.</p>
-          <Link href="/wizard" className="text-blue-600 hover:underline">→ Naar wizard</Link>
+          <p className="text-muted mb-6">Ga eerst door de wizard om data op te halen.</p>
+          <Link href="/wizard" className="text-terracotta font-semibold">→ Naar wizard</Link>
         </div>
       </div>
     )
   }
 
-  const sortedSections = Object.values(ARTICLE_SECTIONS).sort((a, b) => a.priority - b.priority)
+  const actiefTab = ARTIKEL_TABS.find(t => t.id === actief) || ARTIKEL_TABS[0]
+  const actieveTekst = articles[actief]?.text || ''
+  const limiet = LIMIETEN[actief] || 400
+  const teVeel = actieveTekst.length > limiet
+  const gratis = Math.max(0, 5 - regens)
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-pink-50 py-12 px-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex justify-between items-center">
-          <Link href="/wizard" className="text-blue-600 hover:underline">← Terug naar wizard</Link>
-          {devMode && (
-            <Link href="/test-results" className="text-purple-600 hover:underline text-sm">
-              🔧 Dev: Test Results →
-            </Link>
-          )}
+    <div className="min-h-screen bg-cream text-dark font-sans">
+      {/* Header */}
+      <div className="sticky top-0 z-20 bg-cream/[.92] backdrop-blur-sm border-b border-dark/10">
+        <div className="max-w-[1320px] mx-auto px-7 py-3.5 flex items-center justify-between gap-6">
+          <Link href="/" className="flex items-center gap-2.5 no-underline">
+            <div className="w-[30px] h-[30px] rounded-full bg-sage flex items-center justify-center text-cream font-extrabold text-[15px]">b</div>
+            <div className="font-bold text-[19px] tracking-tight text-dark">babykrantje<span className="text-terracotta">.nl</span></div>
+          </Link>
+        </div>
+      </div>
+
+      <div className="max-w-[1320px] mx-auto px-7 py-7 grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8 items-start">
+        {/* Left: Newspaper preview */}
+        <div>
+          <div className="flex items-baseline justify-between mb-3.5">
+            <h1 className="text-[32px] tracking-[-0.03em] font-extrabold">Je krant is klaar</h1>
+            <div className="flex items-center gap-3.5 text-[13.5px] text-muted">
+              <span>Voorbeeld met watermerk — de PDF is schoon</span>
+              <span className="inline-flex items-center gap-1.5 bg-sage-light text-[#4A6B47] px-2.5 py-1 rounded-pill text-[13px]">
+                {bewaard ? `✓ Bewaard om ${bewaard}` : '✓ Automatisch bewaard'}
+              </span>
+            </div>
+          </div>
+
+          {/* Newspaper placeholder / generate button */}
+          <div className="w-full min-h-[600px] bg-white shadow-[0_30px_60px_-30px_rgba(35,35,31,.5)] flex flex-col items-center justify-center select-none relative">
+            {generatingAll ? (
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-10 h-10 border-2 border-sage border-t-transparent rounded-full animate-spin" />
+                <p className="text-muted font-serif italic">Artikelen worden geschreven...</p>
+              </div>
+            ) : Object.values(articles).some(a => a !== null) ? (
+              <div className="p-8 w-full">
+                <div className="text-center mb-6">
+                  <h2 className="text-[28px] font-extrabold tracking-tight mb-1">De {testData.basisGegevens.volledigeNaam?.split(' ')[0]}krant</h2>
+                  <p className="font-serif text-sm text-muted">{testData.basisGegevens.geboorteplaats} — {testData.basisGegevens.geboorteDatum}</p>
+                </div>
+                <div className="space-y-4 max-w-[600px] mx-auto">
+                  {ARTIKEL_TABS.map(tab => {
+                    const art = articles[tab.id]
+                    if (!art) return null
+                    return (
+                      <div key={tab.id} className="border-b border-dark/[.08] pb-4 last:border-b-0">
+                        <h3 className="font-bold text-sm mb-1">{tab.titel}</h3>
+                        <p className="font-serif text-[14px] leading-relaxed text-subtle line-clamp-3">{art.text}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="text-[80px] font-extrabold text-dark/[.06] rotate-[-30deg] select-none">WATERMERK</div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                <p className="font-serif italic text-lg text-muted">Genereer eerst de artikelen</p>
+                <button
+                  onClick={generateAll}
+                  className="bk-btn-primary"
+                >
+                  Genereer alle 8 artikelen
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="text-[13px] text-muted-light mt-2.5">
+            Deze weergave is beveiligd: rechtsklikken en downloaden zijn uitgeschakeld.
+          </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">📝 AI Artikelen Genereren</h1>
-              <p className="text-gray-600">Genereer en preview artikelen per sectie</p>
-            </div>
-
-            <div className="flex gap-4">
-              {/* Developer mode toggle */}
-              <button
-                onClick={() => setDevMode(!devMode)}
-                className={`px-4 py-2 rounded-lg font-semibold transition-colors text-sm ${
-                  devMode
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {devMode ? '🔧 Dev Mode: AAN' : '🔧 Dev Mode'}
-              </button>
-
-              {/* Usage info */}
-              <div className="bg-blue-50 rounded-lg p-4 text-sm">
-                <div className="font-semibold text-blue-900">Vandaag gebruikt:</div>
-                <div className="text-blue-700">{50 - usageInfo.remaining}/50 requests</div>
-                <div className="text-blue-700">€{usageInfo.cost.toFixed(4)}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Baby info */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-sm">
-            <strong className="text-gray-700">Baby:</strong> {testData.basisGegevens.volledigeNaam} 
-            <span className="mx-2">|</span>
-            <strong className="text-gray-700">Geboren:</strong> {testData.basisGegevens.geboorteDatum}
-            <span className="mx-2">|</span>
-            <strong className="text-gray-700">Plaats:</strong> {testData.basisGegevens.geboorteplaats}
-          </div>
-
-          {/* Genereer alles in één call */}
-          <div className="mb-6">
-            <button
-              onClick={generateAll}
-              disabled={generatingAll}
-              className={`w-full px-6 py-4 rounded-lg font-semibold transition-colors ${
-                generatingAll
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-            >
-              {generatingAll ? '⏳ Alle secties worden gegenereerd...' : '⚡ Genereer alle 8 secties in één keer'}
-            </button>
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              Eén gestructureerde AI-call: sneller, goedkoper en consistenter van toon.
-              Per sectie opnieuw genereren kan daarna nog steeds.
-            </p>
-          </div>
-
-          {devMode && (
-            <div className="bg-purple-50 rounded-lg p-4 mb-6 border border-purple-200 text-sm text-purple-800">
-              🔧 Prompts leven sinds v2.0.0 uitsluitend in de backend
-              (<code>lib/prompts.ts</code>); de frontend stuurt alleen data.
-            </div>
-          )}
-
-          {/* Secties grid */}
-          <div className="space-y-4">
-            {sortedSections.map(config => {
-              const article = articles[config.id]
-              const isLoading = loading[config.id]
-
+        {/* Right: Side panel */}
+        <div className="lg:sticky lg:top-[88px] flex flex-col gap-4">
+          {/* Panel tabs */}
+          <div className="flex gap-2">
+            {(['teksten', 'fotos'] as const).map(tab => {
+              const on = paneel === tab
               return (
-                <div key={config.id} className="border border-gray-200 rounded-lg p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-2xl">{config.icon}</span>
-                        <h2 className="text-xl font-semibold text-gray-900">{config.title}</h2>
-                      </div>
-                      <p className="text-sm text-gray-600">{config.description}</p>
-                      <p className="text-xs text-gray-500 mt-1">Doel: ~{config.targetWordCount} woorden</p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      {!article && (
-                        <button
-                          onClick={() => generateArticle(config.id)}
-                          disabled={isLoading}
-                          className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-                            isLoading 
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                              : 'bg-blue-600 hover:bg-blue-700 text-white'
-                          }`}
-                        >
-                          {isLoading ? 'Genereren...' : 'Genereer'}
-                        </button>
-                      )}
-                      
-                      {article && (
-                        <>
-                          <button
-                            onClick={() => generateArticle(config.id)}
-                            disabled={isLoading}
-                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors"
-                          >
-                            ↻ Opnieuw
-                          </button>
-                          <button
-                            onClick={() => setArticles(prev => ({ ...prev, [config.id]: null }))}
-                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-colors"
-                          >
-                            ✕ Verwijder
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Preview */}
-                  {article && (
-                    <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-500">
-                      <div className="flex justify-between items-center mb-3">
-                        <div className="text-xs text-gray-500">
-                          {article.wordCount} woorden • Gegenereerd {new Date(article.generatedAt).toLocaleTimeString('nl-NL')}
-                        </div>
-                      </div>
-                      <div className="prose prose-sm max-w-none text-gray-800 whitespace-pre-wrap">
-                        {article.text}
-                      </div>
-                    </div>
-                  )}
-
-                  {isLoading && (
-                    <div className="bg-blue-50 rounded-lg p-4 text-center">
-                      <div className="animate-pulse text-blue-600">⏳ AI is aan het schrijven...</div>
-                    </div>
-                  )}
-                </div>
+                <button
+                  key={tab}
+                  onClick={() => setPaneel(tab)}
+                  className="flex-1 border cursor-pointer text-[15px] font-semibold py-2.5 rounded-xl"
+                  style={{
+                    background: on ? '#23231F' : '#FFFDF9',
+                    color: on ? '#FBF7F1' : '#23231F',
+                    borderColor: on ? '#23231F' : 'rgba(35,35,31,.15)',
+                  }}
+                >
+                  {tab === 'teksten' ? 'Teksten' : "Foto's"}
+                </button>
               )
             })}
           </div>
 
-          {/* Actions */}
-          <div className="mt-8 pt-6 border-t flex gap-4">
-            <Link href="/test-results" className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-colors">
-              ← Terug naar resultaten
-            </Link>
-            <button
-              onClick={() => {
-                const count = Object.values(articles).filter(a => a !== null).length
-                alert(`${count}/8 artikelen gegenereerd.\n\nVolgende stap: Prompts verbeteren op basis van deze resultaten.`)
-              }}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors"
+          {/* Teksten panel */}
+          {paneel === 'teksten' && (
+            <>
+              <div className="bg-cream-card border border-dark/[.12] rounded-card p-5">
+                <div className="font-bold text-[17px] mb-1">Teksten aanpassen</div>
+                <div className="font-serif text-[15px] text-subtle mb-3.5">
+                  Kies een artikel. Zelf typen is gratis, opnieuw laten schrijven kost &euro; 0,50.
+                </div>
+                <div className="flex flex-wrap gap-[7px]">
+                  {ARTIKEL_TABS.map(tab => {
+                    const on = actief === tab.id
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActief(tab.id)}
+                        className="bk-chip"
+                        style={{
+                          background: on ? '#23231F' : '#fff',
+                          color: on ? '#FBF7F1' : '#23231F',
+                          borderColor: on ? '#23231F' : 'rgba(35,35,31,.2)',
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-cream-card border border-dark/[.12] rounded-card p-5">
+                <div className="font-bold text-[17px] mb-2.5">{actiefTab.titel}</div>
+                <textarea
+                  value={actieveTekst}
+                  onChange={(e) => updateArticleText(e.target.value)}
+                  rows={11}
+                  className="bk-input font-serif text-[15px] leading-relaxed"
+                  style={{ borderColor: teVeel ? '#B5563A' : 'rgba(35,35,31,.2)' }}
+                />
+                <div className="text-[13px] mt-[7px]" style={{ color: teVeel ? '#B5563A' : '#8A857B' }}>
+                  {teVeel
+                    ? `${actieveTekst.length - limiet} tekens te veel — dit valt buiten het kader`
+                    : `${limiet - actieveTekst.length} tekens ruimte over in dit kader`
+                  }
+                </div>
+                <div className="flex justify-between items-center mt-3 gap-2.5">
+                  <button
+                    onClick={() => generateArticle(actief)}
+                    disabled={loading[actief]}
+                    className="border border-dark/25 bg-white text-sm font-semibold px-4 py-2.5 rounded-pill"
+                  >
+                    {loading[actief] ? '⏳ Bezig...' : '↻ Opnieuw laten schrijven · € 0,50'}
+                  </button>
+                  <div className="text-[13px] text-muted-light text-right">
+                    {gratis > 0 ? `${gratis} gratis herschrijvingen over` : 'Wordt bij je bestelling opgeteld'}
+                  </div>
+                </div>
+                <div className="text-[13px] text-muted-light mt-2.5 border-t border-dark/[.08] pt-2.5">
+                  Wijzigingen worden automatisch bewaard.
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Foto's panel */}
+          {paneel === 'fotos' && (
+            <div className="bg-cream-card border border-dark/[.12] rounded-card p-5">
+              <div className="font-bold text-[17px] mb-1">Foto&apos;s</div>
+              <div className="font-serif text-[15px] text-subtle mb-4">
+                Vier eigen foto&apos;s, plus de foto&apos;s bij het nieuws, de naamgenoot en de muziek.
+                Die laatste drie mag je vervangen door iets eigens.
+              </div>
+              <div className="flex flex-col gap-3">
+                {[
+                  { naam: 'Hoofdfoto', hint: 'Groot, boven het openingsartikel' },
+                  { naam: 'Foto 2', hint: 'Fotostrip onder het artikel' },
+                  { naam: 'Foto 3', hint: 'Fotostrip onder het artikel' },
+                  { naam: 'Foto 4', hint: 'Fotostrip onder het artikel' },
+                  { naam: 'Foto bij het nieuws', hint: 'Wij kiezen er standaard een uit het archief' },
+                  { naam: 'Foto van de naamgenoot', hint: 'Vervangbaar door een eigen foto' },
+                  { naam: 'Foto bij muziek & films', hint: 'Artiest, albumhoes of filmposter' },
+                ].map((sl, i) => (
+                  <div key={i} className="flex gap-3 items-start pb-3 border-b border-dark/[.08] last:border-b-0">
+                    <div className="w-16 h-12 flex-shrink-0 rounded-lg flex items-center justify-center text-[11px] text-muted bg-[#F5F1E9] border border-dashed border-dark/25 cursor-pointer">
+                      +
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-baseline gap-2">
+                        <div className="font-semibold text-[14.5px]">{sl.naam}</div>
+                        <button className="text-terracotta text-[13.5px] font-semibold bg-transparent border-none p-0 cursor-pointer">Foto kiezen</button>
+                      </div>
+                      <div className="text-[12.5px] text-muted-light">{sl.hint}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Bestellen CTA */}
+          <div className="bg-dark text-cream rounded-card p-5">
+            <div className="font-bold text-[19px] mb-1.5">Tevreden?</div>
+            <div className="font-serif text-[15.5px] leading-relaxed opacity-85 mb-4">
+              Haal het watermerk weg en download de drukklare PDF, of laat hem printen en inlijsten.
+            </div>
+            <Link
+              href="/checkout"
+              className="block w-full bg-terracotta text-cream font-semibold text-base py-3.5 rounded-pill text-center no-underline"
             >
-              ✓ Klaar ({Object.values(articles).filter(a => a !== null).length}/8)
-            </button>
+              Bestellen →
+            </Link>
           </div>
+          <button
+            onClick={() => router.push('/wizard')}
+            className="bg-transparent border-none text-sm text-muted cursor-pointer text-left p-0"
+          >
+            ← Gegevens aanpassen
+          </button>
         </div>
       </div>
-      <VersionFooter />
     </div>
   )
 }
