@@ -86,12 +86,16 @@ button:disabled {
   }
 
   .bk-chip {
-    @apply border cursor-pointer text-[14.5px] rounded-pill;
+    @apply border cursor-pointer text-[14.5px] rounded-pill transition-colors duration-150;
     padding: 9px 16px;
   }
 
   .bk-chip-off {
-    @apply bg-white text-dark border-dark/[.22];
+    @apply bg-cream-card text-dark border-dark/40;
+  }
+
+  .bk-chip-off:hover {
+    @apply bg-cream-dark border-dark/60;
   }
 
   .bk-chip-on {
