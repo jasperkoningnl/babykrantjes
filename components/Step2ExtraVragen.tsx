@@ -20,17 +20,23 @@ const CHIP_SETS: Record<ChipSet, string[]> = {
 }
 
 export default function Step2ExtraVragen({ data, updateData, onNext, onBack }: Props) {
+  const MULTI_SELECT_SETS: ChipSet[] = ['baby']
+
   const [chips, setChips] = useState<Record<ChipSet, string[]>>({
     zwangerschap: [],
     plek: data.geboorteLocatie ? [data.geboorteLocatie === 'thuis' ? 'Thuis' : data.geboorteLocatie === 'ziekenhuis' ? 'Ziekenhuis' : data.geboorteLocatie === 'geboortecentrum' ? 'Geboortecentrum' : 'Anders'] : [],
     bevalling: [],
-    baby: [],
+    baby: data.eersteIndruk || [],
   })
+  const [eersteIndrukOverig, setEersteIndrukOverig] = useState(data.eersteIndrukOverig || '')
 
   const toggleChip = (set: ChipSet, label: string) => {
     setChips(prev => {
       const cur = prev[set]
-      const next = cur.includes(label) ? cur.filter(x => x !== label) : [...cur, label]
+      const isMulti = MULTI_SELECT_SETS.includes(set)
+      const next = cur.includes(label)
+        ? cur.filter(x => x !== label)
+        : isMulti ? [...cur, label] : [label]
       return { ...prev, [set]: next }
     })
 
@@ -45,6 +51,8 @@ export default function Step2ExtraVragen({ data, updateData, onNext, onBack }: P
     updateData({
       zwangerschapVerloop: chips.zwangerschap.join(', ') || undefined,
       bevallingVerloop: chips.bevalling.length > 0 ? chips.bevalling[0].toLowerCase() as any : undefined,
+      eersteIndruk: chips.baby.length > 0 ? chips.baby : undefined,
+      eersteIndrukOverig: eersteIndrukOverig.trim() || undefined,
     })
     onNext()
   }
@@ -137,6 +145,13 @@ export default function Step2ExtraVragen({ data, updateData, onNext, onBack }: P
           />
           <label className="bk-label mb-[9px]">Eerste indruk van dit kindje</label>
           {renderChips('baby')}
+          <input
+            type="text"
+            value={eersteIndrukOverig}
+            onChange={(e) => setEersteIndrukOverig(e.target.value)}
+            placeholder="Of omschrijf het zelf…"
+            className="bk-input mt-3"
+          />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-5">
             <div>
               <label className="bk-label">Broertjes of zusjes</label>

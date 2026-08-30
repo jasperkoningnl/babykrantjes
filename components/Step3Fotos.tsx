@@ -153,7 +153,7 @@ export default function Step3Fotos({ data, updateData, ensurePaper, onNext, onBa
         </div>
 
         <div className="bg-peach rounded-xl p-4 mt-[18px] font-serif text-[15.5px] leading-relaxed">
-          Geen foto bij de hand? Geen probleem — je kunt ze later toevoegen. De krant is ook zonder foto&apos;s compleet.
+          Geen foto bij de hand? Geen probleem — je kunt ze later toevoegen.
         </div>
 
         <div className="flex justify-between items-center mt-6">
