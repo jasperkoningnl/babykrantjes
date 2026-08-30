@@ -40,8 +40,6 @@ export default function Step4Review({ data, onBack }: Props) {
     { k: "Foto's", v: `${[data.fotos.foto1, data.fotos.foto2, data.fotos.foto3, data.fotos.foto4].filter(Boolean).length} van 4 toegevoegd` },
   ]
 
-  const bronnen = ['NOS-archief', 'KNMI', 'Top 40', 'TMDB films & series', 'TV-gids', 'Meertens naamdatabank', 'Wikipedia']
-
   return (
     <div className="animate-bk-rise">
       <h1 className="bk-heading">Klopt dit?</h1>
@@ -55,16 +53,6 @@ export default function Step4Review({ data, onBack }: Props) {
             <div className="font-serif text-base text-right">{r.v}</div>
           </div>
         ))}
-      </div>
-
-      {/* Sources */}
-      <div className="bk-card">
-        <div className="font-bold text-[17px] mb-3">Wij zoeken er zelf bij</div>
-        <div className="flex flex-wrap gap-2">
-          {bronnen.map((b) => (
-            <div key={b} className="bg-cream-dark rounded-pill px-3.5 py-[7px] text-sm">{b}</div>
-          ))}
-        </div>
       </div>
 
       {/* Navigation */}

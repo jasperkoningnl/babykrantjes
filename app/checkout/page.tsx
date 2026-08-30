@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Voorpagina, { type VoorpaginaProps } from '@/components/Voorpagina'
+import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen } from '@/lib/calculations'
 
 type Product = 'pdf' | 'print' | 'ingelijst'
 
@@ -38,6 +40,71 @@ const OPTIES: { id: Product; naam: string; prijs: string; bedrag: number; tekst:
 ]
 
 const BETAALWIJZEN = ['iDEAL', 'Bancontact', 'Creditcard']
+
+function formatDatumLang(dateStr: string): string {
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return 'De geboortedag'
+    const s = d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  } catch { return 'De geboortedag' }
+}
+
+function buildPaperProps(data: any): VoorpaginaProps {
+  if (!data) return {}
+  const bg = data.basisGegevens || {}
+  const voornaam = (bg.volledigeNaam || 'Baby').trim().split(' ')[0]
+  const datumLang = formatDatumLang(bg.geboorteDatum || '')
+  let berekend = data.berekend || {}
+  try {
+    if (!berekend.sterrenbeeld && bg.geboorteDatum) {
+      berekend = {
+        sterrenbeeld: getSterrenbeeld(bg.geboorteDatum),
+        chineesJaar: getChineesJaar(bg.geboorteDatum),
+        geboortebloem: getGeboortebloem(bg.geboorteDatum),
+        geboortesteen: getGeboortesteen(bg.geboorteDatum),
+      }
+    }
+  } catch {}
+  const articles = data.generatedArticles || {}
+  return {
+    band: '#8FA88A', tint: '#F6DFD1',
+    mastheadA: `De ${voornaam}`, mastheadB: 'krant',
+    volledigeNaam: bg.volledigeNaam || 'Je baby',
+    datumLang, plaats: bg.geboorteplaats || '',
+    kop: `${voornaam} is geboren!`,
+    lead: `${(bg.geboorteplaats || '').toUpperCase()} — Op ${datumLang.toLowerCase()} ${bg.ouder1Naam && bg.ouder2Naam ? `zijn ${bg.ouder1Naam} en ${bg.ouder2Naam}` : `is ${bg.ouder1Naam || ''}`} de trotse ouder${bg.ouder2Naam ? 's' : ''} geworden van ${voornaam}.`,
+    feiten: [
+      { k: 'Volledige naam', v: bg.volledigeNaam || '—' },
+      { k: 'Geboren op', v: datumLang.replace(/^[a-zA-Z]+ /, '') },
+      { k: 'Tijdstip', v: bg.geboorteTijd ? `${bg.geboorteTijd} uur` : '—' },
+      { k: 'Gewicht', v: bg.gewicht ? `${bg.gewicht} gram` : '—' },
+      { k: 'Lengte', v: bg.lengte ? `${bg.lengte} cm` : '—' },
+      { k: 'Sterrenbeeld', v: berekend.sterrenbeeld || '—' },
+      { k: 'Chinees teken', v: berekend.chineesJaar || '—' },
+      { k: 'Geboortebloem', v: berekend.geboortebloem || '—' },
+      { k: 'Geboortesteen', v: berekend.geboortesteen || '—' },
+    ],
+    horoscoopKop: `${berekend.sterrenbeeld || 'Sterrenbeeld'} en ${berekend.chineesJaar || 'Chinees teken'}`,
+    horoscoop: articles.sterrenbeeld ? String(articles.sterrenbeeld).split('\n\n') : [],
+    hoofdartikel: articles.hoofdartikel ? String(articles.hoofdartikel).split('\n\n').slice(0, 3) : [],
+    hoofdfotoBijschrift: 'Foto: de trotse ouders',
+    naamKop: `De betekenis van ${voornaam}`,
+    naamBetekenis: articles.naam_betekenis ? String(articles.naam_betekenis).split('\n\n') : [],
+    naamgenoten: articles.beroemde_namen ? [String(articles.beroemde_namen)] : [],
+    geborenKop: 'Ook geboren op deze dag',
+    geborenOp: articles.geboren_op_dag ? [String(articles.geboren_op_dag)] : [],
+    nieuwsKop: 'Het nieuws van die dag',
+    nieuws: articles.nieuws ? [String(articles.nieuws)] : [],
+    weerKop: 'Het weer',
+    weer: articles.weer ? [String(articles.weer)] : [],
+    cultuur: articles.cultuur ? [String(articles.cultuur)] : [],
+    foto1Url: data.fotos?.foto1?.url,
+    foto2Url: data.fotos?.foto2?.url,
+    foto3Url: data.fotos?.foto3?.url,
+    foto4Url: data.fotos?.foto4?.url,
+  }
+}
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -134,19 +201,9 @@ export default function CheckoutPage() {
             <div className="bg-[#E6DDCE] rounded-xl p-[38px] flex justify-center">
               <div className="bg-[#3A2E24] p-3.5 shadow-[0_26px_44px_-22px_rgba(35,35,31,.65)]">
                 <div className="bg-cream p-3">
-                  <div className="w-[274px] h-[387px] overflow-hidden bg-white flex flex-col p-2 gap-1">
-                    <div className="h-5 bg-sage" />
-                    <div className="h-10 bg-[#ECE7DD]" />
-                    <div className="space-y-1 flex-1">
-                      <div className="h-[3px] bg-[#DAD3C6]" />
-                      <div className="h-[3px] bg-[#DAD3C6]" />
-                      <div className="h-[3px] bg-[#DAD3C6] w-[70%]" />
-                      <div className="h-[3px] bg-[#DAD3C6]" />
-                      <div className="h-[3px] bg-[#DAD3C6] w-[60%]" />
-                      <div className="h-8 bg-[#ECE7DD] mt-2" />
-                      <div className="h-[3px] bg-[#DAD3C6]" />
-                      <div className="h-[3px] bg-[#DAD3C6]" />
-                      <div className="h-[3px] bg-[#DAD3C6] w-[80%]" />
+                  <div className="w-[274px] h-[387px] overflow-hidden">
+                    <div style={{ transform: 'scale(.36)', transformOrigin: 'top left' }}>
+                      <Voorpagina {...buildPaperProps(testData)} watermerk={false} />
                     </div>
                   </div>
                 </div>

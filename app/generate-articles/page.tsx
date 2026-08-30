@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ARTICLE_SECTIONS, type ArticleSection, type GeneratedArticle, type ArticleGenerationResponse } from '@/lib/articleTypes'
+import { type ArticleSection, type GeneratedArticle, type ArticleGenerationResponse } from '@/lib/articleTypes'
+import Voorpagina, { type VoorpaginaProps } from '@/components/Voorpagina'
+import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen } from '@/lib/calculations'
 
 const ARTIKEL_TABS: { id: ArticleSection; label: string; titel: string }[] = [
   { id: 'hoofdartikel', label: 'Openingsartikel', titel: 'Openingsartikel — het geboorteverhaal' },
@@ -31,6 +33,15 @@ function getSessionId(): string {
   return id
 }
 
+function formatDatumLang(dateStr: string): string {
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return 'De geboortedag'
+    const s = d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  } catch { return 'De geboortedag' }
+}
+
 export default function GenerateArticlesPage() {
   const router = useRouter()
   const [sessionId, setSessionId] = useState('')
@@ -48,11 +59,30 @@ export default function GenerateArticlesPage() {
     cultuur: false, naam_betekenis: false, beroemde_namen: false, geboren_op_dag: false,
   })
   const [generatingAll, setGeneratingAll] = useState(false)
+  const hasLoadedPre = useRef(false)
 
   useEffect(() => {
     setSessionId(getSessionId())
     const stored = localStorage.getItem('babykrant_test_data')
-    if (stored) setTestData(JSON.parse(stored))
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      setTestData(parsed)
+
+      if (!hasLoadedPre.current && parsed.generatedArticles) {
+        hasLoadedPre.current = true
+        const generatedAt = new Date().toISOString()
+        const preArticles: Record<string, GeneratedArticle | null> = {}
+        for (const [section, text] of Object.entries(parsed.generatedArticles)) {
+          preArticles[section] = {
+            section: section as ArticleSection,
+            text: String(text),
+            generatedAt,
+            wordCount: parsed.wordCounts?.[section] || 0,
+          }
+        }
+        setArticles(prev => ({ ...prev, ...preArticles }))
+      }
+    }
   }, [])
 
   // Auto-save
@@ -138,7 +168,7 @@ export default function GenerateArticlesPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Geen data gevonden</h1>
           <p className="text-muted mb-6">Ga eerst door de wizard om data op te halen.</p>
-          <Link href="/wizard" className="text-terracotta font-semibold">→ Naar wizard</Link>
+          <Link href="/wizard" className="text-terracotta font-semibold">&rarr; Naar wizard</Link>
         </div>
       </div>
     )
@@ -149,6 +179,77 @@ export default function GenerateArticlesPage() {
   const limiet = LIMIETEN[actief] || 400
   const teVeel = actieveTekst.length > limiet
   const gratis = Math.max(0, 5 - regens)
+
+  const bg = testData.basisGegevens
+  const voornaam = (bg.volledigeNaam || 'Baby').trim().split(' ')[0]
+  const datumLang = formatDatumLang(bg.geboorteDatum)
+
+  let berekend = testData.berekend || {}
+  try {
+    if (!berekend.sterrenbeeld && bg.geboorteDatum) {
+      berekend = {
+        sterrenbeeld: getSterrenbeeld(bg.geboorteDatum),
+        chineesJaar: getChineesJaar(bg.geboorteDatum),
+        geboortebloem: getGeboortebloem(bg.geboorteDatum),
+        geboortesteen: getGeboortesteen(bg.geboorteDatum),
+      }
+    }
+  } catch {}
+
+  const weerData = testData.weather
+  const weerUren = weerData ? [
+    { deel: 'ochtend', temp: `${Math.round(weerData.temperature_morning ?? weerData.temperature ?? 0)}°`, kleur: '#A9B7C4' },
+    { deel: 'middag', temp: `${Math.round(weerData.temperature_afternoon ?? weerData.temperature ?? 0)}°`, kleur: '#E8B84B' },
+    { deel: 'avond', temp: `${Math.round(weerData.temperature_evening ?? weerData.temperature ?? 0)}°`, kleur: '#C9A98C' },
+  ] : []
+
+  const paperProps: VoorpaginaProps = {
+    band: '#8FA88A',
+    tint: '#F6DFD1',
+    mastheadA: `De ${voornaam}`,
+    mastheadB: 'krant',
+    volledigeNaam: bg.volledigeNaam || 'Je baby',
+    datumLang,
+    plaats: bg.geboorteplaats || '',
+    kop: `${voornaam} is geboren!`,
+    lead: `${(bg.geboorteplaats || '').toUpperCase()} — Op ${datumLang.toLowerCase()} ${bg.ouder1Naam && bg.ouder2Naam ? `zijn ${bg.ouder1Naam} en ${bg.ouder2Naam}` : `is ${bg.ouder1Naam || ''}`} de trotse ouder${bg.ouder2Naam ? 's' : ''} geworden van ${voornaam}.`,
+    feiten: [
+      { k: 'Volledige naam', v: bg.volledigeNaam || '—' },
+      { k: 'Geboren op', v: datumLang.replace(/^[a-zA-Z]+ /, '') },
+      { k: 'Tijdstip', v: bg.geboorteTijd ? `${bg.geboorteTijd} uur` : '—' },
+      { k: 'Gewicht', v: bg.gewicht ? `${bg.gewicht} gram` : '—' },
+      { k: 'Lengte', v: bg.lengte ? `${bg.lengte} cm` : '—' },
+      { k: 'Sterrenbeeld', v: berekend.sterrenbeeld || '—' },
+      { k: 'Chinees teken', v: berekend.chineesJaar || '—' },
+      { k: 'Geboortebloem', v: berekend.geboortebloem || '—' },
+      { k: 'Geboortesteen', v: berekend.geboortesteen || '—' },
+    ],
+    horoscoopKop: `${berekend.sterrenbeeld || 'Sterrenbeeld'} en ${berekend.chineesJaar || 'Chinees teken'}`,
+    horoscoop: articles.sterrenbeeld?.text ? articles.sterrenbeeld.text.split('\n\n') : [],
+    hoofdartikel: articles.hoofdartikel?.text ? articles.hoofdartikel.text.split('\n\n').slice(0, 3) : [],
+    hoofdfotoBijschrift: 'Foto: de trotse ouders',
+    stripBijschrift: `De eerste uren: ${voornaam} en ${bg.ouder2Naam ? 'de ouders' : bg.ouder1Naam || 'mama'}`,
+    naamKop: `De betekenis van ${voornaam}`,
+    naamBetekenis: articles.naam_betekenis?.text ? articles.naam_betekenis.text.split('\n\n') : [],
+    naamgenoten: articles.beroemde_namen?.text ? [articles.beroemde_namen.text] : [],
+    geborenKop: 'Ook geboren op deze dag',
+    geborenOp: articles.geboren_op_dag?.text ? [articles.geboren_op_dag.text] : [],
+    nieuwsKop: 'Het nieuws van die dag',
+    nieuws: articles.nieuws?.text ? [articles.nieuws.text] : [],
+    weerKop: weerData?.description ? `Het weer: ${weerData.description}` : 'Het weer',
+    weerMax: weerData ? `${Math.round(weerData.temperature_max ?? weerData.temperature ?? 0)}°` : '',
+    weerPlaats: bg.geboorteplaats || 'Nederland',
+    weerUren,
+    weer: articles.weer?.text ? [articles.weer.text] : [],
+    cultuur: articles.cultuur?.text ? [articles.cultuur.text] : [],
+    watermerk: true,
+    foto1Url: testData.fotos?.foto1?.url,
+    foto2Url: testData.fotos?.foto2?.url,
+    foto3Url: testData.fotos?.foto3?.url,
+    foto4Url: testData.fotos?.foto4?.url,
+  }
+
+  const hasArticles = Object.values(articles).some(a => a !== null)
 
   return (
     <div className="min-h-screen bg-cream text-dark font-sans">
@@ -165,57 +266,42 @@ export default function GenerateArticlesPage() {
       <div className="max-w-[1320px] mx-auto px-7 py-7 grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8 items-start">
         {/* Left: Newspaper preview */}
         <div>
-          <div className="flex items-baseline justify-between mb-3.5">
+          <div className="flex items-baseline justify-between mb-3.5 flex-wrap gap-2">
             <h1 className="text-[32px] tracking-[-0.03em] font-extrabold">Je krant is klaar</h1>
             <div className="flex items-center gap-3.5 text-[13.5px] text-muted">
               <span>Voorbeeld met watermerk — de PDF is schoon</span>
-              <span className="inline-flex items-center gap-1.5 bg-sage-light text-[#4A6B47] px-2.5 py-1 rounded-pill text-[13px]">
+              <span className="inline-flex items-center gap-1.5 bg-[#EDF1EA] text-[#4A6B47] px-2.5 py-1 rounded-pill text-[13px]">
                 {bewaard ? `✓ Bewaard om ${bewaard}` : '✓ Automatisch bewaard'}
               </span>
             </div>
           </div>
 
-          {/* Newspaper placeholder / generate button */}
-          <div className="w-full min-h-[600px] bg-white shadow-[0_30px_60px_-30px_rgba(35,35,31,.5)] flex flex-col items-center justify-center select-none relative">
-            {generatingAll ? (
+          {/* Newspaper preview using Voorpagina component */}
+          {generatingAll ? (
+            <div className="w-full h-[600px] bg-white shadow-[0_30px_60px_-30px_rgba(35,35,31,.5)] flex items-center justify-center select-none">
               <div className="flex flex-col items-center gap-4">
                 <div className="w-10 h-10 border-2 border-sage border-t-transparent rounded-full animate-spin" />
                 <p className="text-muted font-serif italic">Artikelen worden geschreven...</p>
               </div>
-            ) : Object.values(articles).some(a => a !== null) ? (
-              <div className="p-8 w-full">
-                <div className="text-center mb-6">
-                  <h2 className="text-[28px] font-extrabold tracking-tight mb-1">De {testData.basisGegevens.volledigeNaam?.split(' ')[0]}krant</h2>
-                  <p className="font-serif text-sm text-muted">{testData.basisGegevens.geboorteplaats} — {testData.basisGegevens.geboorteDatum}</p>
-                </div>
-                <div className="space-y-4 max-w-[600px] mx-auto">
-                  {ARTIKEL_TABS.map(tab => {
-                    const art = articles[tab.id]
-                    if (!art) return null
-                    return (
-                      <div key={tab.id} className="border-b border-dark/[.08] pb-4 last:border-b-0">
-                        <h3 className="font-bold text-sm mb-1">{tab.titel}</h3>
-                        <p className="font-serif text-[14px] leading-relaxed text-subtle line-clamp-3">{art.text}</p>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="text-[80px] font-extrabold text-dark/[.06] rotate-[-30deg] select-none">WATERMERK</div>
+            </div>
+          ) : hasArticles ? (
+            <div className="w-full overflow-hidden select-none bg-white shadow-[0_30px_60px_-30px_rgba(35,35,31,.5)]" style={{ userSelect: 'none' }}>
+              <div style={{ transformOrigin: 'top left' }} className="scale-[calc(100%)]">
+                <div className="w-[760px] mx-auto" style={{ transform: 'scale(var(--paper-scale, 1))', transformOrigin: 'top left' }}>
+                  <Voorpagina {...paperProps} />
                 </div>
               </div>
-            ) : (
+            </div>
+          ) : (
+            <div className="w-full h-[600px] bg-white shadow-[0_30px_60px_-30px_rgba(35,35,31,.5)] flex items-center justify-center select-none">
               <div className="flex flex-col items-center gap-4">
                 <p className="font-serif italic text-lg text-muted">Genereer eerst de artikelen</p>
-                <button
-                  onClick={generateAll}
-                  className="bk-btn-primary"
-                >
+                <button onClick={generateAll} className="bk-btn-primary">
                   Genereer alle 8 artikelen
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
           <div className="text-[13px] text-muted-light mt-2.5">
             Deze weergave is beveiligd: rechtsklikken en downloaden zijn uitgeschakeld.
           </div>
@@ -294,7 +380,7 @@ export default function GenerateArticlesPage() {
                     disabled={loading[actief]}
                     className="border border-dark/25 bg-white text-sm font-semibold px-4 py-2.5 rounded-pill"
                   >
-                    {loading[actief] ? '⏳ Bezig...' : '↻ Opnieuw laten schrijven · € 0,50'}
+                    {loading[actief] ? 'Bezig...' : '↻ Opnieuw laten schrijven · € 0,50'}
                   </button>
                   <div className="text-[13px] text-muted-light text-right">
                     {gratis > 0 ? `${gratis} gratis herschrijvingen over` : 'Wordt bij je bestelling opgeteld'}
@@ -352,14 +438,14 @@ export default function GenerateArticlesPage() {
               href="/checkout"
               className="block w-full bg-terracotta text-cream font-semibold text-base py-3.5 rounded-pill text-center no-underline"
             >
-              Bestellen →
+              Bestellen &rarr;
             </Link>
           </div>
           <button
             onClick={() => router.push('/wizard')}
             className="bg-transparent border-none text-sm text-muted cursor-pointer text-left p-0"
           >
-            ← Gegevens aanpassen
+            &larr; Gegevens aanpassen
           </button>
         </div>
       </div>
