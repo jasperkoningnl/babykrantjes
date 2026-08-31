@@ -57,12 +57,13 @@ export default function LoadingScreenPage() {
   const hasStarted = useRef(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem('babykrant_test_data')
-    if (stored) {
-      setData(JSON.parse(stored))
-    } else {
-      router.push('/wizard')
-    }
+    fetch('/api/papers', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Geen geldige krantsessie')
+        const result = await response.json()
+        setData(result.data)
+      })
+      .catch(() => router.push('/wizard'))
   }, [router])
 
   useEffect(() => {
@@ -135,23 +136,28 @@ export default function LoadingScreenPage() {
       } catch {}
     }
 
-    localStorage.setItem('babykrant_test_data', JSON.stringify(enrichedData))
+    await fetch('/api/papers', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: enrichedData }),
+    })
 
     // Generate articles
     try {
-      const sessionId = localStorage.getItem('babykrant_session_id') || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      localStorage.setItem('babykrant_session_id', sessionId)
-
       const res = await fetch('/api/generate-paper', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: enrichedData, paperId: enrichedData.paperId ?? null, sessionId }),
+        body: JSON.stringify({}),
       })
       const result = await res.json()
       if (result.success && result.articles) {
         enrichedData.generatedArticles = result.articles
         enrichedData.wordCounts = result.wordCounts
-        localStorage.setItem('babykrant_test_data', JSON.stringify(enrichedData))
+        await fetch('/api/papers', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ generatedArticles: result.articles, manualEdits: result.articles }),
+        })
       }
     } catch (error) {
       console.error('Article generation error:', error)
@@ -170,13 +176,16 @@ export default function LoadingScreenPage() {
     setEmailVerzenden(true)
 
     try {
+      const save = await fetch('/api/papers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactEmail: email }),
+      })
+      if (!save.ok) throw new Error('E-mailadres kon niet worden bewaard')
       const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          babyNaam: data?.basisGegevens?.volledigeNaam,
-        }),
+        body: JSON.stringify({}),
       })
       if (!res.ok) {
         const result = await res.json()

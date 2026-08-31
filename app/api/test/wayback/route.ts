@@ -3,11 +3,11 @@
 // Genereert random datums en test de scraper 3x per datum
 
 import { NextRequest, NextResponse } from 'next/server'
+import { parseTestLimits } from '@/lib/waybackTestLimits'
 
 // Force dynamic rendering - don't try to pre-render during build
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes max
-
 interface TestRun {
   runNumber: number
   success: boolean
@@ -113,9 +113,11 @@ function analyzeConsistency(runs: TestRun[]): 'consistent' | 'variable' | 'faile
 }
 
 export async function GET(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_TEST_PAGE !== 'true') {
+    return new NextResponse(null, { status: 404, headers: { 'Cache-Control': 'no-store' } })
+  }
   const searchParams = request.nextUrl.searchParams
-  const count = parseInt(searchParams.get('count') || '10')
-  const runsPerDate = parseInt(searchParams.get('runs') || '3')
+  const { count, runs: runsPerDate } = parseTestLimits(searchParams)
 
   console.log(`[Test Wayback] Starting test: ${count} dates × ${runsPerDate} runs`)
 

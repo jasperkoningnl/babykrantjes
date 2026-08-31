@@ -1,140 +1,91 @@
-// app/api/photos/upload/route.ts
-// @version 1.0.0
-// Foto-upload naar Vercel Blob Storage, direct vanuit stap 3 van de wizard.
-// - POST: multipart/form-data met 'file', optioneel 'paperId' en 'position'
-//         → uploadt naar Blob en registreert in paper_photos (indien paperId)
-// - DELETE: JSON body { url, photoId? } → verwijdert uit Blob en paper_photos
-//
-// Vereist env var BLOB_READ_WRITE_TOKEN (Vercel → Storage → Blob).
-
+import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { put, del } from '@vercel/blob'
+import sharp from 'sharp'
+import { findPaperSession } from '@/lib/paperSession'
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase'
 
-const MAX_SIZE = 10 * 1024 * 1024 // 10MB, zelfde limiet als de wizard-UI
-const ALLOWED_TYPES: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-}
-
-// Vercel Blob kent twee koppelvormen:
-// - klassiek: BLOB_READ_WRITE_TOKEN (statisch token)
-// - OIDC (nieuwe standaard): BLOB_STORE_ID + het VERCEL_OIDC_TOKEN dat
-//   Vercel tijdens runtime injecteert; de @vercel/blob SDK wisselt die
-//   zelf om. Beide vormen zijn hier geldig.
-function blobConfigured(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID)
-}
+export const runtime = 'nodejs'
+const MAX_SIZE = 10 * 1024 * 1024
+const MAX_DIMENSION = 12_000
+const MAX_PIXELS = 40_000_000
+const ALLOWED_FORMATS = new Set(['jpeg', 'png', 'webp'])
 
 export async function POST(request: NextRequest) {
-  if (!blobConfigured()) {
-    return NextResponse.json(
-      { error: 'Foto-opslag is niet geconfigureerd (BLOB_READ_WRITE_TOKEN of BLOB_STORE_ID ontbreekt)' },
-      { status: 503 }
-    )
-  }
+  if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Foto-opslag is niet geconfigureerd' }, { status: 503 })
+  const session = await findPaperSession(request)
+  if (!session) return NextResponse.json({ error: 'Geen geldige krantsessie' }, { status: 401 })
 
   try {
     const formData = await request.formData()
     const file = formData.get('file')
-    const paperId = String(formData.get('paperId') || '').trim() || null
-    const positionRaw = parseInt(String(formData.get('position') || ''), 10)
-    const position = Number.isFinite(positionRaw) && positionRaw >= 1 && positionRaw <= 4 ? positionRaw : null
+    const position = Number.parseInt(String(formData.get('position') || ''), 10)
+    if (!(file instanceof File)) return NextResponse.json({ error: 'Geen bestand meegestuurd' }, { status: 400 })
+    if (file.size <= 0 || file.size > MAX_SIZE) return NextResponse.json({ error: 'Afbeelding mag maximaal 10MB zijn' }, { status: 400 })
+    if (!Number.isInteger(position) || position < 1 || position > 4) return NextResponse.json({ error: 'Ongeldige fotopositie' }, { status: 400 })
 
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Geen bestand meegestuurd (veld: file)' }, { status: 400 })
+    const source = Buffer.from(await file.arrayBuffer())
+    const image = sharp(source, { failOn: 'error', limitInputPixels: MAX_PIXELS })
+    const metadata = await image.metadata()
+    if (!metadata.format || !ALLOWED_FORMATS.has(metadata.format) || !metadata.width || !metadata.height) {
+      return NextResponse.json({ error: 'Bestandsinhoud is geen toegestane afbeelding' }, { status: 400 })
+    }
+    if (metadata.width > MAX_DIMENSION || metadata.height > MAX_DIMENSION || metadata.width * metadata.height > MAX_PIXELS) {
+      return NextResponse.json({ error: 'Afbeeldingsafmetingen zijn te groot' }, { status: 400 })
     }
 
-    const extension = ALLOWED_TYPES[file.type]
-    if (!extension) {
-      return NextResponse.json(
-        { error: `Bestandstype ${file.type || 'onbekend'} niet toegestaan (JPG, PNG of WebP)` },
-        { status: 400 }
-      )
-    }
-
-    if (file.size > MAX_SIZE) {
-      return NextResponse.json({ error: 'Bestand is groter dan 10MB' }, { status: 400 })
-    }
-
-    const pathname = `papers/${paperId ?? 'ongekoppeld'}/foto-${position ?? 'x'}.${extension}`
-    const blob = await put(pathname, file, {
-      access: 'public',
-      addRandomSuffix: true,
-      contentType: file.type,
+    const encoded = await image.rotate().resize({ width: 4000, height: 4000, fit: 'inside', withoutEnlargement: true }).webp({ quality: 85 }).toBuffer({ resolveWithObject: true })
+    const objectPath = `${session.paperId}/${randomUUID()}.webp`
+    const supabase = getSupabaseAdmin()
+    const { error: uploadError } = await supabase.storage.from('paper-photos').upload(objectPath, encoded.data, {
+      contentType: 'image/webp',
+      cacheControl: '3600',
+      upsert: false,
     })
+    if (uploadError) throw uploadError
 
-    // Registreer in paper_photos zodra er een krant-record is om aan te koppelen
-    let photoId: string | null = null
-    if (paperId && isSupabaseAdminConfigured()) {
-      const supabase = getSupabaseAdmin()
-
-      // Eén foto per positie: vervang een eerdere upload op dezelfde plek
-      if (position !== null) {
-        const { data: existing } = await supabase
-          .from('paper_photos')
-          .select('id, file_path')
-          .eq('paper_id', paperId)
-          .eq('position', position)
-
-        for (const row of existing ?? []) {
-          await supabase.from('paper_photos').delete().eq('id', row.id)
-          try {
-            await del(row.file_path)
-          } catch (err) {
-            console.error('[Photos] Kon oude blob niet verwijderen:', err)
-          }
-        }
-      }
-
-      const { data, error } = await supabase
-        .from('paper_photos')
-        .insert({ paper_id: paperId, file_path: blob.url, position })
-        .select('id')
-        .single()
-
-      if (error) {
-        console.error('[Photos] paper_photos insert fout:', error.message)
-      } else {
-        photoId = data.id
-      }
+    const { data: existing } = await supabase.from('paper_photos').select('id, file_path').eq('paper_id', session.paperId).eq('position', position)
+    const { data: photo, error: insertError } = await supabase
+      .from('paper_photos')
+      .insert({
+        paper_id: session.paperId,
+        file_path: objectPath,
+        position,
+        mime_type: 'image/webp',
+        byte_size: encoded.data.length,
+        width: encoded.info.width,
+        height: encoded.info.height,
+      })
+      .select('id')
+      .single()
+    if (insertError || !photo) {
+      await supabase.storage.from('paper-photos').remove([objectPath])
+      throw insertError || new Error('Foto kon niet worden geregistreerd')
     }
 
-    return NextResponse.json({ url: blob.url, photoId })
-  } catch (err) {
-    console.error('[Photos] Upload fout:', err)
-    return NextResponse.json({ error: 'Upload mislukt' }, { status: 500 })
+    for (const old of existing || []) {
+      await supabase.storage.from('paper-photos').remove([old.file_path])
+      await supabase.from('paper_photos').delete().eq('id', old.id).eq('paper_id', session.paperId)
+    }
+    return NextResponse.json({ photoId: photo.id, url: `/api/photos/${encodeURIComponent(photo.id)}` })
+  } catch (error) {
+    console.error('[Photos] Upload fout:', error)
+    return NextResponse.json({ error: 'Upload mislukt' }, { status: 400 })
   }
 }
 
 export async function DELETE(request: NextRequest) {
-  if (!blobConfigured()) {
-    return NextResponse.json(
-      { error: 'Foto-opslag is niet geconfigureerd (BLOB_READ_WRITE_TOKEN of BLOB_STORE_ID ontbreekt)' },
-      { status: 503 }
-    )
-  }
+  if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Foto-opslag is niet geconfigureerd' }, { status: 503 })
+  const session = await findPaperSession(request)
+  if (!session) return NextResponse.json({ error: 'Geen geldige krantsessie' }, { status: 401 })
+  const photoId = String((await request.json().catch(() => ({})))?.photoId || '').trim()
+  if (!/^[0-9a-f-]{36}$/i.test(photoId)) return NextResponse.json({ error: 'photoId is verplicht' }, { status: 400 })
 
-  try {
-    const body = await request.json()
-    const url = String(body?.url || '').trim()
-    const photoId = String(body?.photoId || '').trim() || null
-
-    if (!url) {
-      return NextResponse.json({ error: 'url is verplicht' }, { status: 400 })
-    }
-
-    await del(url)
-
-    if (photoId && isSupabaseAdminConfigured()) {
-      const { error } = await getSupabaseAdmin().from('paper_photos').delete().eq('id', photoId)
-      if (error) console.error('[Photos] paper_photos delete fout:', error.message)
-    }
-
-    return NextResponse.json({ ok: true })
-  } catch (err) {
-    console.error('[Photos] Delete fout:', err)
-    return NextResponse.json({ error: 'Verwijderen mislukt' }, { status: 500 })
-  }
+  const supabase = getSupabaseAdmin()
+  const { data: photo } = await supabase.from('paper_photos').select('id, file_path').eq('id', photoId).eq('paper_id', session.paperId).maybeSingle()
+  if (!photo) return NextResponse.json({ error: 'Foto niet gevonden' }, { status: 404 })
+  const { error: storageError } = await supabase.storage.from('paper-photos').remove([photo.file_path])
+  if (storageError) return NextResponse.json({ error: 'Verwijderen mislukt' }, { status: 500 })
+  const { error } = await supabase.from('paper_photos').delete().eq('id', photo.id).eq('paper_id', session.paperId)
+  if (error) return NextResponse.json({ error: 'Verwijderen mislukt' }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }

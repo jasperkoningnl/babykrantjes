@@ -49,9 +49,9 @@ npm run lint
 npm run build
 ```
 
-Zonder environment variables werkt de app in afgeslankte modus: geen
-Supabase-cache, geen foto-upload, geen rate limiting. AI-generatie vereist
-minimaal `ANTHROPIC_API_KEY`.
+De app faalt bewust dicht wanneer Supabase of Redis ontbreekt voor beveiligde
+opslag, e-mail en AI-generatie. Er is geen account of wachtwoord nodig: iedere
+krant gebruikt een willekeurige HttpOnly gastensessie.
 
 ## Environment variables
 
@@ -61,8 +61,9 @@ minimaal `ANTHROPIC_API_KEY`.
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable/anon key (client-side reads) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key — alleen server-side, nooit `NEXT_PUBLIC_` |
-| `BLOB_STORE_ID` (of `BLOB_READ_WRITE_TOKEN`) | Vercel Blob (foto-uploads); de OIDC-koppeling via het Storage-tabblad zet `BLOB_STORE_ID` automatisch |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Upstash Redis: rate limiting + wayback-cache (de Vercel-integratie zet deze automatisch; `UPSTASH_REDIS_REST_*` werkt ook) |
+| `RESEND_API_KEY` | Eenmalige herstel-links per e-mail |
+| `NEXT_PUBLIC_SITE_URL` | Canonieke HTTPS-site-URL voor herstel-links |
 | `CRON_SECRET` | Verplicht voor `/api/cron/*` |
 | `TMDB_API_KEY` | Films en series |
 | `ENABLE_TEST_PAGE` | `true` = debug/testroutes open (alleen previews) |
@@ -73,7 +74,8 @@ Setup en beheer staan in [`supabase/README.md`](supabase/README.md):
 
 1. `supabase/migrations/0001_schema.sql` uitvoeren in de SQL editor
 2. Edge Functions deployen (`npx supabase functions deploy ...`)
-3. `supabase/migrations/0002_cron.sql` uitvoeren (placeholders invullen)
+3. Vault-secrets handmatig aanmaken en `supabase/migrations/0002_cron.sql` uitvoeren
+4. `supabase/migrations/20260831181754_passwordless_guest_sessions.sql` reviewen en uitvoeren
 
 | Job | Bron | Schema (NL-tijd) | Tabel |
 |---|---|---|---|

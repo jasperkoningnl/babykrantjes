@@ -61,9 +61,9 @@ export default function TestResultsPage() {
   useEffect(() => {
     console.log(`[Babykrant] test-results page ${APP_VERSION}`)
     
-    const stored = localStorage.getItem('babykrant_test_data')
-    if (stored) {
-      const parsedData = JSON.parse(stored)
+    fetch('/api/papers', { cache: 'no-store' }).then(async (response) => {
+      if (!response.ok) throw new Error('Geen geldige krantsessie')
+      const parsedData = (await response.json()).data
       setData(parsedData)
       
       const birthDate = parsedData.basisGegevens.geboorteDatum
@@ -187,8 +187,7 @@ export default function TestResultsPage() {
           })
         }
       }
-    }
-    setLoading(false)
+    }).catch(() => undefined).finally(() => setLoading(false))
   }, [])
 
   if (loading) {

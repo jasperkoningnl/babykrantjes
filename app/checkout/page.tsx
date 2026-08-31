@@ -66,7 +66,7 @@ function buildPaperProps(data: any): VoorpaginaProps {
       }
     }
   } catch {}
-  const articles = data.generatedArticles || {}
+  const articles = { ...(data.generatedArticles || {}), ...(data.manualEdits || {}) }
   return {
     band: '#8FA88A', tint: '#F6DFD1',
     mastheadA: `De ${voornaam}`, mastheadB: 'krant',
@@ -114,9 +114,13 @@ export default function CheckoutPage() {
   const [testData, setTestData] = useState<any>(null)
 
   useEffect(() => {
-    const stored = localStorage.getItem('babykrant_test_data')
-    if (stored) setTestData(JSON.parse(stored))
-  }, [])
+    fetch('/api/papers', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Geen geldige krantsessie')
+        setTestData((await response.json()).data)
+      })
+      .catch(() => router.push('/wizard'))
+  }, [router])
 
   const optie = OPTIES.find(o => o.id === gekozen)!
   const bonRegels = [

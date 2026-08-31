@@ -47,7 +47,7 @@ export default function Step3Fotos({ data, updateData, ensurePaper, onNext, onBa
       const formData = new FormData()
       formData.append('file', file)
       formData.append('position', String(FOTO_POSITIONS[fotoKey]))
-      if (paperId) formData.append('paperId', paperId)
+      if (!paperId) throw new Error('Geen geldige krantsessie')
       const response = await fetch('/api/photos/upload', { method: 'POST', body: formData })
       const result = await response.json()
       if (!response.ok) {
@@ -73,7 +73,7 @@ export default function Step3Fotos({ data, updateData, ensurePaper, onNext, onBa
         await fetch('/api/photos/upload', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: current.url, photoId: current.photoId }),
+          body: JSON.stringify({ photoId: current.photoId }),
         })
       } catch (err) {
         console.error('[Step3] Verwijderen uit Blob mislukt:', err)

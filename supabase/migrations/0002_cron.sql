@@ -1,9 +1,9 @@
 -- supabase/migrations/0002_cron.sql
 -- Dagelijkse pipeline: pg_cron + pg_net triggeren de Edge Functions.
 --
--- VOORAF INVULLEN (zoek-en-vervang in dit bestand):
---   {project-ref}       → het Supabase project-ref (uit de project-URL)
---   {service_role_key}  → de service role key (Dashboard → Settings → API)
+-- VOORAF HANDMATIG IN VAULT OPSLAAN (nooit in dit bestand plakken):
+--   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+--   select vault.create_secret('<server-side secret key>', 'edge_function_secret_key');
 --
 -- LET OP: pg_cron draait in UTC. Nederland is UTC+1 (winter) / UTC+2 (zomer).
 -- De schema's hieronder zijn in UTC gezet zodat ze rond de bedoelde
@@ -41,8 +41,8 @@ on conflict (name) do update set
 -- Job 1: TV-programmering — 06:00 NL ≈ 05:00 UTC (dagelijks)
 select cron.schedule('scrape-tv-daily', '0 5 * * *', $$
   select net.http_post(
-    url := 'https://{project-ref}.supabase.co/functions/v1/scrape-tv',
-    headers := '{"Authorization": "Bearer {service_role_key}", "Content-Type": "application/json"}'::jsonb,
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-tv',
+    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
@@ -50,8 +50,8 @@ $$);
 -- Job 2: Kijkcijfers — 10:00 NL ≈ 09:00 UTC (dagelijks)
 select cron.schedule('scrape-ratings-daily', '0 9 * * *', $$
   select net.http_post(
-    url := 'https://{project-ref}.supabase.co/functions/v1/scrape-ratings',
-    headers := '{"Authorization": "Bearer {service_role_key}", "Content-Type": "application/json"}'::jsonb,
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-ratings',
+    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
@@ -59,8 +59,8 @@ $$);
 -- Job 3: Streaming top 10 — 08:00 NL ≈ 07:00 UTC (dagelijks)
 select cron.schedule('scrape-streaming-daily', '0 7 * * *', $$
   select net.http_post(
-    url := 'https://{project-ref}.supabase.co/functions/v1/scrape-streaming',
-    headers := '{"Authorization": "Bearer {service_role_key}", "Content-Type": "application/json"}'::jsonb,
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-streaming',
+    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
@@ -68,8 +68,8 @@ $$);
 -- Job 4: Google News NL — 07:00 NL ≈ 06:00 UTC (dagelijks)
 select cron.schedule('scrape-google-news-daily', '0 6 * * *', $$
   select net.http_post(
-    url := 'https://{project-ref}.supabase.co/functions/v1/scrape-google-news',
-    headers := '{"Authorization": "Bearer {service_role_key}", "Content-Type": "application/json"}'::jsonb,
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-google-news',
+    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
@@ -77,8 +77,8 @@ $$);
 -- Job 5: Top 40 — maandag 12:00 NL ≈ 11:00 UTC (wekelijks)
 select cron.schedule('scrape-music-weekly', '0 11 * * 1', $$
   select net.http_post(
-    url := 'https://{project-ref}.supabase.co/functions/v1/scrape-music',
-    headers := '{"Authorization": "Bearer {service_role_key}", "Content-Type": "application/json"}'::jsonb,
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-music',
+    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
@@ -86,8 +86,8 @@ $$);
 -- Job 6: Nieuwsdossiers — zondag 03:00 NL ≈ 02:00 UTC (wekelijks)
 select cron.schedule('scrape-dossiers-weekly', '0 2 * * 0', $$
   select net.http_post(
-    url := 'https://{project-ref}.supabase.co/functions/v1/scrape-dossiers',
-    headers := '{"Authorization": "Bearer {service_role_key}", "Content-Type": "application/json"}'::jsonb,
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-dossiers',
+    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
