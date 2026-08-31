@@ -4,10 +4,10 @@ import { getSupabaseAdmin } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest, context: { params: { photoId: string } }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ photoId: string }> }) {
   const session = await findPaperSession(request)
   if (!session) return NextResponse.json({ error: 'Geen geldige krantsessie' }, { status: 401 })
-  const photoId = context.params.photoId
+  const photoId = (await context.params).photoId
   if (!/^[0-9a-f-]{36}$/i.test(photoId)) return NextResponse.json({ error: 'Foto niet gevonden' }, { status: 404 })
 
   const supabase = getSupabaseAdmin()
