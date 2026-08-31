@@ -67,23 +67,27 @@ async function collectAllData(data: BabykrantData, birthDate: string, birthPlace
       enrichedData.bornPersons = bornPersons.length > 0 ? bornPersons : undefined
     } catch {}
   }
-  await fetch('/api/papers', {
+  const saveResponse = await fetch('/api/papers', {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: enrichedData }),
   })
-  try {
-    const res = await fetch('/api/generate-paper', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
-    })
-    const result = await res.json()
-    if (result.success && result.articles) {
-      await fetch('/api/papers', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ generatedArticles: result.articles, manualEdits: result.articles }),
-      })
-    }
-  } catch (error) {
-    console.error('Article generation error:', error)
+  if (!saveResponse.ok) throw new Error('De krantgegevens konden niet worden bewaard')
+
+  const res = await fetch('/api/generate-paper', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+    signal: AbortSignal.timeout(125_000),
+  })
+  const result = await res.json().catch(() => null)
+  if (!res.ok || !result?.success || !result.articles) {
+    throw new Error(result?.error || 'De artikelen konden niet worden gemaakt')
   }
+
+  const articleSaveResponse = await fetch('/api/papers', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ generatedArticles: result.articles, manualEdits: result.articles }),
+  })
+  if (!articleSaveResponse.ok) throw new Error('De artikelen konden niet worden bewaard')
 }
 
 export default function LoadingScreenPage() {
@@ -93,6 +97,8 @@ export default function LoadingScreenPage() {
   const [email, setEmail] = useState('')
   const [emailVerstuurd, setEmailVerstuurd] = useState(false)
   const [klaar, setKlaar] = useState(false)
+  const [generationError, setGenerationError] = useState('')
+  const [generationAttempt, setGenerationAttempt] = useState(0)
   const [factIndex, setFactIndex] = useState(() => Math.floor(Math.random() * FUN_FACTS.length))
   const hasStarted = useRef(false)
 
@@ -114,8 +120,25 @@ export default function LoadingScreenPage() {
     const birthPlace = data.basisGegevens.geboorteplaats
     const fullName = data.basisGegevens.volledigeNaam
 
-    collectAllData(data, birthDate, birthPlace, fullName).finally(() => setKlaar(true))
-  }, [data])
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    collectAllData(data, birthDate, birthPlace, fullName)
+      .then(() => {
+        setGenerationError('')
+        setKlaar(true)
+      })
+      .catch((error) => {
+        console.error('[LoadingScreen] Generatie mislukt:', error)
+        setGenerationError('Het maken duurt langer dan verwacht. We proberen het automatisch opnieuw.')
+        retryTimer = setTimeout(() => {
+          hasStarted.current = false
+          setGenerationAttempt(attempt => attempt + 1)
+        }, Math.min(60_000, 5_000 * 2 ** Math.min(generationAttempt, 3)))
+      })
+
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer)
+    }
+  }, [data, generationAttempt])
 
   useEffect(() => {
     if (!data) return
@@ -181,8 +204,9 @@ export default function LoadingScreenPage() {
     return () => clearTimeout(timeout)
   }, [klaar, router])
 
-  const progress = Math.round((genStap / GEN_TAKEN.length) * 100)
-  const genKop = genStap >= GEN_TAKEN.length ? 'Klaar!' : `${GEN_TAKEN[genStap] || GEN_TAKEN[0]}…`
+  const displayedStep = klaar ? GEN_TAKEN.length : Math.min(genStap, GEN_TAKEN.length - 1)
+  const progress = klaar ? 100 : Math.min(92, Math.round((displayedStep / GEN_TAKEN.length) * 100))
+  const genKop = klaar ? 'Klaar!' : `${GEN_TAKEN[displayedStep]}…`
 
   return (
     <div className="min-h-screen bg-cream text-dark font-sans">
@@ -211,10 +235,10 @@ export default function LoadingScreenPage() {
         {/* Task list */}
         <div className="text-left flex flex-col gap-3 mb-10">
           {GEN_TAKEN.map((label, i) => {
-            const done = i < genStap
-            const current = i === genStap
+            const done = i < displayedStep || klaar
+            const current = !klaar && i === displayedStep
             const dotColor = done ? '#8FA88A' : current ? '#D9A441' : '#EAE2D5'
-            const textColor = i <= genStap ? '#23231F' : '#A9A398'
+            const textColor = i <= displayedStep ? '#23231F' : '#A9A398'
 
             return (
               <div key={i} className="flex items-center gap-3 text-base" style={{ color: textColor }}>
@@ -236,6 +260,12 @@ export default function LoadingScreenPage() {
             <div className="font-bold text-[15px] text-sage mb-1.5">Wist je dat…</div>
             <p className="font-serif text-[15px] text-subtle leading-relaxed">{FUN_FACTS[factIndex]}</p>
           </div>
+        )}
+
+        {generationError && !klaar && (
+          <p className="font-serif text-[14px] text-subtle mb-6" role="status">
+            {generationError}
+          </p>
         )}
 
         {/* Email option / redirect notice */}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type ArticleSection, type GeneratedArticle, type ArticleGenerationResponse } from '@/lib/articleTypes'
@@ -49,6 +49,7 @@ export default function GenerateArticlesPage() {
   })
   const [generatingAll, setGeneratingAll] = useState(false)
   const hasLoadedPre = useRef(false)
+  const hasTriggeredAutomaticGeneration = useRef(false)
 
   useEffect(() => {
     fetch('/api/papers', { cache: 'no-store' }).then(async (response) => {
@@ -115,8 +116,7 @@ export default function GenerateArticlesPage() {
     }
   }
 
-  const generateAll = async () => {
-    if (!testData) return
+  const generateAll = useCallback(async () => {
     setGeneratingAll(true)
     try {
       const res = await fetch('/api/generate-paper', {
@@ -145,7 +145,16 @@ export default function GenerateArticlesPage() {
     } finally {
       setGeneratingAll(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!testData || hasTriggeredAutomaticGeneration.current) return
+    const hasStoredArticles = Object.values(articles).some(article => article !== null)
+    if (hasStoredArticles) return
+    hasTriggeredAutomaticGeneration.current = true
+    const timer = setTimeout(() => void generateAll(), 0)
+    return () => clearTimeout(timer)
+  }, [testData, articles, generateAll])
 
   const updateArticleText = (text: string) => {
     setArticles(prev => {
@@ -274,14 +283,14 @@ export default function GenerateArticlesPage() {
           </div>
 
           {/* Newspaper preview using Voorpagina component */}
-          {generatingAll ? (
+          {generatingAll || !hasArticles ? (
             <div className="w-full h-[600px] bg-white shadow-[0_30px_60px_-30px_rgba(35,35,31,.5)] flex items-center justify-center select-none">
               <div className="flex flex-col items-center gap-4">
                 <div className="w-10 h-10 border-2 border-sage border-t-transparent rounded-full animate-spin" />
                 <p className="text-muted font-serif italic">Artikelen worden geschreven...</p>
               </div>
             </div>
-          ) : hasArticles ? (
+          ) : (
             <div className="w-full overflow-hidden select-none bg-white shadow-[0_30px_60px_-30px_rgba(35,35,31,.5)]" style={{ userSelect: 'none' }}>
               <div style={{ transformOrigin: 'top left' }} className="scale-[calc(100%)]">
                 <div className="w-[760px] mx-auto" style={{ transform: 'scale(var(--paper-scale, 1))', transformOrigin: 'top left' }}>
@@ -289,19 +298,7 @@ export default function GenerateArticlesPage() {
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="w-full h-[600px] bg-white shadow-[0_30px_60px_-30px_rgba(35,35,31,.5)] flex items-center justify-center select-none">
-              <div className="flex flex-col items-center gap-4">
-                <p className="font-serif italic text-lg text-muted">Genereer eerst de artikelen</p>
-                <button onClick={generateAll} className="bk-btn-primary">
-                  Genereer alle 8 artikelen
-                </button>
-              </div>
-            </div>
           )}
-          <div className="text-[13px] text-muted-light mt-2.5">
-            Deze weergave is beveiligd: rechtsklikken en downloaden zijn uitgeschakeld.
-          </div>
         </div>
 
         {/* Right: Side panel */}

@@ -127,7 +127,7 @@ export default function WizardPage() {
           <span>{stapTijden[currentStep - 1]}</span>
         </div>
 
-        {!hydrated && <div className="py-20 text-center text-muted">Je concept wordt veilig geladen…</div>}
+        {!hydrated && <div className="py-20" aria-hidden="true" />}
         {/* Step content */}
         {hydrated && currentStep === 1 && (
           <Step1BasisGegevens
