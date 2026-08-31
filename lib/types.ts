@@ -85,11 +85,10 @@ export interface ExtraVragen {
   eersteIndrukOverig?: string  // Open invoerveld voor eerste indruk
 }
 
-// UPDATED v4.0.0: Foto's worden direct bij selectie naar Vercel Blob
-// geüpload. De wizard-state bevat alleen nog URLs (die overleven
-// JSON.stringify naar localStorage, in tegenstelling tot File-objecten).
+// Foto's worden direct naar private Supabase Storage geüpload. De state bevat
+// alleen photoId en een beveiligde applicatieroute; nooit een permanente URL.
 export interface UploadedPhoto {
-  url: string            // Vercel Blob URL
+  url: string            // /api/photos/:photoId; route maakt een korte signed URL
   photoId?: string | null // paper_photos.id in Supabase, indien gekoppeld
   fileName?: string      // oorspronkelijke bestandsnaam (voor weergave)
 }
@@ -105,7 +104,7 @@ export interface BabykrantData {
   basisGegevens: BasisGegevens
   extraVragen: ExtraVragen
   fotos: GeuploadeFotos
-  /** generated_papers.id in Supabase; gezet zodra de wizard een concept-krant heeft aangemaakt */
+  /** Alleen voor UI-correlatie; server-autorisatie gebruikt uitsluitend de HttpOnly sessiecookie. */
   paperId?: string | null
 }
 

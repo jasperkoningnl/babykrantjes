@@ -8,9 +8,8 @@
 // Env vars: KV_REST_API_URL en KV_REST_API_TOKEN (de namen die de
 // Upstash/Vercel-integratie injecteert en die lib/waybackCache.ts al
 // gebruikt), met UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN als
-// alternatief. Zonder configuratie wordt er gewaarschuwd en doorgelaten
-// (fail-open), zodat een misconfiguratie de site niet platlegt — zet de
-// env vars in productie dus altijd.
+// alternatief. Beveiligde en kostbare routes falen dicht wanneer Redis
+// ontbreekt of niet bereikbaar is.
 
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
@@ -19,6 +18,7 @@ import { USAGE_LIMITS } from './articleTypes'
 let redis: Redis | null = null
 let articleLimiter: Ratelimit | null = null
 let paperLimiter: Ratelimit | null = null
+let emailLimiter: Ratelimit | null = null
 
 function redisCredentials(): { url: string; token: string } | null {
   if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
@@ -30,8 +30,19 @@ function redisCredentials(): { url: string; token: string } | null {
   return null
 }
 
-function isRedisConfigured(): boolean {
+export function isRedisConfigured(): boolean {
   return redisCredentials() !== null
+}
+
+function getEmailLimiter(): Ratelimit {
+  if (!emailLimiter) {
+    emailLimiter = new Ratelimit({
+      redis: getRedis(),
+      limiter: Ratelimit.slidingWindow(3, '1 h'),
+      prefix: 'babykrant:email',
+    })
+  }
+  return emailLimiter
 }
 
 function getRedis(): Redis {
@@ -72,6 +83,7 @@ export interface RateLimitResult {
   remaining: number
   /** Alleen gezet wanneer de limiter daadwerkelijk actief is */
   enforced: boolean
+  unavailable?: boolean
 }
 
 /** Client-IP uit de request headers (Vercel zet x-forwarded-for). */
@@ -86,8 +98,8 @@ export async function checkRateLimit(
   type: 'article' | 'paper'
 ): Promise<RateLimitResult> {
   if (!isRedisConfigured()) {
-    console.warn('[RateLimit] Upstash niet geconfigureerd — rate limiting staat UIT')
-    return { allowed: true, remaining: -1, enforced: false }
+    console.error('[RateLimit] Upstash niet geconfigureerd — request geweigerd')
+    return { allowed: false, remaining: 0, enforced: false, unavailable: true }
   }
 
   try {
@@ -95,9 +107,25 @@ export async function checkRateLimit(
     const result = await limiter.limit(getClientIp(request))
     return { allowed: result.success, remaining: result.remaining, enforced: true }
   } catch (err) {
-    // Redis-storing mag generatie niet blokkeren; wel luid loggen.
     console.error('[RateLimit] Fout bij limiet-check:', err)
-    return { allowed: true, remaining: -1, enforced: false }
+    return { allowed: false, remaining: 0, enforced: false, unavailable: true }
+  }
+}
+
+export async function checkEmailRateLimit(request: Request, paperId: string, email: string): Promise<RateLimitResult> {
+  if (!isRedisConfigured()) return { allowed: false, remaining: 0, enforced: false, unavailable: true }
+  try {
+    const limiter = getEmailLimiter()
+    const identifiers = [`paper:${paperId}`, `email:${email}`, `ip:${getClientIp(request)}`]
+    const results = await Promise.all(identifiers.map((identifier) => limiter.limit(identifier)))
+    return {
+      allowed: results.every((result) => result.success),
+      remaining: Math.min(...results.map((result) => result.remaining)),
+      enforced: true,
+    }
+  } catch (error) {
+    console.error('[RateLimit] E-maillimiter niet beschikbaar:', error)
+    return { allowed: false, remaining: 0, enforced: false, unavailable: true }
   }
 }
 
@@ -107,33 +135,40 @@ function todayKey(): string {
   return `${DAILY_COST_KEY_PREFIX}${new Date().toISOString().slice(0, 10)}`
 }
 
-/**
- * Globale dagelijkse kostenbewaking (alle gebruikers samen). Geeft de
- * nieuwe dagtotaal-stand terug; -1 als Redis niet beschikbaar is.
- */
-export async function addDailyCost(cost: number): Promise<number> {
-  if (!isRedisConfigured()) return -1
-  try {
-    const key = todayKey()
-    const total = await getRedis().incrbyfloat(key, cost)
-    await getRedis().expire(key, 60 * 60 * 48)
-    return Number(total)
-  } catch (err) {
-    console.error('[RateLimit] Fout bij kosten-tracking:', err)
-    return -1
-  }
-}
-
-/** Huidige dagkosten (alle gebruikers samen); 0 als onbekend. */
-export async function getDailyCost(): Promise<number> {
-  if (!isRedisConfigured()) return 0
-  try {
-    const value = await getRedis().get<number>(todayKey())
-    return Number(value ?? 0)
-  } catch {
-    return 0
-  }
-}
-
 /** Globaal dagbudget in dollars voor alle generatie samen. */
 export const DAILY_COST_BUDGET = 5.0
+
+const RESERVE_SCRIPT = `
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+local amount = tonumber(ARGV[1])
+local budget = tonumber(ARGV[2])
+if current + amount > budget then return -1 end
+local total = redis.call('INCRBYFLOAT', KEYS[1], amount)
+redis.call('EXPIRE', KEYS[1], 172800)
+return total
+`
+
+/** Reserveert het maximale bedrag atomair vóór een kostbare call. */
+export async function reserveDailyCost(amount: number): Promise<{ ok: boolean; total: number; unavailable?: boolean }> {
+  if (!isRedisConfigured()) return { ok: false, total: -1, unavailable: true }
+  try {
+    const result = await getRedis().eval(RESERVE_SCRIPT, [todayKey()], [String(amount), String(DAILY_COST_BUDGET)])
+    const total = Number(result)
+    return { ok: total >= 0, total }
+  } catch (error) {
+    console.error('[RateLimit] Budgetreservering mislukt:', error)
+    return { ok: false, total: -1, unavailable: true }
+  }
+}
+
+/** Verrekent na afloop het verschil met de vooraf gereserveerde bovengrens. */
+export async function settleDailyCost(reserved: number, actual: number): Promise<void> {
+  if (!isRedisConfigured()) return
+  const difference = actual - reserved
+  if (Math.abs(difference) < 0.000001) return
+  try {
+    await getRedis().incrbyfloat(todayKey(), difference)
+  } catch (error) {
+    console.error('[RateLimit] Budgetverrekening mislukt:', error)
+  }
+}

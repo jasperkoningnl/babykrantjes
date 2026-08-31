@@ -13,8 +13,6 @@ export type ArticleSection =
 
 export interface ArticleGenerationRequest {
   section: ArticleSection
-  data: any
-  sessionId: string
 }
 
 export interface ArticleGenerationResponse {

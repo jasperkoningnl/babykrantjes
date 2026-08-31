@@ -19,6 +19,10 @@ function getApiKey(): string {
 }
 
 async function postMessages(body: Record<string, unknown>): Promise<any> {
+  const serialized = JSON.stringify(body)
+  if (Buffer.byteLength(serialized, 'utf8') > 100 * 1024) {
+    throw new Error('AI-invoer is te groot')
+  }
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: {
@@ -26,7 +30,8 @@ async function postMessages(body: Record<string, unknown>): Promise<any> {
       'x-api-key': getApiKey(),
       'anthropic-version': API_VERSION_HEADER,
     },
-    body: JSON.stringify(body),
+    body: serialized,
+    signal: AbortSignal.timeout(45_000),
   })
 
   if (!response.ok) {

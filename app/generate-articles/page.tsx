@@ -23,16 +23,6 @@ const LIMIETEN: Record<string, number> = {
   geboren_op_dag: 250, sterrenbeeld: 330, nieuws: 240, weer: 230, cultuur: 230,
 }
 
-function getSessionId(): string {
-  if (typeof window === 'undefined') return ''
-  let id = localStorage.getItem('babykrant_session_id')
-  if (!id) {
-    id = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    localStorage.setItem('babykrant_session_id', id)
-  }
-  return id
-}
-
 function formatDatumLang(dateStr: string): string {
   try {
     const d = new Date(dateStr)
@@ -44,7 +34,6 @@ function formatDatumLang(dateStr: string): string {
 
 export default function GenerateArticlesPage() {
   const router = useRouter()
-  const [sessionId, setSessionId] = useState('')
   const [testData, setTestData] = useState<any>(null)
   const [paneel, setPaneel] = useState<'teksten' | 'fotos'>('teksten')
   const [actief, setActief] = useState<ArticleSection>('hoofdartikel')
@@ -62,32 +51,40 @@ export default function GenerateArticlesPage() {
   const hasLoadedPre = useRef(false)
 
   useEffect(() => {
-    setSessionId(getSessionId())
-    const stored = localStorage.getItem('babykrant_test_data')
-    if (stored) {
-      const parsed = JSON.parse(stored)
+    fetch('/api/papers', { cache: 'no-store' }).then(async (response) => {
+      if (!response.ok) throw new Error('Geen geldige krantsessie')
+      const parsed = (await response.json()).data
       setTestData(parsed)
 
-      if (!hasLoadedPre.current && parsed.generatedArticles) {
+      const storedArticles = { ...(parsed.generatedArticles || {}), ...(parsed.manualEdits || {}) }
+      if (!hasLoadedPre.current && Object.keys(storedArticles).length) {
         hasLoadedPre.current = true
         const generatedAt = new Date().toISOString()
         const preArticles: Record<string, GeneratedArticle | null> = {}
-        for (const [section, text] of Object.entries(parsed.generatedArticles)) {
+        for (const [section, stored] of Object.entries(storedArticles)) {
+          const text = typeof stored === 'object' && stored && 'text' in stored ? String((stored as GeneratedArticle).text) : String(stored)
           preArticles[section] = {
             section: section as ArticleSection,
-            text: String(text),
+            text,
             generatedAt,
             wordCount: parsed.wordCounts?.[section] || 0,
           }
         }
         setArticles(prev => ({ ...prev, ...preArticles }))
       }
-    }
-  }, [])
+    }).catch(() => router.push('/wizard'))
+  }, [router])
 
   // Auto-save
   useEffect(() => {
+    if (!hasLoadedPre.current) return
     const timer = setTimeout(() => {
+      const manualEdits = Object.fromEntries(Object.entries(articles).filter(([, article]) => article).map(([section, article]) => [section, article!.text]))
+      fetch('/api/papers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manualEdits }),
+      }).catch((error) => console.error('[Editor] Autosave mislukt:', error))
       const nu = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
       setBewaard(nu)
     }, 700)
@@ -101,7 +98,7 @@ export default function GenerateArticlesPage() {
       const res = await fetch('/api/generate-article', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section, data: testData, sessionId }),
+        body: JSON.stringify({ section }),
       })
       const result: ArticleGenerationResponse = await res.json()
       if (result.success && result.text) {
@@ -125,7 +122,7 @@ export default function GenerateArticlesPage() {
       const res = await fetch('/api/generate-paper', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: testData, paperId: testData.paperId ?? null, sessionId }),
+        body: JSON.stringify({}),
       })
       const result = await res.json()
       if (result.success && result.articles) {

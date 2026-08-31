@@ -17,11 +17,11 @@
     "@supabase/supabase-js": "^2.110.5",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.35.8",
-    "@vercel/blob": "^2.6.1",
     "next": "^14.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "resend": "^6.25.0",
+    "sharp": "^0.35.4",
     "undici": "^8.7.0"
   },
   "devDependencies": {

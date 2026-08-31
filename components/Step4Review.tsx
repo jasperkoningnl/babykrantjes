@@ -11,8 +11,12 @@ interface Props {
 export default function Step4Review({ data, onBack }: Props) {
   const router = useRouter()
 
-  const handleGenerate = () => {
-    localStorage.setItem('babykrant_test_data', JSON.stringify(data))
+  const handleGenerate = async () => {
+    await fetch('/api/papers', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data }),
+    })
     router.push('/loading-screen')
   }
 

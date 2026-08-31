@@ -1,131 +1,56 @@
-// app/api/generate-paper/route.ts
-// @version 1.0.0
-// Genereert de complete babykrant (alle acht secties) in één gestructureerde
-// Claude-call: één system prompt, één user prompt met alle data, één response.
-// Goedkoper en consistenter van toon dan acht losse calls. Per-sectie
-// regeneratie blijft mogelijk via /api/generate-article.
-
 import { NextRequest, NextResponse } from 'next/server'
 import { CLAUDE_PRICING } from '@/lib/articleTypes'
 import type { ArticleSection } from '@/lib/articleTypes'
 import { SYSTEM_PROMPT, buildFullPaperPrompt, PAPER_TOOL } from '@/lib/prompts'
 import { callClaudeStructured } from '@/lib/claude'
 import { gatherNewsFacts, gatherCultuurFacts } from '@/lib/factGathering'
-import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase'
-import { checkRateLimit, addDailyCost, getDailyCost, DAILY_COST_BUDGET } from '@/lib/rateLimit'
+import { getSupabaseAdmin } from '@/lib/supabase'
+import { checkRateLimit, reserveDailyCost, settleDailyCost } from '@/lib/rateLimit'
+import { findPaperSession } from '@/lib/paperSession'
+import { loadPaperState } from '@/lib/paperState'
 
 export const maxDuration = 120
-
-export interface PaperGenerationResponse {
-  success: boolean
-  articles?: Record<ArticleSection, string>
-  wordCounts?: Record<ArticleSection, number>
-  tokensUsed?: number
-  cost?: number
-  error?: string
-}
+const RESERVED_COST = 0.10
 
 function calculateCost(inputTokens: number, outputTokens: number): number {
-  return ((inputTokens / 1_000_000) * CLAUDE_PRICING.inputCostPer1MTokens) +
-         ((outputTokens / 1_000_000) * CLAUDE_PRICING.outputCostPer1MTokens)
+  return ((inputTokens / 1_000_000) * CLAUDE_PRICING.inputCostPer1MTokens) + ((outputTokens / 1_000_000) * CLAUDE_PRICING.outputCostPer1MTokens)
 }
 
 export async function POST(request: NextRequest) {
+  const session = await findPaperSession(request)
+  if (!session) return NextResponse.json({ success: false, error: 'Geen geldige krantsessie' }, { status: 401 })
+  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ success: false, error: 'API niet geconfigureerd' }, { status: 503 })
+
+  const rateLimit = await checkRateLimit(request, 'paper')
+  if (!rateLimit.allowed) return NextResponse.json({ success: false, error: 'Generatie tijdelijk niet beschikbaar' }, { status: rateLimit.unavailable ? 503 : 429 })
+  const reservation = await reserveDailyCost(RESERVED_COST)
+  if (!reservation.ok) return NextResponse.json({ success: false, error: reservation.unavailable ? 'Generatie tijdelijk niet beschikbaar' : 'Dagbudget bereikt' }, { status: reservation.unavailable ? 503 : 429 })
+
   try {
-    const body = await request.json()
-    const data = body?.data
-
-    if (!data?.basisGegevens) {
-      return NextResponse.json(
-        { success: false, error: 'Missende velden (data.basisGegevens)' } as PaperGenerationResponse,
-        { status: 400 }
-      )
+    const data: any = await loadPaperState(session.paperId)
+    if (!data?.basisGegevens?.volledigeNaam || !data?.basisGegevens?.geboorteDatum) {
+      await settleDailyCost(RESERVED_COST, 0)
+      return NextResponse.json({ success: false, error: 'Vul eerst naam en geboortedatum in' }, { status: 400 })
+    }
+    const inputSize = Buffer.byteLength(JSON.stringify(data), 'utf8')
+    if (inputSize > 64 * 1024) {
+      await settleDailyCost(RESERVED_COST, 0)
+      return NextResponse.json({ success: false, error: 'Invoer is te groot' }, { status: 413 })
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(
-        { success: false, error: 'API niet geconfigureerd' } as PaperGenerationResponse,
-        { status: 500 }
-      )
-    }
-
-    // Rate limiting op IP (strakker dan per-sectie: dit is de dure call)
-    const rateLimit = await checkRateLimit(request, 'paper')
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { success: false, error: 'Limiet bereikt, probeer het later opnieuw' } as PaperGenerationResponse,
-        { status: 429 }
-      )
-    }
-
-    // Globaal dagbudget (alle gebruikers samen)
-    const dailyCost = await getDailyCost()
-    if (dailyCost >= DAILY_COST_BUDGET) {
-      return NextResponse.json(
-        { success: false, error: 'Dagbudget bereikt, probeer het morgen opnieuw' } as PaperGenerationResponse,
-        { status: 429 }
-      )
-    }
-
-    // Feiten verzamelen voor nieuws en cultuur via AI-modellen (parallel)
-    const geboorteDatum = data.basisGegevens?.geboorteDatum || ''
-    console.log(`[GeneratePaper] Feiten verzamelen voor ${geboorteDatum}...`)
-    const [nieuwsFacts, cultuurFacts] = await Promise.all([
-      gatherNewsFacts(geboorteDatum),
-      gatherCultuurFacts(geboorteDatum),
-    ])
-    data.gatheredFacts = {
-      nieuws: nieuwsFacts.combined,
-      cultuur: cultuurFacts.combined,
-    }
-
-    const userPrompt = buildFullPaperPrompt(data)
-    console.log(`[GeneratePaper] Feiten verzameld, artikel genereren voor ${data.basisGegevens?.volledigeNaam || 'onbekend'}`)
-
-    const result = await callClaudeStructured<Record<ArticleSection, string>>(
-      userPrompt,
-      SYSTEM_PROMPT,
-      PAPER_TOOL
-    )
-
+    const geboorteDatum = data.basisGegevens.geboorteDatum
+    const [nieuwsFacts, cultuurFacts] = await Promise.all([gatherNewsFacts(geboorteDatum), gatherCultuurFacts(geboorteDatum)])
+    data.gatheredFacts = { nieuws: nieuwsFacts.combined, cultuur: cultuurFacts.combined }
+    const result = await callClaudeStructured<Record<ArticleSection, string>>(buildFullPaperPrompt(data), SYSTEM_PROMPT, PAPER_TOOL)
     const articles = result.data
-    const wordCounts = Object.fromEntries(
-      Object.entries(articles).map(([section, text]) => [
-        section,
-        String(text).trim().split(/\s+/).filter(Boolean).length,
-      ])
-    ) as Record<ArticleSection, number>
-
-    const totalTokens = result.tokensUsed.input + result.tokensUsed.output
+    const wordCounts = Object.fromEntries(Object.entries(articles).map(([section, text]) => [section, String(text).trim().split(/\s+/).filter(Boolean).length]))
     const cost = calculateCost(result.tokensUsed.input, result.tokensUsed.output)
-    await addDailyCost(cost)
-    console.log(`[GeneratePaper] Succes - ${totalTokens} tokens, $${cost.toFixed(4)}`)
-
-    // Resultaat opslaan bij de concept-krant (indien aanwezig)
-    const paperId = String(body?.paperId || data?.paperId || '').trim()
-    if (paperId && isSupabaseAdminConfigured()) {
-      const { error } = await getSupabaseAdmin()
-        .from('generated_papers')
-        .update({ generated_articles: articles, status: 'generated' })
-        .eq('id', paperId)
-      if (error) console.error('[GeneratePaper] Kon generated_papers niet bijwerken:', error.message)
-    }
-
-    return NextResponse.json({
-      success: true,
-      articles,
-      wordCounts,
-      tokensUsed: totalTokens,
-      cost,
-    } as PaperGenerationResponse)
+    await settleDailyCost(RESERVED_COST, cost)
+    const { error } = await getSupabaseAdmin().from('generated_papers').update({ generated_articles: articles, manual_edits: articles, status: 'generated' }).eq('id', session.paperId)
+    if (error) throw error
+    return NextResponse.json({ success: true, articles, wordCounts, tokensUsed: result.tokensUsed.input + result.tokensUsed.output, cost })
   } catch (error) {
     console.error('[GeneratePaper] Error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Er ging iets mis',
-      } as PaperGenerationResponse,
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: 'Generatie mislukt' }, { status: 500 })
   }
 }

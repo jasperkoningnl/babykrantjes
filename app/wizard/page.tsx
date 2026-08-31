@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Step1BasisGegevens from '@/components/Step1BasisGegevens'
@@ -12,72 +12,63 @@ import type { BabykrantData, BasisGegevens, ExtraVragen, GeuploadeFotos } from '
 const stapNamen = ['Basisgegevens', 'Het verhaal', "Foto's", 'Controle']
 const stapTijden = ['± 2 minuten', '± 6 minuten', '± 1 minuut', 'Bijna klaar']
 
+const EMPTY_DATA: BabykrantData = {
+  basisGegevens: {
+    volledigeNaam: '', geboorteDatum: '', geboorteTijd: '', geboorteplaats: '',
+    gewicht: 0, lengte: 0, ouder1Naam: '', ouder2Naam: '', alleenstaand: false,
+  },
+  extraVragen: {
+    geboorteLocatie: 'ziekenhuis', geboorteLocatieNaam: undefined,
+    bevallingVerloop: undefined, bevallingAndersOmschrijving: undefined,
+    wieWarenErbij: [], zwangerschapVerloop: undefined, voornaamReden: undefined,
+    achternaamReden: undefined, heeftBroertjesZusjes: false, broertjesZusjes: [],
+    reactieBroertjesZusjes: undefined, eersteKraamvisite: undefined, bijzonderheden: undefined,
+  },
+  fotos: { foto1: null, foto2: null, foto3: null, foto4: null },
+  paperId: null,
+}
+
 export default function WizardPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
-  const [data, setData] = useState<BabykrantData>({
-    basisGegevens: {
-      volledigeNaam: '',
-      geboorteDatum: '',
-      geboorteTijd: '',
-      geboorteplaats: '',
-      gewicht: 0,
-      lengte: 0,
-      ouder1Naam: '',
-      ouder2Naam: '',
-      alleenstaand: false,
-    },
-    extraVragen: {
-      geboorteLocatie: 'ziekenhuis',
-      geboorteLocatieNaam: undefined,
-      bevallingVerloop: undefined,
-      bevallingAndersOmschrijving: undefined,
-      wieWarenErbij: [],
-      zwangerschapVerloop: undefined,
-      voornaamReden: undefined,
-      achternaamReden: undefined,
-      heeftBroertjesZusjes: false,
-      broertjesZusjes: [],
-      reactieBroertjesZusjes: undefined,
-      eersteKraamvisite: undefined,
-      bijzonderheden: undefined,
-    },
-    fotos: {
-      foto1: null,
-      foto2: null,
-      foto3: null,
-      foto4: null,
-    },
-    paperId: null,
-  })
+  const [data, setData] = useState<BabykrantData>(EMPTY_DATA)
+  const [hydrated, setHydrated] = useState(false)
 
-  const paperPromiseRef = useRef<Promise<string | null> | null>(null)
-  const ensurePaper = (): Promise<string | null> => {
-    if (data.paperId) return Promise.resolve(data.paperId)
-    if (!paperPromiseRef.current) {
-      paperPromiseRef.current = (async () => {
-        try {
-          const response = await fetch('/api/papers', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              basisGegevens: data.basisGegevens,
-              extraVragen: data.extraVragen,
-            }),
-          })
-          if (!response.ok) return null
-          const result = await response.json()
-          const id: string | null = result?.id ?? null
-          if (id) setData(prev => ({ ...prev, paperId: id }))
-          return id
-        } catch (err) {
-          console.error('[Wizard] Kon concept-krant niet aanmaken:', err)
-          return null
-        }
-      })()
-    }
-    return paperPromiseRef.current
-  }
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      let response = await fetch('/api/papers', { cache: 'no-store' })
+      if (response.status === 401 || response.status === 404) {
+        response = await fetch('/api/papers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: EMPTY_DATA }),
+        })
+      }
+      if (!response.ok) return
+      const result = await response.json()
+      if (active && result.data) {
+        setData({ ...EMPTY_DATA, ...result.data, paperId: result.data.paperId || result.id })
+        setCurrentStep(Math.min(4, Math.max(1, Number(result.data.wizardStep || 1))))
+        setHydrated(true)
+      }
+    })().catch((error) => console.error('[Wizard] Laden mislukt:', error))
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated || !data.paperId) return
+    const timer = setTimeout(() => {
+      fetch('/api/papers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { ...data, wizardStep: currentStep } }),
+      }).catch((error) => console.error('[Wizard] Autosave mislukt:', error))
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [data, currentStep, hydrated])
+
+  const ensurePaper = async (): Promise<string | null> => data.paperId || null
 
   const updateBasisGegevens = (newData: Partial<BasisGegevens>) => {
     setData(prev => ({
@@ -136,8 +127,9 @@ export default function WizardPage() {
           <span>{stapTijden[currentStep - 1]}</span>
         </div>
 
+        {!hydrated && <div className="py-20 text-center text-muted">Je concept wordt veilig geladen…</div>}
         {/* Step content */}
-        {currentStep === 1 && (
+        {hydrated && currentStep === 1 && (
           <Step1BasisGegevens
             data={data.basisGegevens}
             updateData={updateBasisGegevens}
@@ -146,7 +138,7 @@ export default function WizardPage() {
           />
         )}
 
-        {currentStep === 2 && (
+        {hydrated && currentStep === 2 && (
           <Step2ExtraVragen
             data={data.extraVragen}
             updateData={updateExtraVragen}
@@ -155,7 +147,7 @@ export default function WizardPage() {
           />
         )}
 
-        {currentStep === 3 && (
+        {hydrated && currentStep === 3 && (
           <Step3Fotos
             data={data.fotos}
             updateData={updateFotos}
@@ -165,7 +157,7 @@ export default function WizardPage() {
           />
         )}
 
-        {currentStep === 4 && (
+        {hydrated && currentStep === 4 && (
           <Step4Review
             data={data}
             onBack={prevStep}

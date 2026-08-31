@@ -11,7 +11,7 @@ export const RELEASE_NOTES = {
     'Supabase gekoppeld: schema, cache-on-read laag en krant-persistentie (generated_papers)',
     'Dagelijkse scrape-pipeline: 6 Edge Functions + pg_cron (tv, kijkcijfers, streaming, Google News, Top 40, dossiers)',
     'Nieuwsartikel in twee blokken met dossier-matching op de geboortedag',
-    'Foto-upload naar Vercel Blob — foto\'s overleven refresh en localStorage',
+    'Private foto-opslag en server-side hervatten via een veilige gastensessie',
     'Model-upgrade naar Haiku 4.5 en alle 8 secties in één gestructureerde call',
     'Server-side rate limiting op IP, TLS-hack verwijderd, debugroutes achter env-flag',
     'Parser-tests met HTML-fixtures in CI'

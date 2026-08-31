@@ -23,9 +23,23 @@
    De functies gebruiken `SUPABASE_URL` en `SUPABASE_SERVICE_ROLE_KEY`;
    die worden door Supabase automatisch in de runtime geïnjecteerd.
 
-3. **Cron jobs registreren**: vervang in `migrations/0002_cron.sql` de
-   placeholders `{project-ref}` en `{service_role_key}` en voer het bestand
-   uit in de SQL editor.
+3. **Cron secrets in Vault zetten**: open de SQL editor en voer zelf uit
+   (vul de echte waarden uitsluitend daar in, nooit in Git):
+
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+   select vault.create_secret('<server-side secret key>', 'edge_function_secret_key');
+   ```
+
+   Gebruik de actuele server-side secret key uit Project Settings → API Keys.
+   `vault.decrypted_secrets` mag niet aan `anon` of `authenticated` worden
+   toegekend. Voer daarna `migrations/0002_cron.sql` uit in de SQL editor.
+
+4. **Gastensessies en private foto-opslag**: review en voer
+   `migrations/20260831181754_passwordless_guest_sessions.sql` uit. Deze maakt
+   de private bucket, sessie-/herstellinktabellen en opruimjobs aan. De app
+   verwijdert Storage-objecten via de Storage API voordat conceptrecords
+   worden gewist; verwijder nooit rechtstreeks uit `storage.objects`.
 
 ## Handmatig een job draaien
 
