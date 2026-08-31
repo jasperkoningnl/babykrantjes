@@ -46,6 +46,46 @@ const GEN_TAKEN = [
   'Acht artikelen schrijven',
 ]
 
+async function collectAllData(data: BabykrantData, birthDate: string, birthPlace: string, fullName: string) {
+  const enrichedData: any = { ...data }
+  try {
+    enrichedData.berekend = {
+      sterrenbeeld: getSterrenbeeld(birthDate), chineesJaar: getChineesJaar(birthDate),
+      geboortebloem: getGeboortebloem(birthDate), geboortesteen: getGeboortesteen(birthDate), kleur: getKleur(birthDate),
+    }
+  } catch {}
+  if (birthDate && birthPlace) {
+    try { enrichedData.weather = await getHistoricalWeather(birthDate, birthPlace) } catch {}
+  }
+  if (fullName) {
+    try { enrichedData.nameMeaning = await getNameMeaning(fullName) } catch {}
+    try { enrichedData.famousNamesakes = await getFamousNamesakes(fullName) } catch {}
+  }
+  if (birthDate) {
+    try {
+      const bornPersons = await getBornOnThisDay(birthDate)
+      enrichedData.bornPersons = bornPersons.length > 0 ? bornPersons : undefined
+    } catch {}
+  }
+  await fetch('/api/papers', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: enrichedData }),
+  })
+  try {
+    const res = await fetch('/api/generate-paper', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    })
+    const result = await res.json()
+    if (result.success && result.articles) {
+      await fetch('/api/papers', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generatedArticles: result.articles, manualEdits: result.articles }),
+      })
+    }
+  } catch (error) {
+    console.error('Article generation error:', error)
+  }
+}
+
 export default function LoadingScreenPage() {
   const router = useRouter()
   const [data, setData] = useState<BabykrantData | null>(null)
@@ -74,8 +114,7 @@ export default function LoadingScreenPage() {
     const birthPlace = data.basisGegevens.geboorteplaats
     const fullName = data.basisGegevens.volledigeNaam
 
-    collectAllData(data, birthDate, birthPlace, fullName)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    collectAllData(data, birthDate, birthPlace, fullName).finally(() => setKlaar(true))
   }, [data])
 
   useEffect(() => {
@@ -99,72 +138,6 @@ export default function LoadingScreenPage() {
     }, 5000)
     return () => clearInterval(factTimer)
   }, [data, klaar])
-
-  const collectAllData = async (
-    data: BabykrantData,
-    birthDate: string,
-    birthPlace: string,
-    fullName: string
-  ) => {
-    const enrichedData: any = { ...data }
-
-    try {
-      enrichedData.berekend = {
-        sterrenbeeld: getSterrenbeeld(birthDate),
-        chineesJaar: getChineesJaar(birthDate),
-        geboortebloem: getGeboortebloem(birthDate),
-        geboortesteen: getGeboortesteen(birthDate),
-        kleur: getKleur(birthDate),
-      }
-    } catch {}
-
-    if (birthDate && birthPlace) {
-      try {
-        enrichedData.weather = await getHistoricalWeather(birthDate, birthPlace)
-      } catch {}
-    }
-
-    if (fullName) {
-      try { enrichedData.nameMeaning = await getNameMeaning(fullName) } catch {}
-      try { enrichedData.famousNamesakes = await getFamousNamesakes(fullName) } catch {}
-    }
-
-    if (birthDate) {
-      try {
-        const bornPersons = await getBornOnThisDay(birthDate)
-        enrichedData.bornPersons = bornPersons.length > 0 ? bornPersons : undefined
-      } catch {}
-    }
-
-    await fetch('/api/papers', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: enrichedData }),
-    })
-
-    // Generate articles
-    try {
-      const res = await fetch('/api/generate-paper', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      const result = await res.json()
-      if (result.success && result.articles) {
-        enrichedData.generatedArticles = result.articles
-        enrichedData.wordCounts = result.wordCounts
-        await fetch('/api/papers', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ generatedArticles: result.articles, manualEdits: result.articles }),
-        })
-      }
-    } catch (error) {
-      console.error('Article generation error:', error)
-    }
-
-    setKlaar(true)
-  }
 
   const [emailError, setEmailError] = useState('')
   const [emailVerzenden, setEmailVerzenden] = useState(false)

@@ -1,4 +1,4 @@
-// middleware.ts
+// proxy.ts
 // @version 2.0.0
 // Productroutes zijn publiek bereikbaar; krantdata en mutaties worden in de
 // route handlers via een HttpOnly gastensessie geautoriseerd. Alleen debug- en
@@ -16,7 +16,7 @@ function isDebugOrTestPage(pathname: string): boolean {
   )
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (isDebugOrTestPage(pathname) && (process.env.NODE_ENV === 'production' || process.env.ENABLE_TEST_PAGE !== 'true')) {
