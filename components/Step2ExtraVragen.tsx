@@ -107,7 +107,7 @@ export default function Step2ExtraVragen({ data, updateData, onNext, onBack }: P
         {/* De bevalling */}
         <div className="bk-card">
           <div className="flex items-center gap-2.5 mb-[18px]">
-            <div className="bk-section-dot bg-terracotta" />
+            <div className="bk-section-dot bg-sage" />
             <div className="font-bold text-xl tracking-tight">De bevalling</div>
           </div>
           <label className="bk-label mb-[9px]">Waar is de baby geboren?</label>
@@ -132,7 +132,7 @@ export default function Step2ExtraVragen({ data, updateData, onNext, onBack }: P
         {/* De baby & de naam */}
         <div className="bk-card">
           <div className="flex items-center gap-2.5 mb-[18px]">
-            <div className="bk-section-dot bg-gold" />
+            <div className="bk-section-dot bg-sage" />
             <div className="font-bold text-xl tracking-tight">De baby &amp; de naam</div>
           </div>
           <label className="bk-label">Waarom deze naam?</label>
