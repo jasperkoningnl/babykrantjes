@@ -10,7 +10,11 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Verzoek niet toegestaan' }, { status: 401 })
 
   const supabase = getSupabaseAdmin()
-  const { data: paper } = await supabase.from('generated_papers').select('baby_name, contact_email').eq('id', session.paperId).maybeSingle()
+  const { data: paper, error: paperError } = await supabase.from('generated_papers').select('baby_name, contact_email').eq('id', session.paperId).maybeSingle()
+  if (paperError) {
+    console.error('[SendEmail] Krant ophalen mislukt:', paperError.message)
+    return NextResponse.json({ error: 'E-mail kon niet worden verstuurd' }, { status: 503 })
+  }
   const email = String(paper?.contact_email || '').trim().toLowerCase()
   const generic = { accepted: true, message: 'Als het adres beschikbaar is, wordt de link verstuurd.' }
   if (!email) return NextResponse.json(generic, { status: 202 })
@@ -39,15 +43,21 @@ export async function POST(request: NextRequest) {
   const safeUrl = escapeHtml(recoveryUrl.toString())
 
   try {
-    const { error } = await new Resend(process.env.RESEND_API_KEY).emails.send({
+    const { data, error } = await new Resend(process.env.RESEND_API_KEY).emails.send({
       from: 'Babykrantje <noreply@babykrantje.nl>',
       to: email,
       subject: `Je link naar het babykrantje van ${subjectName}`,
       html: `<div style="font-family:Georgia,'Times New Roman',serif;max-width:520px;margin:0 auto;padding:40px 24px;color:#23231F"><h1 style="font-family:system-ui,sans-serif;font-size:26px">Het babykrantje van ${naam}</h1><p style="font-size:16px;line-height:1.6">Gebruik de eenmalige link hieronder. De link verloopt binnen 15 minuten.</p><p><a href="${safeUrl}" style="display:inline-block;background:#8FA88A;color:#FDF8F0;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:700">Open mijn babykrantje</a></p><p style="font-size:13px;color:#7A756C">Heb je dit niet aangevraagd, dan kun je deze e-mail negeren.</p></div>`,
     })
-    if (error) console.error('[SendEmail] Resend fout:', error)
+    if (error || !data?.id) {
+      console.error('[SendEmail] Resend fout:', error || 'Geen bericht-id ontvangen')
+      await supabase.from('paper_recovery_links').update({ revoked_at: new Date().toISOString() }).eq('token_hash', hashToken(token)).is('used_at', null)
+      return NextResponse.json({ error: 'E-mail kon niet worden verstuurd. Probeer het opnieuw.' }, { status: 503 })
+    }
   } catch (error) {
     console.error('[SendEmail] Provider fout:', error)
+    await supabase.from('paper_recovery_links').update({ revoked_at: new Date().toISOString() }).eq('token_hash', hashToken(token)).is('used_at', null)
+    return NextResponse.json({ error: 'E-mail kon niet worden verstuurd. Probeer het opnieuw.' }, { status: 503 })
   }
   return NextResponse.json(generic, { status: 202 })
 }

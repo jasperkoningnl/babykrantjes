@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { type ArticleSection, type GeneratedArticle, type ArticleGenerationResponse } from '@/lib/articleTypes'
 import Voorpagina, { type VoorpaginaProps } from '@/components/Voorpagina'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen } from '@/lib/calculations'
+import RecoveryEmailForm from '@/components/RecoveryEmailForm'
 
 const ARTIKEL_TABS: { id: ArticleSection; label: string; titel: string }[] = [
   { id: 'hoofdartikel', label: 'Openingsartikel', titel: 'Openingsartikel — het geboorteverhaal' },
@@ -421,6 +422,14 @@ export default function GenerateArticlesPage() {
               </div>
             </div>
           )}
+
+          <div className="bg-cream-card border border-dark/[.12] rounded-card p-5">
+            <div className="font-bold text-[17px] mb-1">Link per e-mail</div>
+            <div className="font-serif text-[15px] text-subtle mb-3.5">
+              Mail jezelf een link om later verder te gaan.
+            </div>
+            <RecoveryEmailForm initialEmail={testData.contactEmail || ''} compact />
+          </div>
 
           {/* Bestellen CTA */}
           <div className="bg-dark text-cream rounded-card p-5">
