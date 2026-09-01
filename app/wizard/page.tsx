@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import Link from 'next/link'
 import Step1BasisGegevens from '@/components/Step1BasisGegevens'
 import Step2ExtraVragen from '@/components/Step2ExtraVragen'
@@ -105,8 +106,11 @@ export default function WizardPage() {
       <div className="sticky top-0 z-20 bg-cream/[.92] backdrop-blur-sm border-b border-dark/10">
         <div className="max-w-container mx-auto px-7 py-3.5 flex items-center justify-between gap-6">
           <Link href="/" className="flex items-center gap-2.5 no-underline">
-            <div className="w-[30px] h-[30px] rounded-full bg-sage flex items-center justify-center text-cream font-extrabold text-[15px]">b</div>
-            <div className="font-bold text-[19px] tracking-tight text-dark">babykrantje<span className="text-terracotta">.nl</span></div>
+            <Image src="/favicon.svg" alt="" aria-hidden="true" width={30} height={30} className="rounded-full" />
+            <div>
+              <div className="font-bold text-[19px] leading-none tracking-tight text-dark">babykrantje<span className="text-terracotta">.nl</span></div>
+              <div className="font-serif text-[11px] leading-none text-muted mt-1">Geboren op 1 september 2026</div>
+            </div>
           </Link>
         </div>
       </div>
