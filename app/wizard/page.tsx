@@ -19,11 +19,12 @@ const EMPTY_DATA: BabykrantData = {
     gewicht: 0, lengte: 0, ouder1Naam: '', ouder2Naam: '', alleenstaand: false,
   },
   extraVragen: {
-    geboorteLocatie: 'ziekenhuis', geboorteLocatieNaam: undefined,
+    geboorteLocatie: undefined, geboorteLocatieNaam: undefined,
     bevallingVerloop: undefined, bevallingAndersOmschrijving: undefined,
     wieWarenErbij: [], zwangerschapVerloop: undefined, voornaamReden: undefined,
     achternaamReden: undefined, heeftBroertjesZusjes: false, broertjesZusjes: [],
     reactieBroertjesZusjes: undefined, eersteKraamvisite: undefined, bijzonderheden: undefined,
+    eersteIndruk: undefined, eersteIndrukOverig: undefined,
   },
   fotos: { foto1: null, foto2: null, foto3: null, foto4: null },
   paperId: null,
