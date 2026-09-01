@@ -72,7 +72,7 @@ button:disabled {
   }
 
   .bk-btn-primary:hover {
-    @apply bg-terracotta-dark;
+    @apply bg-terracotta-dark text-cream;
   }
 
   .bk-btn-back {
@@ -91,11 +91,16 @@ button:disabled {
   }
 
   .bk-chip-off {
-    @apply bg-cream-card text-dark border-dark/40;
+    @apply bg-cream text-dark border-dark/40 shadow-sm;
   }
 
   .bk-chip-off:hover {
-    @apply bg-cream-dark border-dark/60;
+    @apply bg-cream-dark text-dark border-dark/60;
+  }
+
+  .bk-chip:focus-visible {
+    outline: 2px solid #8FA88A;
+    outline-offset: 2px;
   }
 
   .bk-chip-on {
