@@ -37,7 +37,7 @@ export interface ExtraVragen {
   // ========================================================================
   
   // Waar geboren (MOVED van BasisGegevens v3.0.0)
-  geboorteLocatie: 'thuis' | 'ziekenhuis' | 'geboortecentrum' | 'anders'
+  geboorteLocatie?: 'thuis' | 'ziekenhuis' | 'geboortecentrum' | 'anders'
   geboorteLocatieNaam?: string  // Alleen ingevuld als ziekenhuis of anders
   
   // Hoe was bevalling
