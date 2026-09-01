@@ -9,6 +9,7 @@ import { getHistoricalWeather } from '@/lib/weatherAPI'
 import { getBornOnThisDay } from '@/lib/bornOnThisDayAPI'
 import { getNameMeaning } from '@/lib/nameMeaningAPI'
 import { getFamousNamesakes } from '@/lib/famousNamesakesAPI'
+import RecoveryEmailForm from '@/components/RecoveryEmailForm'
 
 const FUN_FACTS = [
   'Elke seconde worden er wereldwijd ongeveer 4,3 baby’s geboren!',
@@ -94,8 +95,6 @@ export default function LoadingScreenPage() {
   const router = useRouter()
   const [data, setData] = useState<BabykrantData | null>(null)
   const [genStap, setGenStap] = useState(0)
-  const [email, setEmail] = useState('')
-  const [emailVerstuurd, setEmailVerstuurd] = useState(false)
   const [klaar, setKlaar] = useState(false)
   const [generationError, setGenerationError] = useState('')
   const [generationAttempt, setGenerationAttempt] = useState(0)
@@ -161,40 +160,6 @@ export default function LoadingScreenPage() {
     }, 5000)
     return () => clearInterval(factTimer)
   }, [data, klaar])
-
-  const [emailError, setEmailError] = useState('')
-  const [emailVerzenden, setEmailVerzenden] = useState(false)
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email || emailVerzenden) return
-    setEmailError('')
-    setEmailVerzenden(true)
-
-    try {
-      const save = await fetch('/api/papers', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contactEmail: email }),
-      })
-      if (!save.ok) throw new Error('E-mailadres kon niet worden bewaard')
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      if (!res.ok) {
-        const result = await res.json()
-        setEmailError(result.error || 'Er ging iets mis')
-        setEmailVerzenden(false)
-        return
-      }
-      setEmailVerstuurd(true)
-    } catch {
-      setEmailError('Kon geen verbinding maken')
-      setEmailVerzenden(false)
-    }
-  }
 
   useEffect(() => {
     if (!klaar) return
@@ -284,38 +249,14 @@ export default function LoadingScreenPage() {
               </button>
             </div>
           </div>
-        ) : !emailVerstuurd ? (
+        ) : (
           <div className="animate-bk-rise">
             <div className="bg-cream-card border border-dark/10 rounded-card p-6 text-left">
               <div className="font-bold text-[17px] mb-1.5">Je krant wordt nu gemaakt</div>
               <p className="font-serif text-[15px] text-subtle mb-4">
                 Vul je mailadres in en krijg een link als de krant af is. Of blijf wachten.
               </p>
-              <form onSubmit={handleEmailSubmit} className="flex gap-2.5">
-                <input
-                  type="email"
-                  placeholder="E-mailadres"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="bk-input flex-1"
-                />
-                <button type="submit" disabled={emailVerzenden} className="bk-btn-primary whitespace-nowrap disabled:opacity-60">
-                  {emailVerzenden ? 'Versturen…' : 'Mail mij een link'}
-                </button>
-              </form>
-              {emailError && (
-                <p className="text-sm text-red-600 mt-2">{emailError}</p>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="animate-bk-rise">
-            <div className="bg-sage/10 border border-sage/20 rounded-card p-6 text-center">
-              <div className="font-bold text-[17px] text-[#4A6B47] mb-1">Genoteerd!</div>
-              <p className="font-serif text-[15px] text-subtle">
-                We sturen een link naar <strong>{email}</strong> zodra je krant klaar is.
-                Je kunt dit venster sluiten of blijven wachten.
-              </p>
+              <RecoveryEmailForm initialEmail={data?.contactEmail || ''} />
             </div>
           </div>
         )}

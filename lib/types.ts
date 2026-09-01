@@ -104,6 +104,7 @@ export interface BabykrantData {
   basisGegevens: BasisGegevens
   extraVragen: ExtraVragen
   fotos: GeuploadeFotos
+  contactEmail?: string
   /** Alleen voor UI-correlatie; server-autorisatie gebruikt uitsluitend de HttpOnly sessiecookie. */
   paperId?: string | null
 }

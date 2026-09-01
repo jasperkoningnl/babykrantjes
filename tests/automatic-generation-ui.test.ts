@@ -21,4 +21,15 @@ describe('automatische generatie-interface', () => {
     expect(loading).toContain("if (!res.ok || !result?.success || !result.articles)")
     expect(loading).toContain('setKlaar(true)')
   })
+
+  it('houdt de herstellink beschikbaar nadat de generatie klaar is', () => {
+    expect(read('app/loading-screen/page.tsx')).toContain('RecoveryEmailForm')
+    expect(read('app/generate-articles/page.tsx')).toContain('RecoveryEmailForm')
+  })
+
+  it('toont pas succes nadat de mailprovider het bericht accepteert', () => {
+    const route = read('app/api/send-email/route.ts')
+    expect(route).toContain("if (error || !data?.id)")
+    expect(route).toContain("status: 503")
+  })
 })
