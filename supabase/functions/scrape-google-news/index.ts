@@ -7,6 +7,7 @@
 //   ?date=YYYY-MM-DD  — datum waaronder de items worden opgeslagen (default vandaag)
 
 import { runJob, SupabaseClient } from '../_shared/db.ts'
+import { withScrapeAuth } from '../_shared/auth.ts'
 import { fetchWithRetry, sleep } from '../_shared/fetch.ts'
 import { todayISO } from '../_shared/dates.ts'
 import { parseGoogleNewsRss } from '../_shared/parsers/googleNews.ts'
@@ -77,12 +78,14 @@ async function scrape(supabase: SupabaseClient, date: string): Promise<{ inserte
 }
 
 Deno.serve(async (req: Request) => {
-  const url = new URL(req.url)
-  const date = url.searchParams.get('date') || todayISO()
+  return withScrapeAuth(req, async () => {
+    const url = new URL(req.url)
+    const date = url.searchParams.get('date') || todayISO()
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return Response.json({ ok: false, error: 'Ongeldige datum, gebruik YYYY-MM-DD' }, { status: 400 })
-  }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return Response.json({ ok: false, error: 'Ongeldige datum, gebruik YYYY-MM-DD' }, { status: 400 })
+    }
 
-  return runJob(SOURCE_NAME, (supabase) => scrape(supabase, date))
+    return runJob(SOURCE_NAME, (supabase) => scrape(supabase, date))
+  })
 })
