@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import Voorpagina, { type VoorpaginaProps } from '@/components/Voorpagina'
 
@@ -72,12 +73,12 @@ const voorbeeldTerracotta: VoorpaginaProps = {
 }
 
 const secties = [
-  { tag: 'de voorpagina', titel: 'Persoonlijk openingsartikel', tekst: 'Jullie geboorteverhaal, geschreven als een echt krantenbericht — met kop, lead en jullie eigen details.' },
-  { tag: 'de naam', titel: 'Naamgenoten', tekst: 'Waar de naam vandaan komt, wat hij betekent en welke beroemde mensen hem al droegen.' },
-  { tag: 'de datum', titel: 'Geboren op', tekst: 'Wie deze verjaardag nog meer heeft: schrijvers, sterren en een enkele astronaut.' },
-  { tag: 'de sterren', titel: 'Horoscoop', tekst: 'Sterrenbeeld en Chinees teken, met een knipoog beschreven. Geloven mag, lachen ook.' },
-  { tag: 'die dag', titel: 'Nieuws van de dag', tekst: 'De koppen van de geboortedag, uit het archief opgediept en netjes naverteld.' },
-  { tag: 'die dag', titel: 'Muziek, films en series', tekst: 'Wat er nummer 1 stond, wat er in de bioscoop draaide en waar Nederland naar keek.' },
+  { titel: 'Persoonlijk openingsartikel', tekst: 'Jullie geboorteverhaal, geschreven als een echt krantenbericht — met kop, lead en jullie eigen details.' },
+  { titel: 'Naamgenoten', tekst: 'Waar de naam vandaan komt, wat hij betekent en welke beroemde mensen hem al droegen.' },
+  { titel: 'Geboren op', tekst: 'Wie deze verjaardag nog meer heeft: schrijvers, sterren en een enkele astronaut.' },
+  { titel: 'Horoscoop', tekst: 'Sterrenbeeld en Chinees teken, met een knipoog beschreven. Geloven mag, lachen ook.' },
+  { titel: 'Nieuws van de dag', tekst: 'De koppen van de geboortedag, uit het archief opgediept en netjes naverteld.' },
+  { titel: 'Muziek, films en series', tekst: 'Wat er nummer 1 stond, wat er in de bioscoop draaide en waar Nederland naar keek.' },
 ]
 
 const stappen = [
@@ -99,8 +100,11 @@ export default function Home() {
       <div className="sticky top-0 z-20 bg-cream/[.92] backdrop-blur-sm border-b border-dark/10">
         <div className="max-w-container mx-auto px-7 py-3.5 flex items-center justify-between gap-6">
           <Link href="/" className="flex items-center gap-2.5 no-underline">
-            <div className="w-[30px] h-[30px] rounded-full bg-sage flex items-center justify-center text-cream font-extrabold text-[15px]">b</div>
-            <div className="font-bold text-[19px] tracking-tight text-dark">babykrantje<span className="text-terracotta">.nl</span></div>
+            <Image src="/favicon.svg" alt="" aria-hidden="true" width={30} height={30} className="rounded-full" />
+            <div>
+              <div className="font-bold text-[19px] leading-none tracking-tight text-dark">babykrantje<span className="text-terracotta">.nl</span></div>
+              <div className="font-serif text-[11px] leading-none text-muted mt-1">Geboren op 1 september 2026</div>
+            </div>
           </Link>
           <div className="flex items-center gap-6 text-sm font-medium">
             <a href="#voorbeelden" className="text-dark no-underline hover:text-terracotta">Voorbeelden</a>
@@ -147,7 +151,6 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[18px]">
           {secties.map((s, i) => (
             <div key={i} className="bk-card">
-              <div className="font-serif text-[13px] italic text-sage mb-2.5">{s.tag}</div>
               <div className="font-bold text-[19px] tracking-tight mb-[7px]">{s.titel}</div>
               <div className="font-serif text-[15px] leading-relaxed text-subtle">{s.tekst}</div>
             </div>
