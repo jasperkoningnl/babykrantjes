@@ -115,3 +115,8 @@ tests/             Vitest parser-tests + HTML-fixtures
 
 Krant-layout/PDF-generatie, bestelflow en betaling (Mollie/iDEAL),
 print-on-demand, AVG/juridisch en een scrape-health dashboard volgen later.
+
+De voorgenomen verbouwing naar een herbruikbare, redactioneel beheerde
+contentbibliotheek staat in
+[`docs/contentbibliotheek-implementatieplan.md`](docs/contentbibliotheek-implementatieplan.md).
+Dit plan moet eerst worden gereviewd voordat de implementatie start.
