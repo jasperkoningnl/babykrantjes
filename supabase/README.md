@@ -21,17 +21,19 @@
    ```
 
    De functies gebruiken `SUPABASE_URL` en `SUPABASE_SERVICE_ROLE_KEY`;
-   die worden door Supabase automatisch in de runtime geïnjecteerd.
+   die worden door Supabase automatisch in de runtime geïnjecteerd. Stel
+   daarnaast via Edge Functions → Secrets een willekeurige, uitsluitend voor
+   deze scrape-aanroepen gebruikte `SCRAPE_FUNCTION_SECRET` in.
 
 3. **Cron secrets in Vault zetten**: open de SQL editor en voer zelf uit
    (vul de echte waarden uitsluitend daar in, nooit in Git):
 
    ```sql
    select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
-   select vault.create_secret('<server-side secret key>', 'edge_function_secret_key');
+   select vault.create_secret('<dezelfde dedicated scrape secret>', 'scrape_function_secret');
    ```
 
-   Gebruik de actuele server-side secret key uit Project Settings → API Keys.
+   Gebruik dus niet de anon/publishable key of service-role key als scrape-secret.
    `vault.decrypted_secrets` mag niet aan `anon` of `authenticated` worden
    toegekend. Voer daarna `migrations/0002_cron.sql` uit in de SQL editor.
 
@@ -47,7 +49,7 @@ Elke functie is los aan te roepen (bijv. om een gemiste dag in te halen):
 
 ```bash
 curl -X POST "https://<project-ref>.supabase.co/functions/v1/scrape-tv?date=2026-07-13" \
-  -H "Authorization: Bearer <service_role_key>"
+  -H "x-scrape-secret: <dedicated scrape secret>"
 ```
 
 De dagelijkse functies accepteren `?date=YYYY-MM-DD` (default: gisteren,

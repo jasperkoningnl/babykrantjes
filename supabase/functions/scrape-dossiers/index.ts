@@ -10,6 +10,7 @@
 // - dossiers die niet meer voorkomen: active → false
 
 import { runJob, SupabaseClient } from '../_shared/db.ts'
+import { withScrapeAuth } from '../_shared/auth.ts'
 import { fetchWithRetry, sleep, BROWSER_HEADERS } from '../_shared/fetch.ts'
 import { todayISO } from '../_shared/dates.ts'
 import { parseVrtDossiers, parseAlJazeeraTags, type ScrapedDossier } from '../_shared/parsers/dossiers.ts'
@@ -133,6 +134,6 @@ async function scrape(supabase: SupabaseClient): Promise<{ inserted: number; det
   return { inserted: totalProcessed, details: { perSource, errors } }
 }
 
-Deno.serve(async (_req: Request) => {
-  return runJob(SOURCE_NAME, (supabase) => scrape(supabase))
+Deno.serve(async (req: Request) => {
+  return withScrapeAuth(req, () => runJob(SOURCE_NAME, (supabase) => scrape(supabase)))
 })
