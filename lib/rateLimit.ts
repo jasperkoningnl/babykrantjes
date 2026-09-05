@@ -13,12 +13,14 @@
 
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
+import { isIP } from 'node:net'
 import { USAGE_LIMITS } from './articleTypes'
 
 let redis: Redis | null = null
 let articleLimiter: Ratelimit | null = null
 let paperLimiter: Ratelimit | null = null
 let emailLimiter: Ratelimit | null = null
+let draftLimiter: Ratelimit | null = null
 
 function redisCredentials(): { url: string; token: string } | null {
   if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
@@ -78,6 +80,17 @@ function getPaperLimiter(): Ratelimit {
   return paperLimiter
 }
 
+function getDraftLimiter(): Ratelimit {
+  if (!draftLimiter) {
+    draftLimiter = new Ratelimit({
+      redis: getRedis(),
+      limiter: Ratelimit.slidingWindow(6, '1 h'),
+      prefix: 'babykrant:draft',
+    })
+  }
+  return draftLimiter
+}
+
 export interface RateLimitResult {
   allowed: boolean
   remaining: number
@@ -86,11 +99,66 @@ export interface RateLimitResult {
   unavailable?: boolean
 }
 
-/** Client-IP uit de request headers (Vercel zet x-forwarded-for). */
+/**
+ * Client-IP uit headers die door het hostingplatform worden overschreven.
+ * Een syntactisch ongeldig of ontbrekend adres wordt niet op één gedeelde
+ * fallback-bucket gezet: callers kunnen daardoor fail-closed reageren.
+ */
 export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for')
-  if (forwarded) return forwarded.split(',')[0].trim()
-  return request.headers.get('x-real-ip') || 'onbekend'
+  const forwarded = request.headers.get('x-vercel-forwarded-for') || request.headers.get('x-forwarded-for')
+  const candidate = (forwarded?.split(',')[0] || request.headers.get('x-real-ip') || '').trim()
+  return isIP(candidate) ? candidate : ''
+}
+
+/** Limiet voor het maken van concepten; Redis en een platform-IP zijn verplicht. */
+export async function checkDraftCreationLimit(request: Request): Promise<RateLimitResult> {
+  const ip = getClientIp(request)
+  if (!isRedisConfigured() || !ip) return { allowed: false, remaining: 0, enforced: false, unavailable: true }
+  try {
+    const result = await getDraftLimiter().limit(`ip:${ip}`)
+    return { allowed: result.success, remaining: result.remaining, enforced: true }
+  } catch (error) {
+    console.error('[RateLimit] Conceptlimiter niet beschikbaar:', error)
+    return { allowed: false, remaining: 0, enforced: false, unavailable: true }
+  }
+}
+
+export const UPLOAD_LIMITS = {
+  maxRequestBytes: 10 * 1024 * 1024 + 64 * 1024,
+  session: { count: 24, bytes: 80 * 1024 * 1024 },
+  paper: { count: 24, bytes: 80 * 1024 * 1024 },
+  ip: { count: 80, bytes: 300 * 1024 * 1024 },
+} as const
+
+const RESERVE_UPLOAD_SCRIPT = `
+for i = 1, 3 do
+  local count = tonumber(redis.call('GET', KEYS[(i - 1) * 2 + 1]) or '0')
+  local bytes = tonumber(redis.call('GET', KEYS[(i - 1) * 2 + 2]) or '0')
+  if count + 1 > tonumber(ARGV[(i - 1) * 2 + 1]) or bytes + tonumber(ARGV[7]) > tonumber(ARGV[(i - 1) * 2 + 2]) then
+    return 0
+  end
+end
+for i = 1, 6 do redis.call('INCRBY', KEYS[i], i % 2 == 1 and 1 or tonumber(ARGV[7])); redis.call('EXPIRE', KEYS[i], 86400) end
+return 1
+`
+
+/** Reserveert uploadaantal én ingress-bytes atomair vóór body parsing. */
+export async function reserveUploadCapacity(request: Request, sessionId: string, paperId: string, bytes: number): Promise<RateLimitResult> {
+  const ip = getClientIp(request)
+  if (!isRedisConfigured() || !ip || !Number.isSafeInteger(bytes) || bytes <= 0 || bytes > UPLOAD_LIMITS.maxRequestBytes) {
+    return { allowed: false, remaining: 0, enforced: false, unavailable: !isRedisConfigured() || !ip }
+  }
+  const day = new Date().toISOString().slice(0, 10)
+  const dimensions = [`session:${sessionId}`, `paper:${paperId}`, `ip:${ip}`]
+  const keys = dimensions.flatMap((dimension) => [`babykrant:upload:${day}:${dimension}:count`, `babykrant:upload:${day}:${dimension}:bytes`])
+  const limits = [UPLOAD_LIMITS.session, UPLOAD_LIMITS.paper, UPLOAD_LIMITS.ip].flatMap((limit) => [String(limit.count), String(limit.bytes)])
+  try {
+    const result = await getRedis().eval(RESERVE_UPLOAD_SCRIPT, keys, [...limits, String(bytes)])
+    return { allowed: Number(result) === 1, remaining: 0, enforced: true }
+  } catch (error) {
+    console.error('[RateLimit] Uploadreservering mislukt:', error)
+    return { allowed: false, remaining: 0, enforced: false, unavailable: true }
+  }
 }
 
 export async function checkRateLimit(

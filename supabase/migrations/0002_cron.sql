@@ -3,7 +3,7 @@
 --
 -- VOORAF HANDMATIG IN VAULT OPSLAAN (nooit in dit bestand plakken):
 --   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
---   select vault.create_secret('<server-side secret key>', 'edge_function_secret_key');
+--   select vault.create_secret('<dedicated scrape secret>', 'scrape_function_secret');
 --
 -- LET OP: pg_cron draait in UTC. Nederland is UTC+1 (winter) / UTC+2 (zomer).
 -- De schema's hieronder zijn in UTC gezet zodat ze rond de bedoelde
@@ -17,6 +17,20 @@
 -- Extensions (op Supabase beschikbaar, ook op free tier)
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
+create extension if not exists supabase_vault with schema vault;
+
+-- Stop zonder de bestaande jobs te wijzigen als de vereiste Vault-records
+-- ontbreken. De waarden zelf komen nooit in deze migratie of cron.job terecht.
+do $$
+begin
+  if not exists (select 1 from vault.secrets where name = 'project_url') then
+    raise exception 'Vault secret project_url ontbreekt';
+  end if;
+  if not exists (select 1 from vault.secrets where name = 'scrape_function_secret') then
+    raise exception 'Vault secret scrape_function_secret ontbreekt';
+  end if;
+end
+$$;
 
 -- ============================================================================
 -- Seed scrape_sources (administratie; de Edge Functions werken
@@ -38,11 +52,25 @@ on conflict (name) do update set
 -- Cron jobs
 -- ============================================================================
 
+-- cron.schedule is niet op alle pg_cron-versies een upsert. Verwijder alleen
+-- de zes jobs van deze migratie, zodat opnieuw uitvoeren hetzelfde resultaat
+-- oplevert en andere cronjobs ongemoeid blijven.
+select cron.unschedule(jobid)
+from cron.job
+where jobname in (
+  'scrape-tv-daily',
+  'scrape-ratings-daily',
+  'scrape-streaming-daily',
+  'scrape-google-news-daily',
+  'scrape-music-weekly',
+  'scrape-dossiers-weekly'
+);
+
 -- Job 1: TV-programmering — 06:00 NL ≈ 05:00 UTC (dagelijks)
 select cron.schedule('scrape-tv-daily', '0 5 * * *', $$
   select net.http_post(
     url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-tv',
-    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
+    headers := jsonb_build_object('x-scrape-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'scrape_function_secret'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
@@ -51,7 +79,7 @@ $$);
 select cron.schedule('scrape-ratings-daily', '0 9 * * *', $$
   select net.http_post(
     url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-ratings',
-    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
+    headers := jsonb_build_object('x-scrape-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'scrape_function_secret'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
@@ -60,7 +88,7 @@ $$);
 select cron.schedule('scrape-streaming-daily', '0 7 * * *', $$
   select net.http_post(
     url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-streaming',
-    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
+    headers := jsonb_build_object('x-scrape-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'scrape_function_secret'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
@@ -69,7 +97,7 @@ $$);
 select cron.schedule('scrape-google-news-daily', '0 6 * * *', $$
   select net.http_post(
     url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-google-news',
-    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
+    headers := jsonb_build_object('x-scrape-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'scrape_function_secret'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
@@ -78,7 +106,7 @@ $$);
 select cron.schedule('scrape-music-weekly', '0 11 * * 1', $$
   select net.http_post(
     url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-music',
-    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
+    headers := jsonb_build_object('x-scrape-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'scrape_function_secret'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);
@@ -87,7 +115,7 @@ $$);
 select cron.schedule('scrape-dossiers-weekly', '0 2 * * 0', $$
   select net.http_post(
     url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/scrape-dossiers',
-    headers := jsonb_build_object('apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'edge_function_secret_key'), 'Content-Type', 'application/json'),
+    headers := jsonb_build_object('x-scrape-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'scrape_function_secret'), 'Content-Type', 'application/json'),
     timeout_milliseconds := 120000
   )
 $$);

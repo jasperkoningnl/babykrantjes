@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
 import { findPaperSession } from '@/lib/paperSession'
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase'
+import { reserveUploadCapacity, UPLOAD_LIMITS } from '@/lib/rateLimit'
 
 export const runtime = 'nodejs'
 const MAX_SIZE = 10 * 1024 * 1024
@@ -14,6 +15,17 @@ export async function POST(request: NextRequest) {
   if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: 'Foto-opslag is niet geconfigureerd' }, { status: 503 })
   const session = await findPaperSession(request)
   if (!session) return NextResponse.json({ error: 'Geen geldige krantsessie' }, { status: 401 })
+
+  const contentLength = Number(request.headers.get('content-length'))
+  if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
+    return NextResponse.json({ error: 'Content-Length is verplicht' }, { status: 411 })
+  }
+  if (contentLength > UPLOAD_LIMITS.maxRequestBytes) return NextResponse.json({ error: 'Upload is te groot' }, { status: 413 })
+  const reservation = await reserveUploadCapacity(request, session.id, session.paperId, contentLength)
+  if (!reservation.allowed) return NextResponse.json(
+    { error: reservation.unavailable ? 'Uploadbeveiliging is tijdelijk niet beschikbaar' : 'Uploadquotum bereikt' },
+    { status: reservation.unavailable ? 503 : 429 },
+  )
 
   try {
     const formData = await request.formData()
@@ -43,30 +55,22 @@ export async function POST(request: NextRequest) {
     })
     if (uploadError) throw uploadError
 
-    const { data: existing } = await supabase.from('paper_photos').select('id, file_path').eq('paper_id', session.paperId).eq('position', position)
-    const { data: photo, error: insertError } = await supabase
-      .from('paper_photos')
-      .insert({
-        paper_id: session.paperId,
-        file_path: objectPath,
-        position,
-        mime_type: 'image/webp',
-        byte_size: encoded.data.length,
-        width: encoded.info.width,
-        height: encoded.info.height,
-      })
-      .select('id')
-      .single()
+    const { data: rows, error: insertError } = await supabase.rpc('replace_paper_photo', {
+      target_paper_id: session.paperId,
+      target_position: position,
+      new_file_path: objectPath,
+      new_byte_size: encoded.data.length,
+      new_width: encoded.info.width,
+      new_height: encoded.info.height,
+    })
+    const photo = rows?.[0]
     if (insertError || !photo) {
       await supabase.storage.from('paper-photos').remove([objectPath])
       throw insertError || new Error('Foto kon niet worden geregistreerd')
     }
 
-    for (const old of existing || []) {
-      await supabase.storage.from('paper-photos').remove([old.file_path])
-      await supabase.from('paper_photos').delete().eq('id', old.id).eq('paper_id', session.paperId)
-    }
-    return NextResponse.json({ photoId: photo.id, url: `/api/photos/${encodeURIComponent(photo.id)}` })
+    if (photo.previous_file_path) await supabase.storage.from('paper-photos').remove([photo.previous_file_path])
+    return NextResponse.json({ photoId: photo.photo_id, url: `/api/photos/${encodeURIComponent(photo.photo_id)}` })
   } catch (error) {
     console.error('[Photos] Upload fout:', error)
     return NextResponse.json({ error: 'Upload mislukt' }, { status: 400 })

@@ -62,6 +62,7 @@ krant gebruikt een willekeurige HttpOnly gastensessie.
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable/anon key (client-side reads) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key — alleen server-side, nooit `NEXT_PUBLIC_` |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Upstash Redis: rate limiting + wayback-cache (de Vercel-integratie zet deze automatisch; `UPSTASH_REDIS_REST_*` werkt ook) |
+| `TURNSTILE_SECRET_KEY` | Optioneel: verplicht Cloudflare Turnstile-token bij het maken van ieder nieuw concept |
 | `RESEND_API_KEY` | Eenmalige herstel-links per e-mail |
 | `NEXT_PUBLIC_SITE_URL` | Canonieke HTTPS-site-URL voor herstel-links |
 | `PAYMENT_PROVIDER_ORIGIN` | Optionele, exacte HTTPS-origin van een betaalprovider zodra de browserintegratie bestaat (geen wildcard of pad nodig) |
@@ -140,3 +141,8 @@ tests/             Vitest parser-tests + HTML-fixtures
 
 Krant-layout/PDF-generatie, bestelflow en betaling (Mollie/iDEAL),
 print-on-demand, AVG/juridisch en een scrape-health dashboard volgen later.
+
+De voorgenomen verbouwing naar een herbruikbare, redactioneel beheerde
+contentbibliotheek staat in
+[`docs/contentbibliotheek-implementatieplan.md`](docs/contentbibliotheek-implementatieplan.md).
+Dit plan moet eerst worden gereviewd voordat de implementatie start.

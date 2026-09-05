@@ -8,6 +8,7 @@
 //                       kijkonderzoek.nl heeft data tot ~7 dagen terug
 
 import { runJob, SupabaseClient } from '../_shared/db.ts'
+import { withScrapeAuth } from '../_shared/auth.ts'
 import { fetchWithRetry } from '../_shared/fetch.ts'
 import { todayISO, yesterdayISO } from '../_shared/dates.ts'
 import { parseKijkcijfers, extractPageDate } from '../_shared/parsers/kijkcijfers.ts'
@@ -73,12 +74,14 @@ async function scrape(supabase: SupabaseClient, date: string): Promise<{ inserte
 }
 
 Deno.serve(async (req: Request) => {
-  const url = new URL(req.url)
-  const date = url.searchParams.get('date') || yesterdayISO()
+  return withScrapeAuth(req, async () => {
+    const url = new URL(req.url)
+    const date = url.searchParams.get('date') || yesterdayISO()
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return Response.json({ ok: false, error: 'Ongeldige datum, gebruik YYYY-MM-DD' }, { status: 400 })
-  }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return Response.json({ ok: false, error: 'Ongeldige datum, gebruik YYYY-MM-DD' }, { status: 400 })
+    }
 
-  return runJob(SOURCE_NAME, (supabase) => scrape(supabase, date))
+    return runJob(SOURCE_NAME, (supabase) => scrape(supabase, date))
+  })
 })

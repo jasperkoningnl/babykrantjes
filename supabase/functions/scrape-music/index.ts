@@ -8,6 +8,7 @@
 // hier volstaat gewone fetch met certificaatverificatie AAN.
 
 import { runJob, SupabaseClient } from '../_shared/db.ts'
+import { withScrapeAuth } from '../_shared/auth.ts'
 import { fetchWithRetry, BROWSER_HEADERS } from '../_shared/fetch.ts'
 import { todayISO, mondayOfWeek } from '../_shared/dates.ts'
 import { parseTop40 } from '../_shared/parsers/top40.ts'
@@ -47,6 +48,6 @@ async function scrape(supabase: SupabaseClient): Promise<{ inserted: number; det
   return { inserted: rows.length, details: { weekStart, url } }
 }
 
-Deno.serve(async (_req: Request) => {
-  return runJob(SOURCE_NAME, (supabase) => scrape(supabase))
+Deno.serve(async (req: Request) => {
+  return withScrapeAuth(req, () => runJob(SOURCE_NAME, (supabase) => scrape(supabase)))
 })

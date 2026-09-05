@@ -1,0 +1,17 @@
+[functions.scrape-tv]
+verify_jwt = false
+
+[functions.scrape-ratings]
+verify_jwt = false
+
+[functions.scrape-streaming]
+verify_jwt = false
+
+[functions.scrape-google-news]
+verify_jwt = false
+
+[functions.scrape-music]
+verify_jwt = false
+
+[functions.scrape-dossiers]
+verify_jwt = false
