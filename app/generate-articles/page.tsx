@@ -7,6 +7,8 @@ import { type ArticleSection, type GeneratedArticle, type ArticleGenerationRespo
 import Voorpagina, { type VoorpaginaProps } from '@/components/Voorpagina'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen } from '@/lib/calculations'
 import RecoveryEmailForm from '@/components/RecoveryEmailForm'
+import HistoricalDateWarning from '@/components/HistoricalDateWarning'
+import { savePaperEdits } from '@/lib/savePaperEdits'
 
 const ARTIKEL_TABS: { id: ArticleSection; label: string; titel: string }[] = [
   { id: 'hoofdartikel', label: 'Openingsartikel', titel: 'Openingsartikel — het geboorteverhaal' },
@@ -28,7 +30,7 @@ function formatDatumLang(dateStr: string): string {
   try {
     const d = new Date(dateStr)
     if (isNaN(d.getTime())) return 'De geboortedag'
-    const s = d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    const s = d.toLocaleDateString('nl-NL', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     return s.charAt(0).toUpperCase() + s.slice(1)
   } catch { return 'De geboortedag' }
 }
@@ -40,6 +42,9 @@ export default function GenerateArticlesPage() {
   const [actief, setActief] = useState<ArticleSection>('hoofdartikel')
   const [regens, setRegens] = useState(0)
   const [bewaard, setBewaard] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState(false)
+  const [saveRetry, setSaveRetry] = useState(0)
+  const saveQueue = useRef<Promise<void>>(Promise.resolve())
   const [articles, setArticles] = useState<Record<ArticleSection, GeneratedArticle | null>>({
     hoofdartikel: null, sterrenbeeld: null, nieuws: null, weer: null,
     cultuur: null, naam_betekenis: null, beroemde_namen: null, geboren_op_dag: null,
@@ -80,18 +85,25 @@ export default function GenerateArticlesPage() {
   // Auto-save
   useEffect(() => {
     if (!hasLoadedPre.current) return
+    let cancelled = false
     const timer = setTimeout(() => {
+      setBewaard(null)
+      setSaveError(false)
       const manualEdits = Object.fromEntries(Object.entries(articles).filter(([, article]) => article).map(([section, article]) => [section, article!.text]))
-      fetch('/api/papers', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manualEdits }),
-      }).catch((error) => console.error('[Editor] Autosave mislukt:', error))
-      const nu = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-      setBewaard(nu)
+      // Serialize saves so a slow older response cannot overwrite a newer edit.
+      saveQueue.current = saveQueue.current.then(async () => {
+        if (cancelled) return
+        try {
+          await savePaperEdits(manualEdits)
+          if (!cancelled) setBewaard(new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }))
+        } catch (error) {
+          console.error('[Editor] Autosave mislukt:', error)
+          if (!cancelled) setSaveError(true)
+        }
+      })
     }, 700)
-    return () => clearTimeout(timer)
-  }, [articles])
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [articles, saveRetry])
 
   const generateArticle = async (section: ArticleSection) => {
     if (!testData) return
@@ -127,6 +139,7 @@ export default function GenerateArticlesPage() {
       })
       const result = await res.json()
       if (result.success && result.articles) {
+        hasLoadedPre.current = true
         const generatedAt = new Date().toISOString()
         setArticles(prev => {
           const next = { ...prev }
@@ -277,11 +290,14 @@ export default function GenerateArticlesPage() {
             <h1 className="text-[32px] tracking-[-0.03em] font-extrabold">Je krant is klaar</h1>
             <div className="flex items-center gap-3.5 text-[13.5px] text-muted">
               <span>Voorbeeld met watermerk — de PDF is schoon</span>
-              <span className="inline-flex items-center gap-1.5 bg-[#EDF1EA] text-[#4A6B47] px-2.5 py-1 rounded-pill text-[13px]">
-                {bewaard ? `✓ Bewaard om ${bewaard}` : '✓ Automatisch bewaard'}
+              <span role="status" className="inline-flex items-center gap-1.5 bg-[#EDF1EA] text-[#4A6B47] px-2.5 py-1 rounded-pill text-[13px]">
+                {saveError ? 'Bewaren mislukt' : bewaard ? `✓ Bewaard om ${bewaard}` : 'Nog niet bewaard'}
               </span>
+              {saveError && <button type="button" onClick={() => setSaveRetry(value => value + 1)} className="text-terracotta underline">Opnieuw bewaren</button>}
             </div>
           </div>
+
+          <HistoricalDateWarning date={testData.basisGegevens?.geboorteDatum || ''} />
 
           {/* Newspaper preview using Voorpagina component */}
           {generatingAll || !hasArticles ? (

@@ -1,6 +1,7 @@
 'use client'
 
 import type { BasisGegevens } from '@/lib/types'
+import HistoricalDateWarning from './HistoricalDateWarning'
 
 interface Props {
   data: BasisGegevens
@@ -72,6 +73,8 @@ export default function Step1BasisGegevens({ data, updateData, onNext, onBack }:
               />
             </div>
           </div>
+
+          <HistoricalDateWarning date={data.geboorteDatum} />
 
           {/* Gewicht & Lengte */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
