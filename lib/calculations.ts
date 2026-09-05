@@ -1,11 +1,13 @@
+import { parseCalendarDate } from './contentDates'
+
 // Berekeningen voor babykrant gegevens
 
 export function getSterrenbeeld(datum: string): string {
-  if (!datum) return '-'
+  if (!parseCalendarDate(datum)) return '-'
   
   const date = new Date(datum)
-  const dag = date.getDate()
-  const maand = date.getMonth() + 1 // 0-indexed
+  const dag = date.getUTCDate()
+  const maand = date.getUTCMonth() + 1 // 0-indexed
   
   if ((maand === 3 && dag >= 21) || (maand === 4 && dag <= 19)) return 'Ram'
   if ((maand === 4 && dag >= 20) || (maand === 5 && dag <= 20)) return 'Stier'
@@ -24,9 +26,9 @@ export function getSterrenbeeld(datum: string): string {
 }
 
 export function getChineesJaar(datum: string): string {
-  if (!datum) return '-'
+  if (!parseCalendarDate(datum)) return '-'
   
-  const jaar = new Date(datum).getFullYear()
+  const jaar = new Date(datum).getUTCFullYear()
   const dieren = ['Aap', 'Haan', 'Hond', 'Varken', 'Rat', 'Os', 'Tijger', 'Konijn', 'Draak', 'Slang', 'Paard', 'Geit']
   const index = jaar % 12
   
@@ -34,9 +36,9 @@ export function getChineesJaar(datum: string): string {
 }
 
 export function getGeboortebloem(datum: string): string {
-  if (!datum) return '-'
+  if (!parseCalendarDate(datum)) return '-'
   
-  const maand = new Date(datum).getMonth() + 1
+  const maand = new Date(datum).getUTCMonth() + 1
   const bloemen = [
     'Sneeuwklokje', // januari
     'Viooltje', // februari
@@ -56,9 +58,9 @@ export function getGeboortebloem(datum: string): string {
 }
 
 export function getGeboortesteen(datum: string): string {
-  if (!datum) return '-'
+  if (!parseCalendarDate(datum)) return '-'
   
-  const maand = new Date(datum).getMonth() + 1
+  const maand = new Date(datum).getUTCMonth() + 1
   const stenen = [
     'Granaat', // januari
     'Amethist', // februari
@@ -78,9 +80,9 @@ export function getGeboortesteen(datum: string): string {
 }
 
 export function getKleur(datum: string): string {
-  if (!datum) return '-'
+  if (!parseCalendarDate(datum)) return '-'
   
-  const maand = new Date(datum).getMonth() + 1
+  const maand = new Date(datum).getUTCMonth() + 1
   const kleuren = [
     'Donkerblauw', 'Paars', 'Lichtblauw', 'Geel',
     'Groen', 'Roze', 'Rood', 'Oranje',

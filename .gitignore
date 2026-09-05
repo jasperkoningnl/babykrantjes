@@ -28,6 +28,7 @@ yarn-error.log*
 
 # vercel
 .vercel
+supabase/.temp/
 
 # test pipeline output
 scripts/output/

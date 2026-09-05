@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Voorpagina, { type VoorpaginaProps } from '@/components/Voorpagina'
+import HistoricalDateWarning from '@/components/HistoricalDateWarning'
 import { getSterrenbeeld, getChineesJaar, getGeboortebloem, getGeboortesteen } from '@/lib/calculations'
 
 type Product = 'pdf' | 'print' | 'ingelijst'
@@ -45,7 +46,7 @@ function formatDatumLang(dateStr: string): string {
   try {
     const d = new Date(dateStr)
     if (isNaN(d.getTime())) return 'De geboortedag'
-    const s = d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    const s = d.toLocaleDateString('nl-NL', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     return s.charAt(0).toUpperCase() + s.slice(1)
   } catch { return 'De geboortedag' }
 }
@@ -152,6 +153,8 @@ export default function CheckoutPage() {
 
         <h1 className="text-[44px] leading-none tracking-[-0.03em] font-extrabold mb-2">Hoe wil je hem hebben?</h1>
         <p className="font-serif text-lg text-subtle mb-8">Eenmalige aankoop. De PDF krijg je altijd mee, ook bij een print.</p>
+
+        <HistoricalDateWarning date={testData?.basisGegevens?.geboorteDatum || ''} />
 
         {/* Product cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-[18px] mb-[34px]">

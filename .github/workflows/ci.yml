@@ -9,6 +9,34 @@ on:
       - main
 
 jobs:
+  content-database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: babykrant_content_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Migration, privileges and concurrent worker tests
+        run: npm test -- tests/content-library-db.test.ts
+        env:
+          CONTENT_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/babykrant_content_test
+
   ci:
     runs-on: ubuntu-latest
 

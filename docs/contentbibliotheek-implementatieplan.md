@@ -1,6 +1,6 @@
 # Implementatieplan: centrale contentbibliotheek
 
-> **Status:** voorstel ter review door Claude — nog niet implementeren  
+> **Status:** beperkt nieuws-fundament goedgekeurd door opdrachtgever op 5 september 2026; overige fases blijven voorstel. Zie [review en uitvoeringsstatus](contentbibliotheek-review.md). Productiemigratie niet uitgevoerd.
 > **Doel:** gedeelde artikelen eenmalig genereren, redactioneel beheren en hergebruiken in babykranten.
 
 ## 1. Besluiten en afbakening
