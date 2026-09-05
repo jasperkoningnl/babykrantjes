@@ -62,11 +62,28 @@ krant gebruikt een willekeurige HttpOnly gastensessie.
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable/anon key (client-side reads) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key — alleen server-side, nooit `NEXT_PUBLIC_` |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Upstash Redis: rate limiting + wayback-cache (de Vercel-integratie zet deze automatisch; `UPSTASH_REDIS_REST_*` werkt ook) |
+| `TURNSTILE_SECRET_KEY` | Optioneel: verplicht Cloudflare Turnstile-token bij het maken van ieder nieuw concept |
 | `RESEND_API_KEY` | Eenmalige herstel-links per e-mail |
 | `NEXT_PUBLIC_SITE_URL` | Canonieke HTTPS-site-URL voor herstel-links |
 | `CRON_SECRET` | Verplicht voor `/api/cron/*` |
 | `TMDB_API_KEY` | Films en series |
 | `ENABLE_TEST_PAGE` | `true` = debug/testroutes open (alleen previews) |
+
+### Uploadbeveiliging
+
+Foto-uploads reserveren vóór multipart-parsing, Sharp-decodering en Storage-upload
+atomair Redis-capaciteit voor sessie, krant én vertrouwd platform-IP. Zowel het
+aantal pogingen als de cumulatieve ingress-bytes hebben een dagquotum; ontbrekend
+Redis, IP of `Content-Length` faalt dicht. De database bewaart maximaal de vier
+vaste fotoposities; een nieuwe foto vervangt de bestaande foto op die positie.
+
+Sharp decodeert alleen JPEG, PNG en WebP en schrijft pixels opnieuw als WebP.
+Daarbij worden bronmetadata en eventuele aangehechte payloads niet gekopieerd. Voor
+de huidige dreigingsanalyse (afbeeldingen worden niet als origineel gedownload of
+uitgevoerd) geldt deze re-encoding als voldoende inhoudssanitisatie. Er is daarom
+geen malware- of beeldmoderatiescan toegevoegd. Voeg vóór Storage-upload een scan
+toe als originele bestanden later worden bewaard, publiek aangeboden of voor een
+moderatieplichtige toepassing gebruikt.
 
 ## De dagelijkse pipeline
 

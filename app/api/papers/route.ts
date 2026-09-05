@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabase'
 import { clearSessionCookie, createSessionForPaper, findPaperSession, setSessionCookie } from '@/lib/paperSession'
 import { loadPaperState, validatePaperStateInput } from '@/lib/paperState'
+import { checkDraftCreationLimit, getClientIp } from '@/lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,8 +27,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   if (!isSupabaseAdminConfigured()) return unavailable()
+  const limit = await checkDraftCreationLimit(request)
+  if (!limit.allowed) return NextResponse.json(
+    { error: limit.unavailable ? 'Conceptbeveiliging is tijdelijk niet beschikbaar' : 'Te veel concepten aangemaakt' },
+    { status: limit.unavailable ? 503 : 429 },
+  )
   try {
     const body = await request.json().catch(() => ({}))
+    if (!(await verifyTurnstile(body?.challengeToken, getClientIp(request)))) {
+      return NextResponse.json({ error: 'Beveiligingscontrole mislukt' }, { status: 403 })
+    }
     const initialData = validatePaperStateInput(body?.data || {})
     const basis = (initialData.basisGegevens || {}) as Record<string, unknown>
     const supabase = getSupabaseAdmin()
@@ -56,6 +65,21 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Papers] Create fout:', error)
     return NextResponse.json({ error: 'Kon concept-krant niet aanmaken' }, { status: 400 })
+  }
+}
+
+async function verifyTurnstile(token: unknown, ip: string): Promise<boolean> {
+  const secret = process.env.TURNSTILE_SECRET_KEY
+  if (!secret) return true
+  if (typeof token !== 'string' || token.length < 20 || token.length > 2048) return false
+  try {
+    const body = new URLSearchParams({ secret, response: token, remoteip: ip })
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body, signal: AbortSignal.timeout(5000) })
+    const result = await response.json() as { success?: boolean }
+    return response.ok && result.success === true
+  } catch (error) {
+    console.error('[Papers] Challenge-verificatie niet beschikbaar:', error)
+    return false
   }
 }
 
