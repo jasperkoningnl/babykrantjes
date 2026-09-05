@@ -65,25 +65,34 @@ krant gebruikt een willekeurige HttpOnly gastensessie.
 | `TURNSTILE_SECRET_KEY` | Optioneel: verplicht Cloudflare Turnstile-token bij het maken van ieder nieuw concept |
 | `RESEND_API_KEY` | Eenmalige herstel-links per e-mail |
 | `NEXT_PUBLIC_SITE_URL` | Canonieke HTTPS-site-URL voor herstel-links |
+| `PAYMENT_PROVIDER_ORIGIN` | Optionele, exacte HTTPS-origin van een betaalprovider zodra de browserintegratie bestaat (geen wildcard of pad nodig) |
 | `CRON_SECRET` | Verplicht voor `/api/cron/*` |
 | `TMDB_API_KEY` | Films en series |
 | `ENABLE_TEST_PAGE` | `true` = debug/testroutes open (alleen previews) |
 
-### Uploadbeveiliging
+## Security headers en externe origins
 
-Foto-uploads reserveren vóór multipart-parsing, Sharp-decodering en Storage-upload
-atomair Redis-capaciteit voor sessie, krant én vertrouwd platform-IP. Zowel het
-aantal pogingen als de cumulatieve ingress-bytes hebben een dagquotum; ontbrekend
-Redis, IP of `Content-Length` faalt dicht. De database bewaart maximaal de vier
-vaste fotoposities; een nieuwe foto vervangt de bestaande foto op die positie.
+`next.config.js` zet de beveiligingsheaders op `/(.*)`, dus ook op API-routes en
+Next-assets. De CSP staat uitsluitend de browser-origins toe die de applicatie
+gebruikt: Google Fonts (`fonts.googleapis.com` en `fonts.gstatic.com`), TMDB-
+afbeeldingen (`image.tmdb.org`) en, indien geconfigureerd, de exacte Supabase-
+origin. Foto's worden na een same-origin verzoek naar een korte Supabase signed
+URL doorgestuurd; daarom staat die origin zowel in `img-src` als `connect-src`.
+Server-side databronnen en AI-API's horen niet in een browser-CSP en zijn bewust
+niet toegevoegd.
 
-Sharp decodeert alleen JPEG, PNG en WebP en schrijft pixels opnieuw als WebP.
-Daarbij worden bronmetadata en eventuele aangehechte payloads niet gekopieerd. Voor
-de huidige dreigingsanalyse (afbeeldingen worden niet als origineel gedownload of
-uitgevoerd) geldt deze re-encoding als voldoende inhoudssanitisatie. Er is daarom
-geen malware- of beeldmoderatiescan toegevoegd. Voeg vóór Storage-upload een scan
-toe als originele bestanden later worden bewaard, publiek aangeboden of voor een
-moderatieplichtige toepassing gebruikt.
+De checkout bevat op dit moment geen betaalproviderintegratie. Daarom is
+`frame-src 'none'` de standaard en is er geen fictieve Mollie/Stripe-wildcard.
+Wanneer een provider wordt aangesloten, moet `PAYMENT_PROVIDER_ORIGIN` één exacte
+HTTPS-origin bevatten; deze wordt beperkt toegevoegd aan `connect-src`,
+`form-action`, `frame-src` en de `payment` Permissions Policy. De configuratie
+weigert HTTP en ongeldige origins.
+
+HSTS wordt **door de applicatie** beheerd (niet impliciet aan Vercel overgelaten):
+`Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` wordt
+naast de overige headers vanuit `next.config.js` gezet. Dit maakt het gedrag op
+zowel het Vercel-domein als custom domains expliciet en testbaar. Zet alleen
+subdomeinen onder dit domein die permanent via HTTPS bereikbaar zijn.
 
 ## De dagelijkse pipeline
 
