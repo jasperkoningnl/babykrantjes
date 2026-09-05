@@ -30,6 +30,12 @@ vi.mock('@/lib/paperState', () => ({
   loadPaperState: mocks.loadState,
   validatePaperStateInput: vi.fn((value) => value),
 }))
+vi.mock('@/lib/rateLimit', () => ({
+  checkDraftCreationLimit: vi.fn(async () => ({ allowed: true, remaining: 1, enforced: true })),
+  getClientIp: vi.fn(() => '192.0.2.1'),
+  reserveUploadCapacity: vi.fn(async () => ({ allowed: true, remaining: 1, enforced: true })),
+  UPLOAD_LIMITS: { maxRequestBytes: 10 * 1024 * 1024 + 64 * 1024 },
+}))
 
 function session() {
   return { id: 'session-id', paperId: '11111111-1111-4111-8111-111111111111', expiresAt: '2099-01-01T00:00:00.000Z' }
@@ -97,13 +103,9 @@ describe('private foto-ownership', () => {
   })
 
   it('koppelt upload altijd aan de sessiekrant, niet aan client-paperId', async () => {
-    const inserted: unknown[] = []
-    const existing = chain({ data: [], error: null })
-    const insert = chain({ data: { id: '33333333-3333-4333-8333-333333333333' }, error: null })
-    insert.insert.mockImplementation((value: unknown) => { inserted.push(value); return insert })
-    const from = vi.fn(() => from.mock.calls.length === 1 ? existing : insert)
+    const rpc = vi.fn(async (_name: string, value: unknown) => ({ data: [{ photo_id: '33333333-3333-4333-8333-333333333333' }], error: null }))
     mocks.getSupabase.mockReturnValue({
-      from,
+      rpc,
       storage: { from: vi.fn(() => ({ upload: vi.fn(async () => ({ error: null })), remove: vi.fn(async () => ({ error: null })) })) },
     })
     const form = new FormData()
@@ -112,9 +114,11 @@ describe('private foto-ownership', () => {
     form.set('position', '1')
     form.set('paperId', '22222222-2222-4222-8222-222222222222')
     const { POST } = await import('@/app/api/photos/upload/route')
-    const response = await POST(new NextRequest('https://example.test/api/photos/upload', { method: 'POST', body: form }))
+    const response = await POST(new NextRequest('https://example.test/api/photos/upload', {
+      method: 'POST', body: form, headers: { 'content-length': String(png.length + 500) },
+    }))
     expect(response.status).toBe(200)
-    expect(inserted[0]).toMatchObject({ paper_id: session().paperId })
+    expect(rpc).toHaveBeenCalledWith('replace_paper_photo', expect.objectContaining({ target_paper_id: session().paperId }))
   })
 })
 
