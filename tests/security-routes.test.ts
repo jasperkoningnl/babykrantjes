@@ -135,7 +135,7 @@ describe('eenmalige herstellink', () => {
     mocks.rotateSession.mockResolvedValue({ token: 'new-session', session: session() })
     const { GET } = await import('@/app/api/session/recover/route')
     const response = await GET(new NextRequest('https://babykrantje.nl/api/session/recover?token=valid-token-that-is-long-enough-123456789012'))
-    expect(response.headers.get('location')).toBe('https://babykrantje.nl/generate-articles')
+    expect(response.headers.get('location')).toBe('https://babykrantje.nl/loading-screen')
     expect(response.headers.get('location')).not.toContain('token=')
     expect(mocks.setCookie).toHaveBeenCalledWith(response, 'new-session', session().expiresAt)
   })

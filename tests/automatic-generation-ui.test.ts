@@ -12,14 +12,16 @@ describe('automatische generatie-interface', () => {
   it('biedt geen handmatige knop voor de eerste artikelgeneratie', () => {
     const editor = read('app/generate-articles/page.tsx')
     expect(editor).not.toContain('Genereer alle 8 artikelen')
-    expect(editor).toContain('hasTriggeredAutomaticGeneration')
+    expect(editor).not.toContain("fetch('/api/generate-paper'")
+    expect(read('app/loading-screen/page.tsx')).toContain("fetch('/api/paper-jobs'")
   })
 
   it('markeert een mislukte generatie niet als klaar', () => {
     const loading = read('app/loading-screen/page.tsx')
     expect(loading).not.toContain('.finally(() => setKlaar(true))')
-    expect(loading).toContain("if (!res.ok || !result?.success || !result.articles)")
-    expect(loading).toContain('setKlaar(true)')
+    expect(loading).toContain("status === 'completed'")
+    expect(loading).toContain("status === 'failed'")
+    expect(loading).toContain('Probeer handmatig opnieuw')
   })
 
   it('houdt de herstellink beschikbaar nadat de generatie klaar is', () => {

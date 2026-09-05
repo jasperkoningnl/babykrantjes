@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type ArticleSection, type GeneratedArticle, type ArticleGenerationResponse } from '@/lib/articleTypes'
@@ -48,9 +48,7 @@ export default function GenerateArticlesPage() {
     hoofdartikel: false, sterrenbeeld: false, nieuws: false, weer: false,
     cultuur: false, naam_betekenis: false, beroemde_namen: false, geboren_op_dag: false,
   })
-  const [generatingAll, setGeneratingAll] = useState(false)
   const hasLoadedPre = useRef(false)
-  const hasTriggeredAutomaticGeneration = useRef(false)
 
   useEffect(() => {
     fetch('/api/papers', { cache: 'no-store' }).then(async (response) => {
@@ -59,6 +57,10 @@ export default function GenerateArticlesPage() {
       setTestData(parsed)
 
       const storedArticles = { ...(parsed.generatedArticles || {}), ...(parsed.manualEdits || {}) }
+      if (!Object.keys(storedArticles).length) {
+        router.replace('/loading-screen')
+        return
+      }
       if (!hasLoadedPre.current && Object.keys(storedArticles).length) {
         hasLoadedPre.current = true
         const generatedAt = new Date().toISOString()
@@ -116,46 +118,6 @@ export default function GenerateArticlesPage() {
       setLoading(prev => ({ ...prev, [section]: false }))
     }
   }
-
-  const generateAll = useCallback(async () => {
-    setGeneratingAll(true)
-    try {
-      const res = await fetch('/api/generate-paper', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      const result = await res.json()
-      if (result.success && result.articles) {
-        const generatedAt = new Date().toISOString()
-        setArticles(prev => {
-          const next = { ...prev }
-          for (const [section, text] of Object.entries(result.articles)) {
-            next[section as ArticleSection] = {
-              section: section as ArticleSection,
-              text: String(text),
-              generatedAt,
-              wordCount: result.wordCounts?.[section] || 0,
-            }
-          }
-          return next
-        })
-      }
-    } catch (error) {
-      console.error('Generate all error:', error)
-    } finally {
-      setGeneratingAll(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!testData || hasTriggeredAutomaticGeneration.current) return
-    const hasStoredArticles = Object.values(articles).some(article => article !== null)
-    if (hasStoredArticles) return
-    hasTriggeredAutomaticGeneration.current = true
-    const timer = setTimeout(() => void generateAll(), 0)
-    return () => clearTimeout(timer)
-  }, [testData, articles, generateAll])
 
   const updateArticleText = (text: string) => {
     setArticles(prev => {
@@ -284,7 +246,7 @@ export default function GenerateArticlesPage() {
           </div>
 
           {/* Newspaper preview using Voorpagina component */}
-          {generatingAll || !hasArticles ? (
+          {!hasArticles ? (
             <div className="w-full h-[600px] bg-white shadow-[0_30px_60px_-30px_rgba(35,35,31,.5)] flex items-center justify-center select-none">
               <div className="flex flex-col items-center gap-4">
                 <div className="w-10 h-10 border-2 border-sage border-t-transparent rounded-full animate-spin" />

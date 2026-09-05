@@ -3,7 +3,9 @@ import { hashToken, rotateSessionForPaper, setSessionCookie } from '@/lib/paperS
 import { getSupabaseAdmin } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
-  const cleanUrl = new URL('/generate-articles', request.url)
+  // The loading screen resumes polling the existing job. Enqueue is idempotent,
+  // so recovery never creates a second generation.
+  const cleanUrl = new URL('/loading-screen', request.url)
   const invalidUrl = new URL('/wizard?herstel=ongeldig', request.url)
   const token = request.nextUrl.searchParams.get('token') || ''
   if (token.length < 40 || token.length > 64) return NextResponse.redirect(invalidUrl)

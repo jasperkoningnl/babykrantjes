@@ -47,7 +47,7 @@ export default function RecoveryEmailForm({ initialEmail = '', compact = false }
   if (sent) {
     return (
       <div className={compact ? 'text-sm text-[#4A6B47]' : 'bg-sage/10 border border-sage/20 rounded-card p-6 text-center'} role="status">
-        <strong>Link verstuurd.</strong> Controleer je inbox en eventueel je spammap.
+        <strong>Herstellink verstuurd.</strong> Controleer je inbox en eventueel je spammap.
       </div>
     )
   }
