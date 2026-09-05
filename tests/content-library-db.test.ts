@@ -88,8 +88,13 @@ describe('news foundation migration', () => {
       await new Promise(resolve => setTimeout(resolve, 500))
     }
     for (const role of ['anon', 'authenticated']) {
-      expect((await fetch(`${rest}/articles`, { headers: headers(role) })).status).toBe(403)
-      expect((await fetch(`${rest}/rpc/enqueue_news_job`, { method: 'POST', headers: headers(role), body: JSON.stringify({ p_date: '2025-01-01' }) })).status).toBe(403)
+      // PostgREST maps insufficient privilege to 401 for its anonymous role, 403 otherwise.
+      const denied = await fetch(`${rest}/articles`, { headers: headers(role) })
+      expect(denied.status).toBe(role === 'anon' ? 401 : 403)
+      expect(await denied.json()).toMatchObject({ code: '42501' })
+      const deniedRpc = await fetch(`${rest}/rpc/enqueue_news_job`, { method: 'POST', headers: headers(role), body: JSON.stringify({ p_date: '2025-01-01' }) })
+      expect(deniedRpc.status).toBe(role === 'anon' ? 401 : 403)
+      expect(await deniedRpc.json()).toMatchObject({ code: '42501' })
     }
     const response = await fetch(`${rest}/rpc/enqueue_news_job`, { method: 'POST', headers: headers('service_role'), body: JSON.stringify({ p_date: '2025-01-01' }) })
     expect(response.status).toBe(200)
