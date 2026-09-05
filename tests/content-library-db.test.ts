@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { createHmac } from 'node:crypto'
 import { PGlite } from '@electric-sql/pglite'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -41,14 +42,59 @@ beforeAll(async () => {
     grant usage on schema public to anon, authenticated, service_role;
   `)
   await exec(readFileSync(new URL('../supabase/migrations/20260905101814_content_library_news_foundation.sql', import.meta.url), 'utf8'))
+  await exec(readFileSync(new URL('../supabase/migrations/20260905115345_news_editorial_review.sql', import.meta.url), 'utf8'))
+  await exec("notify pgrst, 'reload schema'")
 }, 60_000)
 
 beforeEach(async () => {
   await exec('truncate public.article_publications, public.article_revisions, public.news_articles, public.articles, public.content_jobs cascade')
+  await exec('update public.news_pilot_budget set reserved_cents = 0')
 })
 afterAll(async () => { if (pool) await pool.end(); else await embedded!.close() })
 
 describe('news foundation migration', () => {
+  it('saves concepts without revision growth, detects stale saves and publishes an immutable snapshot', async () => {
+    const save = (body: string, version: number) => query("select * from public.save_news_draft('2025-01-01', $1, '{}', $2, $3, $4)", [body, sources, version, actor])
+    const [first] = await save('Concept', 0)
+    const [second] = await save('Verbeterd concept', 1)
+    expect(await query('select * from public.article_revisions')).toHaveLength(0)
+    await expect(save('Stale text', 1)).rejects.toThrow(/changed/)
+    await query('select public.publish_news_draft($1, $2, null, $3, $4)', [first.article_id, second.edit_version, actor, 'Bronnen gecontroleerd'])
+    expect(await query('select body from public.article_revisions')).toEqual([{ body: 'Verbeterd concept' }])
+    expect(await query('select * from public.article_drafts')).toHaveLength(0)
+    await expect(save('Stale first tab', 0)).rejects.toThrow(/changed/)
+    await save('Volgende correctie', 3)
+    await expect(save('Old draft version', 1)).rejects.toThrow(/changed/)
+  })
+
+  it('caps concurrent pilot reservations at five euros without resetting on retries', async () => {
+    const reservations = await Promise.all(Array.from({ length: 10 }, () => query('select public.reserve_news_pilot_attempt() as ok')))
+    expect(reservations.filter(rows => rows[0].ok)).toHaveLength(5)
+    expect((await query('select reserved_cents from public.news_pilot_budget'))[0].reserved_cents).toBe(500)
+  })
+
+  it.skipIf(!process.env.CONTENT_TEST_REST_URL)('enforces roles through PostgREST and exposes working RPCs to service workers', async () => {
+    const rest = process.env.CONTENT_TEST_REST_URL!
+    const jwt = (role: string) => {
+      const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
+      const payload = Buffer.from(JSON.stringify({ role, exp: Math.floor(Date.now()/1000)+300 })).toString('base64url')
+      const content = `${header}.${payload}`
+      return `${content}.${createHmac('sha256', process.env.CONTENT_TEST_JWT_SECRET!).update(content).digest('base64url')}`
+    }
+    const headers = (role: string) => ({ Authorization: `Bearer ${jwt(role)}`, 'Content-Type': 'application/json' })
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const ready = await fetch(`${rest}/articles`, { headers: headers('service_role') }).catch(() => null)
+      if (ready?.ok) break
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+    for (const role of ['anon', 'authenticated']) {
+      expect((await fetch(`${rest}/articles`, { headers: headers(role) })).status).toBe(403)
+      expect((await fetch(`${rest}/rpc/enqueue_news_job`, { method: 'POST', headers: headers(role), body: JSON.stringify({ p_date: '2025-01-01' }) })).status).toBe(403)
+    }
+    const response = await fetch(`${rest}/rpc/enqueue_news_job`, { method: 'POST', headers: headers('service_role'), body: JSON.stringify({ p_date: '2025-01-01' }) })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ status: 'queued' })
+  }, 20_000)
   it('deduplicates five requests and claims exactly one worker', async () => {
     const jobs = await Promise.all(Array.from({ length: 5 }, () => enqueue()))
     expect(new Set(jobs.map(rows => rows[0].id)).size).toBe(1)

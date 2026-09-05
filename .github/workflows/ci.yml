@@ -12,6 +12,15 @@ jobs:
   content-database:
     runs-on: ubuntu-latest
     services:
+      postgrest:
+        image: postgrest/postgrest:v13.0.7
+        env:
+          PGRST_DB_URI: postgres://postgres:postgres@postgres:5432/babykrant_content_test
+          PGRST_DB_SCHEMAS: public
+          PGRST_DB_ANON_ROLE: anon
+          PGRST_JWT_SECRET: local-test-only-secret-at-least-32-characters
+        ports:
+          - 3001:3000
       postgres:
         image: postgres:17
         env:
@@ -36,6 +45,8 @@ jobs:
         run: npm test -- tests/content-library-db.test.ts
         env:
           CONTENT_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/babykrant_content_test
+          CONTENT_TEST_REST_URL: http://localhost:3001
+          CONTENT_TEST_JWT_SECRET: local-test-only-secret-at-least-32-characters
 
   ci:
     runs-on: ubuntu-latest
