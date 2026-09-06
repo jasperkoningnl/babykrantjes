@@ -28,8 +28,10 @@ export async function POST(request: NextRequest) {
     const db = getSupabaseAdmin()
     if (input.action === 'save') {
       const draft = validateNewsDraft(input)
+      const existing = await loadNewsEditor(draft.date)
+      const previousFacts = existing.draft?.facts ?? existing.revisions?.[0]?.facts_snapshot ?? {}
       const { error } = await db.rpc('save_news_draft', {
-        p_date: draft.date, p_body: draft.body, p_facts: draft.facts, p_sources: draft.sources,
+        p_date: draft.date, p_body: draft.body, p_facts: { ...previousFacts, ...draft.facts }, p_sources: draft.sources,
         p_expected_version: draft.version, p_actor_id: actor.id,
       })
       if (error) throw error

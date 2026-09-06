@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const mocks = vi.hoisted(() => ({ getUser: vi.fn(), rpc: vi.fn(), load: vi.fn(), gather: vi.fn() }))
+const mocks = vi.hoisted(() => ({ getUser: vi.fn(), rpc: vi.fn(), load: vi.fn(), gather: vi.fn(), archive: vi.fn() }))
+vi.mock('@/lib/waybackResearch', () => ({ gatherWaybackResearch: mocks.archive }))
 vi.mock('@/lib/newsEditorial', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/newsEditorial')>(), loadNewsEditor: mocks.load }))
 vi.mock('@/lib/factGathering', () => ({ gatherNewsFacts: mocks.gather }))
 vi.mock('server-only', () => ({}))
@@ -21,6 +22,7 @@ const request = (body: unknown, origin = 'https://example.test') => new NextRequ
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.load.mockResolvedValue({ article: null, draft: null })
+  mocks.archive.mockResolvedValue({ text: '', sources: [], results: [] })
   process.env.ADMIN_EMAILS = 'editor@example.test'
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test'
@@ -50,11 +52,32 @@ describe('editor access', () => {
     expect(saved.p_body).toBe('Geboortekranttekst')
     expect(mocks.rpc.mock.calls.some(c => c[0] === 'publish_news_draft')).toBe(false)
   })
-  it('does not pay for generation over an existing editor draft', async () => {
+  it('does not pay for generation when the displayed version is stale', async () => {
     process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
     mocks.load.mockResolvedValueOnce({ article: { editorial_version: 1 }, draft: { body: 'Editor work' } })
-    expect((await generate(request({ date: '2025-01-01', version: 1 }))).status).toBe(409)
+    expect((await generate(request({ date: '2025-01-01', version: 0 }))).status).toBe(409)
     expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+  it('regenerates an existing draft with archive evidence and preserves its version guard', async () => {
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
+    mocks.load.mockResolvedValue({ article: { editorial_version: 3 }, draft: { body: 'Old article' } })
+    mocks.rpc.mockResolvedValue({ data: true, error: null })
+    mocks.gather.mockResolvedValue({ results: [{ text: 'Facts', sources: [{ name: 'Source', url: 'https://example.test' }] }, { text: 'Context' }], combined: 'Facts and context' })
+    mocks.archive.mockResolvedValue({ text: 'Archive context', sources: [{ name: 'NOS archive', url: 'https://web.archive.org/web/20250101180000/https://nos.nl/' }], results: [{ name: 'NOS', status: 'Available' }] })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'New article' }], stop_reason: 'end_turn' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    expect((await generate(request({ date: '2025-01-01', version: 3 }))).status).toBe(200)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).messages[0].content).toContain('Archive context')
+    const saved = mocks.rpc.mock.calls.find(c => c[0] === 'save_news_draft')![1]
+    expect(saved.p_expected_version).toBe(3)
+    expect(saved.p_body).toBe('New article')
+    expect(saved.p_facts.generation.archive).toEqual([{ name: 'NOS', status: 'Available' }])
+  })
+  it('retains server-side research metadata when saving an edited article', async () => {
+    mocks.load.mockResolvedValue({ draft: { facts: { generation: { id: 'saved-generation' } } } })
+    mocks.rpc.mockResolvedValue({ error: null })
+    expect((await POST(request({ action: 'save', date: '2025-01-01', body: 'Edited', facts: 'Research', sources: [{ name: 'Source', url: 'https://example.test' }], version: 1 }))).status).toBe(200)
+    expect(mocks.rpc.mock.calls[0][1].p_facts.generation.id).toBe('saved-generation')
   })
   it('does not write an article when either researcher failed', async () => {
     process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
