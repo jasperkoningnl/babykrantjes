@@ -21,7 +21,7 @@ export default function NewsStyleExamples() {
   }
   return <details className="bk-card mt-6" onToggle={event => { if (event.currentTarget.open && !examples) void load() }}>
     <summary className="cursor-pointer font-bold">Voorbeeldartikelen van Jasper</summary>
-    <p className="text-sm text-gray-600 mt-4">De nieuwsberichten uit je vijf voorbeeldkrantjes, als tekst overgenomen. Regelafbrekingen en afgebroken woorden zijn samengevoegd. De schrijver gebruikt ze als stijlvoorbeeld, niet als feitenbron voor andere dagen. Je huidige aanwijzingen blijven leidend.</p>
+    <p className="text-sm text-gray-600 mt-4">De nieuwsberichten uit je vijf voorbeeldkrantjes, als tekst overgenomen. Regelafbrekingen en afgebroken woorden zijn samengevoegd. De schrijver krijgt de nieuwsinhoud zonder persoonlijke geboorte-intro’s en labels, als stijlvoorbeeld voor andere dagen. Je huidige aanwijzingen blijven leidend.</p>
     {busy && <p role="status" className="mt-4">Voorbeelden laden…</p>}
     {error && <p role="alert" className="mt-4">{error} <button onClick={load} className="underline">Probeer opnieuw</button></p>}
     {examples?.map(example => <details key={example.id} className="border-t mt-5 pt-4">

@@ -45,7 +45,7 @@ describe('editor access', () => {
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(sent.system).toBe(SYSTEM_PROMPT)
     expect(sent.messages[0].content).toBe(buildPrompt('nieuws', { basisGegevens: { volledigeNaam: '[NAAM]', geboorteDatum: '2025-01-01' }, gatheredFacts: { nieuws: 'Dagfeiten en context' }, newsStyleExamples: [{ id: 'example', title: 'Example', news_date: '2000-01-01', body: 'Historical style example', style_note: 'Short context' }] }))
-    expect(sent.messages[0].content).toContain('Historical style example')
+    expect(sent.messages[0].content).toContain('<style_examples>')
     expect(sent.messages[0].content).toContain('Geen ongelukken, rampen of doden als opening')
     expect(sent.messages[0].content).toContain('Kies 5-8 nieuwsitems')
     const saved = mocks.rpc.mock.calls.find(c => c[0] === 'save_news_draft')![1]
