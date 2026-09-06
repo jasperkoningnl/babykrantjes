@@ -7,6 +7,7 @@ import { gatherNewsFacts } from '@/lib/factGathering'
 import { buildPrompt, SYSTEM_PROMPT, CLAUDE_MODEL } from '@/lib/prompts'
 import { loadNewsEditor } from '@/lib/newsEditorial'
 import { gatherWaybackResearch } from '@/lib/waybackResearch'
+import { loadNewsStyleExamples } from '@/lib/newsStyleExamples'
 
 export const maxDuration = 120
 export async function POST(request: NextRequest) {
@@ -35,13 +36,13 @@ export async function POST(request: NextRequest) {
     if (error) throw error
     if (!reserved) return NextResponse.json({ error: 'Het proefbudget is bereikt. Je kunt de tekst zelf blijven bewerken.' }, { status: 429 })
     // One reservation covers both researchers and the writer. No retries; failures retain it.
-    const [facts, archive] = await Promise.all([gatherNewsFacts(date, true), gatherWaybackResearch(date)])
+    const [facts, archive, examples] = await Promise.all([gatherNewsFacts(date, true), gatherWaybackResearch(date), loadNewsStyleExamples()])
     if (facts.results.length !== 2 || facts.results.some(r => r.error || !r.text.trim()) || facts.combined.length > 25000) throw new Error('Research incomplete')
     const researchSources = Array.from(new Map(facts.results.flatMap(r => r.sources || []).map(s => [s.url, s])).values())
     if (!researchSources.length) throw new Error('Research has no citations')
     const sources = [...researchSources.slice(0, 20 - archive.sources.length), ...archive.sources]
     const combined = [facts.combined, archive.text].filter(Boolean).join('\n\n')
-    const prompt = buildPrompt('nieuws', { basisGegevens: { volledigeNaam: '[NAAM]', geboorteDatum: date }, gatheredFacts: { nieuws: combined } })
+    const prompt = buildPrompt('nieuws', { basisGegevens: { volledigeNaam: '[NAAM]', geboorteDatum: date }, gatheredFacts: { nieuws: combined }, newsStyleExamples: examples })
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 1500, temperature: 0.7, system: SYSTEM_PROMPT,
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     const result = await response.json()
     const body = (result.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim()
     if (!body || body.length > 20000 || result.stop_reason !== 'end_turn') throw new Error('Incomplete generation')
-    const metadata = { id: generationId, promptVersion: 'birth-news-v1', writer: CLAUDE_MODEL, writerUsage: result.usage,
+    const metadata = { id: generationId, promptVersion: 'birth-news-v2-examples', styleExampleIds: examples.map(e => e.id), writer: CLAUDE_MODEL, writerUsage: result.usage,
       researchers: facts.results, archive: archive.results, reservedCents: 100, createdAt: new Date().toISOString(), humanReviewed: false }
     const notes = `${combined}\n\nWayback: ${archive.results.map(r => `${r.name}: ${r.status}`).join(' ')}`
     const { error: saveError } = await db.rpc('save_news_draft', {

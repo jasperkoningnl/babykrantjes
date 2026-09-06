@@ -8,6 +8,7 @@ import { checkRateLimit, reserveDailyCost, settleDailyCost } from '@/lib/rateLim
 import { findPaperSession } from '@/lib/paperSession'
 import { loadPaperState } from '@/lib/paperState'
 import { getSupabaseAdmin } from '@/lib/supabase'
+import { loadNewsStyleExamples } from '@/lib/newsStyleExamples'
 
 export const maxDuration = 120
 const RESERVED_COST = 0.03
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
       const facts = section === 'nieuws' ? await gatherNewsFacts(date) : await gatherCultuurFacts(date)
       data.gatheredFacts = { ...data.gatheredFacts, [section]: facts.combined }
     }
+    if (section === 'nieuws') data.newsStyleExamples = await loadNewsStyleExamples()
     const result = await callClaude(buildPrompt(section, data), SYSTEM_PROMPT)
     const text = result.text.trim()
     const cost = calculateCost(result.tokensUsed.input, result.tokensUsed.output)

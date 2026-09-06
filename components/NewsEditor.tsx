@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { renewAdminSession } from '@/lib/adminSessionClient'
+import NewsStyleExamples from '@/components/NewsStyleExamples'
 
 const blank = { body: '', facts: '', sources: [] as { name: string; url: string }[] }
 export default function NewsEditor() {
@@ -74,5 +75,6 @@ export default function NewsEditor() {
         </div>
       </details>}
     </section>}
+    <NewsStyleExamples />
   </main>
 }
