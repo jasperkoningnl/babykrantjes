@@ -81,7 +81,7 @@ export function buildPrompt(section: string, data: any): string {
       const volledigeDatum = datumObj.toLocaleDateString('nl-NL', { 
         year: 'numeric', 
         month: 'long', 
-        day: 'numeric' 
+        day: 'numeric'
       })
       
       return `Schrijf een hoofdartikel voor een babykrant over de geboorte van ${naam}.
@@ -150,7 +150,8 @@ Schrijf de tekst:`
         weekday: 'long',
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: 'Europe/Amsterdam'
       })
 
       return `Hieronder staan feiten over het nieuws op ${datumVolledig}, verzameld uit meerdere bronnen. Schrijf een nieuwsartikel van 200-280 woorden voor een babykrant over de geboorte van ${roepnaam}.
@@ -159,7 +160,7 @@ STRUCTUUR:
 Het artikel heeft drie delen:
 
 1. INTRO-ALINEA (2-3 zinnen):
-   - Open met een variant van: "De geboorte van ${roepnaam} is natuurlijk het belangrijkste nieuws op ${datumVolledig}, maar er gebeurde meer op deze dag."
+   - Open exact met: "De geboorte van ${roepnaam} is het belangrijkste nieuws op ${datumVolledig}, maar er gebeurde meer."
    - Noem direct 1-2 grote nieuwsitems als teaser, zodat de lezer wil doorlezen.
 
 2. SUBKOP + UITGEBREIDE ALINEA'S:

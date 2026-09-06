@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     if (date) return NextResponse.json(await loadNewsEditor(date), { headers: { 'Cache-Control': 'no-store' } })
     const db = getSupabaseAdmin()
     const [news, jobs] = await Promise.all([
-      db.from('news_articles').select('news_date, article_id, articles!inner(editorial_status, current_revision_id)').order('news_date', { ascending: false }).limit(60),
+      db.from('news_articles').select('news_date, article_id, articles!inner(editorial_status, current_revision_id)').neq('articles.editorial_status', 'rejected').order('news_date', { ascending: false }).limit(60),
       db.from('content_jobs').select('content_key, status, attempts, last_error').neq('status', 'completed').order('created_at', { ascending: false }).limit(60),
     ])
     if (news.error || jobs.error) throw new Error('Unavailable')

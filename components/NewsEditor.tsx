@@ -47,14 +47,19 @@ export default function NewsEditor() {
       <fieldset disabled={busy} className="bk-card flex flex-col gap-4"><h2 className="text-xl font-bold">Concept voor {loadedDate}</h2>
         <label>Artikeltekst<textarea rows={12} maxLength={20000} className="bk-input" value={form.body} onChange={event => edit({ ...form, body: event.target.value })} /></label>
         <label>Gecontroleerde feiten<textarea rows={5} maxLength={20000} className="bk-input" value={form.facts} onChange={event => edit({ ...form, facts: event.target.value })} /></label>
-        <button disabled={busy || !form.facts.trim()} className="border rounded-xl p-3 disabled:opacity-40" onClick={async () => {
+        <button disabled={busy || dirty || !!record.draft} className="border rounded-xl p-3 disabled:opacity-40" onClick={async () => {
           setBusy(true); setMessage('')
           try {
-            const result = await api('/api/admin/news/generate', { date: loadedDate, ...form })
-            edit({ ...form, body: result.body }); setMessage('AI-concept klaar. Controleer en bewaar de tekst; hij is nog niet gepubliceerd.')
+            const result = await api('/api/admin/news/generate', { date: loadedDate, version: record.article?.editorial_version || 0 })
+            if (result.saved) {
+              accept(result); setQueue(await api('/api/admin/news'))
+              setMessage('Geboortedagnieuws onderzocht, geschreven en als concept bewaard. Nog niet gepubliceerd.')
+            } else {
+              edit({ body: result.body, facts: result.facts, sources: result.sources }); setMessage(result.message)
+            }
           } catch (error) { setMessage((error as Error).message) } finally { setBusy(false) }
-        }}>Maak AI-concept van mijn feiten</button>
-        <p className="text-sm">Alleen je feiten en bronverwijzingen worden gebruikt. Maximaal vijf proefpogingen binnen het afgesproken budget; geen automatische publicatie.</p>
+        }}>{busy ? 'Even wachten…' : 'Maak geboortedagnieuws voor deze datum'}</button>
+        <p className="text-sm">ChatGPT en Claude verzamelen nieuws; Claude Haiku schrijft volgens de geboortekrantformule. De invulplek [NAAM] is voor de naam in de individuele krant. Maximaal vijf proefpogingen; een bestaand concept wordt niet overschreven.</p>
         <h3 className="font-bold">Bronnen</h3>
         {form.sources.map((source: any, index: number) => <div key={index} className="flex flex-col gap-2 border-b pb-3">
           <label>Bronnaam<input className="bk-input" value={source.name} maxLength={200} onChange={event => edit({ ...form, sources: form.sources.map((s: any, i: number) => i === index ? { ...s, name: event.target.value } : s) })} /></label>
