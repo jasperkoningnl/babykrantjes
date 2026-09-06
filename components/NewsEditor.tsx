@@ -1,93 +1,75 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-const blank = { body: '', facts: '', sources: [{ name: '', url: '' }] }
+const blank = { body: '', facts: '', sources: [] as { name: string; url: string }[] }
 export default function NewsEditor() {
   const router = useRouter()
   const [date, setDate] = useState('')
   const [loadedDate, setLoadedDate] = useState('')
   const [record, setRecord] = useState<any>(null)
   const [form, setForm] = useState(blank)
-  const [queue, setQueue] = useState<any>({ news: [], jobs: [] })
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
-  const [reason, setReason] = useState('')
-  const [reviewed, setReviewed] = useState(false)
+  const [editing, setEditing] = useState(false)
   async function api(url: string, body?: unknown) {
     const response = await fetch(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { cache: 'no-store' })
     const data = await response.json()
     if (!response.ok) throw new Error(data.error || 'Verzoek mislukt')
     return data
   }
-  useEffect(() => { api('/api/admin/news').then(setQueue).catch(error => setMessage(error.message)) }, [])
   function accept(data: any) {
     setRecord(data); setLoadedDate(data.date); setDate(data.date)
     const revision = data.revisions?.[0]
-    setForm({ body: data.draft?.body ?? revision?.body ?? '', facts: data.draft?.facts?.notes ?? revision?.facts_snapshot?.notes ?? '', sources: data.draft?.sources ?? revision?.sources_snapshot ?? [{ name: '', url: '' }] })
-    setDirty(false); setReviewed(false)
+    setForm({ body: data.draft?.body ?? revision?.body ?? '', facts: data.draft?.facts?.notes ?? revision?.facts_snapshot?.notes ?? '', sources: data.draft?.sources ?? revision?.sources_snapshot ?? [] })
+    setDirty(false); setEditing(false)
   }
-  async function load(target: string) {
+  async function load() {
     if (dirty && !window.confirm('Je hebt onbewaarde wijzigingen. Wil je deze verlaten?')) return
     setBusy(true); setMessage('')
-    try { accept(await api(`/api/admin/news?date=${encodeURIComponent(target)}`)) }
+    try { accept(await api(`/api/admin/news?date=${encodeURIComponent(date)}`)) }
     catch (error) { setMessage((error as Error).message) }
     finally { setBusy(false) }
   }
-  function edit(next: typeof form) { setForm(next); setDirty(true); setReviewed(false) }
-  const published = record?.revisions?.find((item: any) => item.id === record.article?.current_revision_id)
-  return <main className="max-w-6xl mx-auto p-6">
-    <div className="flex justify-between gap-4"><h1 className="bk-heading">Nieuwsredactie</h1><button onClick={async () => { await fetch('/api/admin/session', { method: 'DELETE' }); router.replace('/admin/login'); router.refresh() }} className="underline">Uitloggen</button></div>
-    <p className="bk-subtext">Controleer feiten en bronnen. Alleen een bewuste publicatie maakt tekst beschikbaar voor hergebruik.</p>
-    <div className="flex gap-3 items-end mb-6"><label className="flex flex-col">Nieuwsdatum<input type="date" className="bk-input" value={date} onChange={event => setDate(event.target.value)} /></label><button disabled={busy || !date} onClick={() => load(date)} className="bk-btn-primary">Open datum</button></div>
+  async function generate() {
+    if (dirty && !window.confirm('Opnieuw genereren vervangt je onbewaarde wijzigingen. Doorgaan?')) return
+    setBusy(true); setMessage('Nieuws onderzoeken en artikel schrijven…')
+    try {
+      const result = await api('/api/admin/news/generate', { date: loadedDate, version: record.article?.editorial_version || 0 })
+      if (result.saved) { accept(result); setMessage('Artikel gegenereerd en bewaard in de database.') }
+      else { setForm({ body: result.body, facts: result.facts, sources: result.sources }); setDirty(true); setEditing(false); setMessage(result.message) }
+    } catch (error) { setMessage((error as Error).message) }
+    finally { setBusy(false) }
+  }
+  async function save() {
+    setBusy(true); setMessage('')
+    try { accept(await api('/api/admin/news', { action: 'save', date: loadedDate, ...form, version: record.article?.editorial_version || 0 })); setMessage('Opgeslagen in de database.') }
+    catch (error) { setMessage((error as Error).message) }
+    finally { setBusy(false) }
+  }
+  return <main className="max-w-3xl mx-auto p-6">
+    <div className="flex justify-between gap-4 mb-6"><h1 className="bk-heading">Nieuwsredactie</h1><button onClick={async () => { await fetch('/api/admin/session', { method: 'DELETE' }); router.replace('/admin/login'); router.refresh() }} className="underline">Uitloggen</button></div>
+    <div className="flex flex-wrap gap-3 items-end mb-6"><label className="flex flex-col">Geboortedatum<input type="date" disabled={busy} className="bk-input" value={date} onChange={event => setDate(event.target.value)} /></label><button disabled={busy || !date} onClick={load} className="bk-btn-primary">Open datum</button></div>
     <p role="status" className="my-4">{message}</p>
-    <div className="flex flex-wrap gap-2 mb-6">{queue.news.map((item: any) => <button disabled={busy} className="border rounded-xl px-3 py-2" key={item.news_date} onClick={() => load(item.news_date)}>{item.news_date} · {item.articles?.current_revision_id ? 'Gepubliceerd' : 'Te beoordelen'}</button>)}</div>
-    {record && <section className="grid md:grid-cols-2 gap-6">
-      <fieldset disabled={busy} className="bk-card flex flex-col gap-4"><h2 className="text-xl font-bold">Concept voor {loadedDate}</h2>
-        <label>Artikeltekst<textarea rows={12} maxLength={20000} className="bk-input" value={form.body} onChange={event => edit({ ...form, body: event.target.value })} /></label>
-        <label>Gecontroleerde feiten<textarea rows={5} maxLength={20000} className="bk-input" value={form.facts} onChange={event => edit({ ...form, facts: event.target.value })} /></label>
-        <button disabled={busy || dirty || !!record.draft} className="border rounded-xl p-3 disabled:opacity-40" onClick={async () => {
-          setBusy(true); setMessage('')
-          try {
-            const result = await api('/api/admin/news/generate', { date: loadedDate, version: record.article?.editorial_version || 0 })
-            if (result.saved) {
-              accept(result); setQueue(await api('/api/admin/news'))
-              setMessage('Geboortedagnieuws onderzocht, geschreven en als concept bewaard. Nog niet gepubliceerd.')
-            } else {
-              edit({ body: result.body, facts: result.facts, sources: result.sources }); setMessage(result.message)
-            }
-          } catch (error) { setMessage((error as Error).message) } finally { setBusy(false) }
-        }}>{busy ? 'Even wachten…' : 'Maak geboortedagnieuws voor deze datum'}</button>
-        <p className="text-sm">ChatGPT en Claude verzamelen nieuws; Claude Haiku schrijft volgens de geboortekrantformule. De invulplek [NAAM] is voor de naam in de individuele krant. Maximaal vijf proefpogingen; een bestaand concept wordt niet overschreven.</p>
-        <h3 className="font-bold">Bronnen</h3>
-        {form.sources.map((source: any, index: number) => <div key={index} className="flex flex-col gap-2 border-b pb-3">
-          <label>Bronnaam<input className="bk-input" value={source.name} maxLength={200} onChange={event => edit({ ...form, sources: form.sources.map((s: any, i: number) => i === index ? { ...s, name: event.target.value } : s) })} /></label>
-          <label>Bronlink<input type="url" className="bk-input" value={source.url} maxLength={2000} onChange={event => edit({ ...form, sources: form.sources.map((s: any, i: number) => i === index ? { ...s, url: event.target.value } : s) })} /></label>
-          {/^https?:\/\//.test(source.url) && <a href={source.url} target="_blank" rel="noopener noreferrer" className="underline">Open bron</a>}
-          <button disabled={form.sources.length === 1} onClick={() => edit({ ...form, sources: form.sources.filter((_: any, i: number) => i !== index) })} className="text-sm underline">Verwijder bron</button>
-        </div>)}
-        <button disabled={form.sources.length >= 20} onClick={() => edit({ ...form, sources: [...form.sources, { name: '', url: '' }] })} className="underline">Bron toevoegen</button>
-        <button disabled={busy} className="bk-btn-primary" onClick={async () => {
-          setBusy(true); setMessage('')
-          try { accept(await api('/api/admin/news', { action: 'save', date: loadedDate, ...form, version: record.article?.editorial_version || 0 })); setMessage('Concept bewaard. Nog niet gepubliceerd.') }
-          catch (error) { setMessage((error as Error).message) } finally { setBusy(false) }
-        }}>Concept bewaren</button>
-        <label>Reden voor publicatie<input className="bk-input" maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} /></label>
-        <label className="flex gap-3"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} />Ik heb tekst, nieuwsdatum en bronnen gecontroleerd.</label>
-        <button disabled={busy || dirty || !record.draft || !reviewed || !reason.trim()} className="bk-btn-primary disabled:opacity-40" onClick={async () => {
-          setBusy(true); setMessage('')
-          try {
-            await api('/api/admin/news', { action: 'publish', articleId: record.article.id, version: record.draft.edit_version, currentRevisionId: record.article.current_revision_id, reason, reviewed })
-            accept(await api(`/api/admin/news?date=${loadedDate}`)); setQueue(await api('/api/admin/news')); setMessage('Artikel gepubliceerd. Bestaande kranten behouden hun tekst.')
-          } catch (error) { setMessage((error as Error).message) } finally { setBusy(false) }
-        }}>Gecontroleerd artikel publiceren</button>
-        {dirty && <p>Bewaar eerst je wijzigingen voordat je publiceert.</p>}
-      </fieldset>
-      <aside className="bk-card"><h2 className="font-bold text-xl mb-4">Huidige publicatie</h2><p className="whitespace-pre-wrap">{published?.body || 'Deze datum heeft nog geen gepubliceerde tekst.'}</p>
-        <h3 className="font-bold mt-6">Publicatiegeschiedenis</h3>{record.publications.map((item: any) => <p key={item.created_at} className="my-3">{new Date(item.created_at).toLocaleString('nl-NL')} · {item.reason}</p>)}
-      </aside>
+    {record && <section className="bk-card">
+      <div className="flex justify-between items-start gap-4 mb-6">
+        <div><h2 className="text-2xl font-bold">{new Date(`${loadedDate}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}</h2>
+          <p className="text-sm text-gray-600 mt-2">{dirty ? 'Deze wijzigingen zijn nog niet opgeslagen.' : form.body ? 'Dit artikel staat in de database.' : 'Er staat nog geen artikel in de database voor deze dag.'}</p></div>
+        {form.body && <button disabled={busy} className="underline shrink-0" onClick={() => setEditing(!editing)}>{editing ? 'Bekijk opmaak' : 'Bewerken'}</button>}
+      </div>
+      {editing ? <label className="block">Artikeltekst<textarea aria-label="Artikeltekst" maxLength={20000} className="bk-input w-full leading-8" ref={element => { if (element) { element.style.height = 'auto'; element.style.height = `${element.scrollHeight}px` } }} value={form.body} onChange={event => { setForm({ ...form, body: event.target.value }); setDirty(true) }} disabled={busy} /></label>
+        : <article className="text-lg leading-8 space-y-5">{form.body ? form.body.split(/\n\s*\n/).map((paragraph, index) => <p key={index} className="whitespace-pre-wrap">{paragraph.split(/(\*\*[^*]+\*\*)/g).map((part, i) => part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part)}</p>) : <p>Genereer het nieuws voor deze geboortedag.</p>}</article>}
+      <div className="flex flex-wrap gap-3 mt-8">
+        {form.body && <button disabled={busy || !dirty} onClick={save} className="bk-btn-primary disabled:opacity-40">Opslaan in database</button>}
+        <button disabled={busy} onClick={generate} className="border rounded-xl px-4 py-3 disabled:opacity-40">{form.body ? 'Genereer opnieuw' : 'Genereer artikel'}</button>
+      </div>
+      {(form.facts || form.sources.length > 0) && <details className="border-t mt-8 pt-4">
+        <summary className="cursor-pointer text-sm">Achterliggende informatie</summary>
+        <div className="mt-4 text-sm leading-6"><p className="whitespace-pre-wrap">{form.facts}</p>
+          {form.sources.length > 0 && <ul className="mt-4 space-y-2">{form.sources.filter(source => /^https?:\/\//.test(source.url)).map((source, index) => <li key={index}><a className="underline break-words" href={source.url} target="_blank" rel="noopener noreferrer">{source.name}</a></li>)}</ul>}
+        </div>
+      </details>}
     </section>}
-    {queue.jobs.length > 0 && <section className="bk-card mt-6"><h2 className="font-bold">Wachtende of mislukte taken</h2>{queue.jobs.map((job: any) => <p key={job.content_key}>{job.content_key} · {job.status === 'failed' ? 'Mislukt' : 'In behandeling'} · {job.attempts} pogingen</p>)}</section>}
   </main>
 }

@@ -4,7 +4,7 @@ import { parseCalendarDate } from './contentDates'
 
 export function validateNewsDraft(input: any) {
   if (!input || !parseCalendarDate(input.date) || typeof input.body !== 'string' || !input.body.trim() || input.body.length > 20000) throw new Error('Vul datum en artikeltekst in')
-  if (typeof input.facts !== 'string' || input.facts.length > 20000) throw new Error('Feiten zijn te lang')
+  if (typeof input.facts !== 'string' || input.facts.length > 40000) throw new Error('Feiten zijn te lang')
   if (!Array.isArray(input.sources) || input.sources.length < 1 || input.sources.length > 20) throw new Error('Voeg minimaal één bron toe')
   const sources = input.sources.map((source: any) => {
     if (typeof source?.name !== 'string' || !source.name.trim() || source.name.length > 200 || typeof source.url !== 'string' || source.url.length > 2000) throw new Error('Ongeldige bron')
