@@ -10,6 +10,7 @@
 
 import { getSterrenbeeld, getChineesJaar } from './calculations'
 import { ARTICLE_SECTIONS, type ArticleSection } from './articleTypes'
+import { buildNewsStyleExamples } from './newsStylePrompt'
 
 /** Het model voor alle artikelgeneratie. */
 export const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
@@ -183,6 +184,8 @@ REGELS:
 - Geen categorie-introducties zoals "In de sportwereld..." of "Op internationaal vlak..."
 - De subkop "STAD - door onze verslaggevers" is het enige kopje. Verder doorlopende tekst.
 - Schrijf zakelijk maar toegankelijk, in het Nederlands.
+
+${buildNewsStyleExamples(data.newsStyleExamples)}
 
 FEITEN:
 ${gatheredNewsFacts || 'Geen feiten beschikbaar'}

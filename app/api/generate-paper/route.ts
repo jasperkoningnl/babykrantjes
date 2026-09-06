@@ -4,6 +4,7 @@ import type { ArticleSection } from '@/lib/articleTypes'
 import { SYSTEM_PROMPT, buildFullPaperPrompt, PAPER_TOOL } from '@/lib/prompts'
 import { callClaudeStructured } from '@/lib/claude'
 import { gatherNewsFacts, gatherCultuurFacts } from '@/lib/factGathering'
+import { loadNewsStyleExamples } from '@/lib/newsStyleExamples'
 import { getSupabaseAdmin } from '@/lib/supabase'
 import { checkRateLimit, reserveDailyCost, settleDailyCost } from '@/lib/rateLimit'
 import { findPaperSession } from '@/lib/paperSession'
@@ -39,7 +40,8 @@ export async function POST(request: NextRequest) {
     }
 
     const geboorteDatum = data.basisGegevens.geboorteDatum
-    const [nieuwsFacts, cultuurFacts] = await Promise.all([gatherNewsFacts(geboorteDatum), gatherCultuurFacts(geboorteDatum)])
+    const [nieuwsFacts, cultuurFacts, newsStyleExamples] = await Promise.all([gatherNewsFacts(geboorteDatum), gatherCultuurFacts(geboorteDatum), loadNewsStyleExamples()])
+    data.newsStyleExamples = newsStyleExamples
     data.gatheredFacts = { nieuws: nieuwsFacts.combined, cultuur: cultuurFacts.combined }
     const result = await callClaudeStructured<Record<ArticleSection, string>>(buildFullPaperPrompt(data), SYSTEM_PROMPT, PAPER_TOOL)
     const articles = result.data
