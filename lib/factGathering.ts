@@ -1,12 +1,14 @@
 // lib/factGathering.ts
 // Feitenverzameling via AI-modellen met websearch voor de nieuws- en cultuursecties.
 //
-// Nieuws:  ChatGPT (web search) + Claude (kennis) → feiten combineren
+// Nieuws: GPT-5.4 + Sonnet 4.6, beide met websearch → feiten combineren
 // Cultuur: ChatGPT (web search) + Claude (kennis) + Gemini (Google Search) → feiten combineren
 
 const OPENAI_MODEL = 'gpt-4o-mini'
 const GEMINI_MODEL = 'gemini-3.6-flash'
 const CLAUDE_FACTS_MODEL = 'claude-haiku-4-5'
+const NEWS_OPENAI_MODEL = 'gpt-5.4-2026-03-05'
+const NEWS_CLAUDE_MODEL = 'claude-sonnet-4-6'
 
 export interface FactResult {
   model: string
@@ -38,23 +40,25 @@ function cultuurFeitenPrompt(datum: string): string {
 // API calls
 // ---------------------------------------------------------------------------
 
-async function callOpenAISearch(prompt: string, bounded = false): Promise<FactResult> {
+async function callOpenAISearch(prompt: string, bounded = false, news = false): Promise<FactResult> {
+  const model = news ? NEWS_OPENAI_MODEL : OPENAI_MODEL
   const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return { model: OPENAI_MODEL, text: '', durationMs: 0, error: 'OPENAI_API_KEY ontbreekt' }
+  if (!apiKey) return { model, text: '', durationMs: 0, error: 'OPENAI_API_KEY ontbreekt' }
 
   const start = Date.now()
   try {
     const res = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: OPENAI_MODEL, tools: [{ type: 'web_search_preview' }], input: prompt,
-        ...(bounded ? { max_output_tokens: 2500, max_tool_calls: 2, store: false } : {}) }),
-      signal: AbortSignal.timeout(45000),
+      body: JSON.stringify({ model, tools: [{ type: news ? 'web_search' : 'web_search_preview' }], input: prompt,
+        ...(news ? { reasoning: { effort: 'low' } } : {}),
+        ...(bounded || news ? { max_output_tokens: 4000, max_tool_calls: 2, store: false } : {}) }),
+      signal: AbortSignal.timeout(news ? 60000 : 45000),
     })
     if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`)
 
     const data = await res.json() as any
-    if (bounded && data.status !== 'completed') throw new Error('Incomplete research')
+    if ((bounded || news) && data.status !== 'completed') throw new Error('Incomplete research')
     const text = (data.output ?? [])
       .filter((item: any) => item.type === 'message')
       .flatMap((item: any) => (item.content ?? []))
@@ -66,9 +70,10 @@ async function callOpenAISearch(prompt: string, bounded = false): Promise<FactRe
       .flatMap((part: any) => part.annotations ?? [])
       .filter((a: any) => a.type === 'url_citation' && /^https?:\/\//.test(a.url))
       .map((a: any) => ({ name: a.title || a.url, url: a.url }))
-    return { model: OPENAI_MODEL, text, sources, usage: data.usage, durationMs: Date.now() - start }
+    if (news && !sources.length) throw new Error('Research has no web citations')
+    return { model, text, sources, usage: data.usage, durationMs: Date.now() - start }
   } catch (err) {
-    return { model: OPENAI_MODEL, text: '', durationMs: Date.now() - start, error: err instanceof Error ? err.message : String(err) }
+    return { model, text: '', durationMs: Date.now() - start, error: err instanceof Error ? err.message : String(err) }
   }
 }
 
@@ -94,9 +99,10 @@ async function callGeminiSearch(prompt: string): Promise<FactResult> {
   }
 }
 
-async function callClaudeFacts(prompt: string): Promise<FactResult> {
+async function callClaudeFacts(prompt: string, news = false): Promise<FactResult> {
+  const model = news ? NEWS_CLAUDE_MODEL : CLAUDE_FACTS_MODEL
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return { model: CLAUDE_FACTS_MODEL, text: '', durationMs: 0, error: 'ANTHROPIC_API_KEY ontbreekt' }
+  if (!apiKey) return { model, text: '', durationMs: 0, error: 'ANTHROPIC_API_KEY ontbreekt' }
 
   const start = Date.now()
   try {
@@ -104,20 +110,29 @@ async function callClaudeFacts(prompt: string): Promise<FactResult> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: CLAUDE_FACTS_MODEL,
-        max_tokens: 1500,
+        model,
+        max_tokens: news ? 3000 : 1500,
+        ...(news ? { tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 2 }],
+          system: 'Gebruik websearch voor de nieuwsfeiten en citeer de geraadpleegde bronnen. Maximaal twee zoekopdrachten. Maak onderscheid tussen de gebeurtenisdatum en publicatiedatum. Noem geen onbevestigde feiten.' } : {}),
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
       }),
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(news ? 60000 : 45000),
     })
     if (!res.ok) throw new Error(`Claude ${res.status}: ${await res.text()}`)
 
     const data = await res.json() as any
     if (data.stop_reason === 'max_tokens') throw new Error('Incomplete research')
-    return { model: CLAUDE_FACTS_MODEL, text: data.content?.[0]?.text ?? '', usage: data.usage, durationMs: Date.now() - start }
+    if (news && data.stop_reason !== 'end_turn') throw new Error('Research paused or incomplete')
+    const blocks = (data.content || []).filter((b: any) => b.type === 'text')
+    const text = blocks.map((b: any) => b.text).join('\n')
+    const sources = blocks.flatMap((b: any) => b.citations || [])
+      .filter((c: any) => c.type === 'web_search_result_location' && /^https?:\/\//.test(c.url))
+      .map((c: any) => ({ name: c.title || c.url, url: c.url }))
+    if (news && !sources.length) throw new Error('Research has no web citations')
+    return { model, text, sources, usage: data.usage, durationMs: Date.now() - start }
   } catch (err) {
-    return { model: CLAUDE_FACTS_MODEL, text: '', durationMs: Date.now() - start, error: err instanceof Error ? err.message : String(err) }
+    return { model, text: '', durationMs: Date.now() - start, error: err instanceof Error ? err.message : String(err) }
   }
 }
 
@@ -138,8 +153,8 @@ function combineResults(results: FactResult[]): string {
 export async function gatherNewsFacts(datum: string, bounded = false): Promise<GatheredFacts> {
   const prompt = nieuwsFeitenPrompt(datum)
   const [chatgpt, claude] = await Promise.all([
-    callOpenAISearch(prompt, bounded),
-    callClaudeFacts(prompt),
+    callOpenAISearch(prompt, bounded, true),
+    callClaudeFacts(prompt, true),
   ])
 
   const results = [chatgpt, claude]
