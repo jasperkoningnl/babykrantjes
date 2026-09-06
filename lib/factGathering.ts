@@ -13,6 +13,8 @@ export interface FactResult {
   text: string
   durationMs: number
   error?: string
+  sources?: { name: string; url: string }[]
+  usage?: unknown
 }
 
 export interface GatheredFacts {
@@ -36,7 +38,7 @@ function cultuurFeitenPrompt(datum: string): string {
 // API calls
 // ---------------------------------------------------------------------------
 
-async function callOpenAISearch(prompt: string): Promise<FactResult> {
+async function callOpenAISearch(prompt: string, bounded = false): Promise<FactResult> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return { model: OPENAI_MODEL, text: '', durationMs: 0, error: 'OPENAI_API_KEY ontbreekt' }
 
@@ -45,11 +47,14 @@ async function callOpenAISearch(prompt: string): Promise<FactResult> {
     const res = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: OPENAI_MODEL, tools: [{ type: 'web_search_preview' }], input: prompt }),
+      body: JSON.stringify({ model: OPENAI_MODEL, tools: [{ type: 'web_search_preview' }], input: prompt,
+        ...(bounded ? { max_output_tokens: 2500, max_tool_calls: 2, store: false } : {}) }),
+      signal: AbortSignal.timeout(45000),
     })
     if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`)
 
     const data = await res.json() as any
+    if (bounded && data.status !== 'completed') throw new Error('Incomplete research')
     const text = (data.output ?? [])
       .filter((item: any) => item.type === 'message')
       .flatMap((item: any) => (item.content ?? []))
@@ -57,7 +62,11 @@ async function callOpenAISearch(prompt: string): Promise<FactResult> {
       .map((c: any) => c.text)
       .join('\n')
 
-    return { model: OPENAI_MODEL, text, durationMs: Date.now() - start }
+    const sources = (data.output ?? []).flatMap((item: any) => item.content ?? [])
+      .flatMap((part: any) => part.annotations ?? [])
+      .filter((a: any) => a.type === 'url_citation' && /^https?:\/\//.test(a.url))
+      .map((a: any) => ({ name: a.title || a.url, url: a.url }))
+    return { model: OPENAI_MODEL, text, sources, usage: data.usage, durationMs: Date.now() - start }
   } catch (err) {
     return { model: OPENAI_MODEL, text: '', durationMs: Date.now() - start, error: err instanceof Error ? err.message : String(err) }
   }
@@ -100,11 +109,13 @@ async function callClaudeFacts(prompt: string): Promise<FactResult> {
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
       }),
+      signal: AbortSignal.timeout(45000),
     })
     if (!res.ok) throw new Error(`Claude ${res.status}: ${await res.text()}`)
 
     const data = await res.json() as any
-    return { model: CLAUDE_FACTS_MODEL, text: data.content?.[0]?.text ?? '', durationMs: Date.now() - start }
+    if (data.stop_reason === 'max_tokens') throw new Error('Incomplete research')
+    return { model: CLAUDE_FACTS_MODEL, text: data.content?.[0]?.text ?? '', usage: data.usage, durationMs: Date.now() - start }
   } catch (err) {
     return { model: CLAUDE_FACTS_MODEL, text: '', durationMs: Date.now() - start, error: err instanceof Error ? err.message : String(err) }
   }
@@ -124,10 +135,10 @@ function combineResults(results: FactResult[]): string {
   return parts.join('\n\n---\n\n')
 }
 
-export async function gatherNewsFacts(datum: string): Promise<GatheredFacts> {
+export async function gatherNewsFacts(datum: string, bounded = false): Promise<GatheredFacts> {
   const prompt = nieuwsFeitenPrompt(datum)
   const [chatgpt, claude] = await Promise.all([
-    callOpenAISearch(prompt),
+    callOpenAISearch(prompt, bounded),
     callClaudeFacts(prompt),
   ])
 

@@ -29,5 +29,6 @@ export async function loadNewsEditor(date: string) {
     db.from('article_publications').select('revision_id, previous_revision_id, reason, created_at').eq('article_id', news.article_id).order('created_at', { ascending: false }).limit(20),
   ])
   for (const result of results) if (result.error) throw result.error
-  return { date, article: results[0].data, draft: results[1].data, revisions: results[2].data, publications: results[3].data }
+  return { date, article: results[0].data, draft: results[1].data,
+    revisions: results[0].data?.editorial_status === 'rejected' ? [] : results[2].data, publications: results[3].data }
 }

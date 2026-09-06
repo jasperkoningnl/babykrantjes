@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const mocks = vi.hoisted(() => ({ getUser: vi.fn(), rpc: vi.fn() }))
+const mocks = vi.hoisted(() => ({ getUser: vi.fn(), rpc: vi.fn(), load: vi.fn(), gather: vi.fn() }))
+vi.mock('@/lib/newsEditorial', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/newsEditorial')>(), loadNewsEditor: mocks.load }))
+vi.mock('@/lib/factGathering', () => ({ gatherNewsFacts: mocks.gather }))
 vi.mock('server-only', () => ({}))
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ auth: { getUser: mocks.getUser } }) }))
 vi.mock('@/lib/supabase', () => ({ getSupabaseAdmin: () => ({ rpc: mocks.rpc }) }))
@@ -9,12 +11,16 @@ import { ADMIN_COOKIE, getAdminIdentity, isAdminEmail } from '@/lib/adminAuth'
 import { validateNewsDraft } from '@/lib/newsEditorial'
 import { POST } from '@/app/api/admin/news/route'
 import { POST as generate } from '@/app/api/admin/news/generate/route'
+import { buildPrompt, SYSTEM_PROMPT } from '@/lib/prompts'
+
+afterEach(() => { vi.unstubAllGlobals(); delete process.env.OPENAI_API_KEY; delete process.env.ANTHROPIC_API_KEY })
 
 const request = (body: unknown, origin = 'https://example.test') => new NextRequest('https://example.test/api/admin/news', {
   method: 'POST', headers: { origin, cookie: `${ADMIN_COOKIE}=test-token`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 })
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.load.mockResolvedValue({ article: null, draft: null })
   process.env.ADMIN_EMAILS = 'editor@example.test'
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test'
@@ -23,6 +29,42 @@ beforeEach(() => {
 })
 
 describe('editor access', () => {
+  it('uses both researchers and the existing newspaper prompt, then saves the result as a draft', async () => {
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
+    mocks.rpc.mockResolvedValue({ data: true, error: null })
+    const results = [{ model: 'chatgpt', text: 'Dagfeiten', sources: [{ name: 'Bron', url: 'https://example.test/news' }], durationMs: 1 }, { model: 'claude', text: 'Context', durationMs: 1 }]
+    mocks.gather.mockResolvedValue({ results, combined: 'Dagfeiten en context' })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'Geboortekranttekst' }], stop_reason: 'end_turn', usage: { input_tokens: 20, output_tokens: 10 } }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const response = await generate(request({ date: '2025-01-01', version: 0 }))
+    expect(response.status).toBe(200)
+    expect(mocks.gather).toHaveBeenCalledWith('2025-01-01', true)
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(sent.system).toBe(SYSTEM_PROMPT)
+    expect(sent.messages[0].content).toBe(buildPrompt('nieuws', { basisGegevens: { volledigeNaam: '[NAAM]', geboorteDatum: '2025-01-01' }, gatheredFacts: { nieuws: 'Dagfeiten en context' } }))
+    expect(sent.messages[0].content).toContain('Geen ongelukken, rampen of doden als opening')
+    expect(sent.messages[0].content).toContain('Kies 5-8 nieuwsitems')
+    const saved = mocks.rpc.mock.calls.find(c => c[0] === 'save_news_draft')![1]
+    expect(saved.p_actor_id).toBe('trusted-id')
+    expect(saved.p_facts.generation.researchers).toEqual(results)
+    expect(saved.p_body).toBe('Geboortekranttekst')
+    expect(mocks.rpc.mock.calls.some(c => c[0] === 'publish_news_draft')).toBe(false)
+  })
+  it('does not pay for generation over an existing editor draft', async () => {
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
+    mocks.load.mockResolvedValueOnce({ article: { editorial_version: 1 }, draft: { body: 'Editor work' } })
+    expect((await generate(request({ date: '2025-01-01', version: 1 }))).status).toBe(409)
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+  it('does not write an article when either researcher failed', async () => {
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
+    mocks.rpc.mockResolvedValue({ data: true, error: null })
+    mocks.gather.mockResolvedValue({ results: [{ text: 'Facts' }, { text: '', error: 'timeout' }], combined: 'Facts' })
+    vi.stubGlobal('fetch', vi.fn())
+    expect((await generate(request({ date: '2025-01-01', version: 0 }))).status).toBe(503)
+    expect(fetch).not.toHaveBeenCalled()
+    expect(mocks.rpc).toHaveBeenCalledTimes(1)
+  })
   it('requires a server-verified, confirmed, allowlisted identity', async () => {
     expect(await getAdminIdentity()).toBeNull()
     expect(isAdminEmail('other@example.test')).toBe(false)
@@ -48,11 +90,12 @@ describe('editor access', () => {
   })
   it('keeps generation disabled by default and fails closed when the budget is exhausted', async () => {
     expect((await generate(request({}))).status).toBe(503)
-    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
     mocks.rpc.mockResolvedValueOnce({ data: false, error: null })
-    const result = await generate(request({ date: '2025-01-01', facts: 'Checked facts', sources: [{ name: 'NOS', url: 'https://nos.nl/' }] }))
+    const result = await generate(request({ date: '2025-01-01', version: 0 }))
     expect(result.status).toBe(429)
     delete process.env.ANTHROPIC_API_KEY
+    delete process.env.OPENAI_API_KEY
   })
   it('rejects invalid dates and unsafe source links', () => {
     const draft = { date: '2025-01-01', body: 'News', facts: 'Facts', version: 0, sources: [{ name: 'source', url: 'javascript:alert(1)' }] }
