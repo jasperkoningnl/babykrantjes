@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic'
-export const metadata = { robots: { index: false, follow: false }, referrer: 'no-referrer' as const }
+// Hide the token-bearing path/query without making native form POST Origin null.
+// The session endpoint must still enforce its same-origin check.
+export const metadata = { robots: { index: false, follow: false }, referrer: 'strict-origin' as const }
 
 export default async function Confirm({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams
