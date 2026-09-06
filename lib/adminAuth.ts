@@ -1,8 +1,23 @@
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
-import type { NextRequest } from 'next/server'
+import type { NextRequest, NextResponse } from 'next/server'
+import type { Session } from '@supabase/supabase-js'
 
 export const ADMIN_COOKIE = '__Host-babykrant_admin'
+export const ADMIN_REFRESH_COOKIE = '__Host-babykrant_admin_refresh'
+const cookieOptions = { httpOnly: true, secure: true, sameSite: 'lax' as const, path: '/' }
+
+export function setAdminSession(response: NextResponse, session: Session) {
+  response.cookies.set(ADMIN_COOKIE, session.access_token, { ...cookieOptions,
+    maxAge: Math.max(0, (session.expires_at || 0) - Math.floor(Date.now() / 1000)) })
+  response.cookies.set(ADMIN_REFRESH_COOKIE, session.refresh_token, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 })
+  response.headers.set('Cache-Control', 'no-store')
+}
+
+export function clearAdminSession(response: NextResponse) {
+  for (const name of [ADMIN_COOKIE, ADMIN_REFRESH_COOKIE]) response.cookies.set(name, '', { ...cookieOptions, maxAge: 0 })
+  response.headers.set('Cache-Control', 'no-store')
+}
 
 export function isAdminEmail(email: string | undefined): boolean {
   const allowed = (process.env.ADMIN_EMAILS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean)

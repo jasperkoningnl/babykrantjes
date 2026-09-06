@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { renewAdminSession } from '@/lib/adminSessionClient'
 
 const blank = { body: '', facts: '', sources: [] as { name: string; url: string }[] }
 export default function NewsEditor() {
@@ -14,7 +15,9 @@ export default function NewsEditor() {
   const [dirty, setDirty] = useState(false)
   const [editing, setEditing] = useState(false)
   async function api(url: string, body?: unknown) {
-    const response = await fetch(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { cache: 'no-store' })
+    const options: RequestInit = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { cache: 'no-store' }
+    let response = await fetch(url, options)
+    if (response.status === 401 && (await renewAdminSession()).ok) response = await fetch(url, options)
     const data = await response.json()
     if (!response.ok) throw new Error(data.error || 'Verzoek mislukt')
     return data
