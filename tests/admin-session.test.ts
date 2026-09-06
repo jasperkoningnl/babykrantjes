@@ -21,6 +21,14 @@ beforeEach(() => {
   mock.verify.mockResolvedValue({ data: { user: { email: 'editor@example.test', email_confirmed_at: 'now' }, session: { access_token: 'verified-token', expires_at: Math.floor(Date.now()/1000)+3600 } }, error: null })
 })
 describe('one-time editor login', () => {
+  it.each(['null', 'https://other.test', ''])('rejects untrusted origin %s even with a valid browser nonce', async origin => {
+    const req = request(createHash('sha256').update(nonce).digest('hex'))
+    if (origin) req.headers.set('origin', origin)
+    else req.headers.delete('origin')
+    const response = await POST(req)
+    expect(response.status).toBe(403)
+    expect(mock.verify).not.toHaveBeenCalled()
+  })
   it('rejects an email link opened outside the requesting browser', async () => {
     const response = await POST(request('a'.repeat(64)))
     expect(response.headers.get('location')).toContain('/admin/login?expired=1')
