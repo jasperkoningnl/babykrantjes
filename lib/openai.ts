@@ -10,6 +10,11 @@ export function writerModel(): string {
   return process.env.OPENAI_WRITER_MODEL || 'gpt-5.4-mini'
 }
 
+/** Schrijfmodel voor het nieuwsartikel (redactieconcept en losse sectie); standaard gelijk aan het schrijfmodel. */
+export function newsWriterModel(): string {
+  return process.env.OPENAI_NEWS_WRITER_MODEL || writerModel()
+}
+
 /** Onderzoeksmodel met websearch voor nieuws en cultuur. */
 export function researchModel(): string {
   return process.env.OPENAI_RESEARCH_MODEL || 'gpt-5.4-2026-03-05'
@@ -89,9 +94,9 @@ function tokensUsed(data: any): TokensUsed {
 export async function callOpenAI(
   prompt: string,
   systemPrompt: string,
-  options: { maxOutputTokens?: number } = {}
+  options: { maxOutputTokens?: number; model?: string } = {}
 ): Promise<{ text: string; tokensUsed: TokensUsed; usage: unknown; model: string }> {
-  const model = writerModel()
+  const model = options.model || writerModel()
   const data = await postResponses({
     model,
     instructions: systemPrompt,

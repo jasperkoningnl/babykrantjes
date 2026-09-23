@@ -59,6 +59,16 @@ describe('editor access', () => {
     expect(saved.p_body).toBe('Geboortekranttekst')
     expect(mocks.rpc.mock.calls.some(c => c[0] === 'publish_news_draft')).toBe(false)
   })
+  it('uses the separately configurable news writer model', async () => {
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.OPENAI_API_KEY = 'test'; process.env.OPENAI_NEWS_WRITER_MODEL = 'gpt-5.4'
+    mocks.rpc.mockResolvedValue({ data: true, error: null })
+    mocks.gather.mockResolvedValue({ results: [{ text: 'Dagfeiten', sources: [{ name: 'Bron', url: 'https://example.test/news' }] }], combined: 'Dagfeiten' })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => openaiText('Tekst') })
+    vi.stubGlobal('fetch', fetchMock)
+    expect((await generate(request({ date: '2025-01-01', version: 0 }))).status).toBe(200)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).model).toBe('gpt-5.4')
+    delete process.env.OPENAI_NEWS_WRITER_MODEL
+  })
   it('does not pay for generation when the displayed version is stale', async () => {
     process.env.NEWS_PILOT_ENABLED = 'true'; process.env.OPENAI_API_KEY = 'test'
     mocks.load.mockResolvedValueOnce({ article: { editorial_version: 1 }, draft: { body: 'Editor work' } })

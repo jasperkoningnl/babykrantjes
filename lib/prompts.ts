@@ -169,8 +169,13 @@ Het artikel heeft drie delen:
 
 3. SELECTIE:
    - Kies 5-8 nieuwsitems. Meer dan de intro, en behandel ze met diepgang.
-   - Mix: Nederlands nieuws, internationale politiek, sport, wetenschap, bijzondere gebeurtenissen.
-   - Kies op tijdsbeeld: de grote verhaallijnen die dit jaar definiëren.
+   - Kies het nieuws van déze dag, in deze volgorde van voorrang:
+     a. wat die dag bovenaan de voorpagina van NOS of NU.nl stond (zie de archiefkoppen) of in het onderzoek als TOP is gemarkeerd;
+     b. het grootste internationale nieuws van die dag;
+     c. het belangrijkste sportnieuws van die dag;
+     d. iets uit wetenschap, cultuur of iets opvallends.
+   - Laat nieuws van een andere dag weg. Een grote verhaallijn van dat jaar alleen als korte achtergrond bij een concreet feit van die dag.
+   - Mix Nederlands en internationaal nieuws.
    - Sluit bij voorkeur af met iets lichts of opvallends (sport, ruimtevaart, een grappig feit).
    - Geen ongelukken, rampen of doden als opening. Specifieke dodentallen vermijden.
 
@@ -178,6 +183,7 @@ REGELS:
 - Gebruik ALLEEN feiten uit de aangeleverde lijst hieronder. Verzin niets.
 - Feiten die in meerdere bronnen voorkomen zijn waarschijnlijk betrouwbaarder.
 - Schrijf als een echte krant: feitelijk, specifiek, met namen en plaatsen. Geen vage samenvattingen.
+- Maak het levendig: geef elk item een concreet detail (een naam, getal, plaats of uitspraak) en wissel korte en langere zinnen af. Geen opsomming van losse feiten.
 - Geen categorie-introducties zoals "In de sportwereld..." of "Op internationaal vlak..."
 - De subkop "STAD - door onze verslaggevers" is het enige kopje. Verder doorlopende tekst.
 - Schrijf zakelijk maar toegankelijk, in het Nederlands.

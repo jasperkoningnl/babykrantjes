@@ -6,7 +6,8 @@ Bijgewerkt op 23 september 2026: overgestapt op alleen OpenAI (onderzoek en schr
 
 De beheerflow gebruikt dezelfde `buildPrompt('nieuws', ...)` en `SYSTEM_PROMPT` als de gewone geboortekrant:
 - GPT-5.4 (`gpt-5.4-2026-03-05`, instelbaar met `OPENAI_RESEARCH_MODEL`) verzamelt met websearch de nieuwsfeiten via `gatherNewsFacts`. Wayback-koppen van NOS en NU.nl vullen dit aan.
-- Het schrijfmodel (`gpt-5.4-mini`, instelbaar met `OPENAI_WRITER_MODEL`) schrijft 200–280 woorden met 5–8 nieuwsitems, Nederlandse en internationale context, eventueel sport en een lichte afsluiting.
+- Het onderzoek levert 12-15 kandidaat-items van precies die dag, met belang (TOP, GROOT, KLEIN). Het schrijfmodel kiest eerst wat bovenaan NOS/NU.nl stond, dan internationaal en sport.
+- Het schrijfmodel (`gpt-5.4-mini`, instelbaar met `OPENAI_NEWS_WRITER_MODEL` of `OPENAI_WRITER_MODEL`) schrijft 200–280 woorden met 5–8 nieuwsitems, Nederlandse en internationale context, eventueel sport en een lichte afsluiting.
 - De vaste openingszin begint met de geboorte. Geen rampen of doden als opening.
 - De gedeelde tekst gebruikt [NAAM]. De individuele krant gebruikt de echte roepnaam; centrale publicaties zijn nog niet op klantgeneratie aangesloten.
 
@@ -22,7 +23,7 @@ De onderzoeker moet webcitaten leveren. Modeluitvoer is geen onafhankelijke bron
 
 `NEWS_PILOT_ENABLED=true` activeert de beheerproef. `ADMIN_EMAILS`, `NEXT_PUBLIC_SITE_URL`, Supabase, Redis, Resend en OpenAI moeten ingesteld zijn.
 
-De database reserveert €1 per proefpoging, maximaal €5 totaal. Deze reservering omvat één onderzoeker en één schrijver, en blijft staan bij mislukking of timeout. Geen automatische retries. De onderzoeker krijgt maximaal twee zoekcalls en 4000 uitvoertokens inclusief reasoning. Het schrijfmodel krijgt maximaal 3000 uitvoertokens inclusief reasoning. Onderzoek heeft een timeout van 60 seconden; schrijven 45 seconden. De reservering is geen gemeten factuurbedrag.
+De database reserveert €1 per proefpoging, maximaal €5 totaal. Deze reservering omvat één onderzoeker en één schrijver, en blijft staan bij mislukking of timeout. Geen automatische retries. De onderzoeker krijgt maximaal vijf zoekcalls en 4000 uitvoertokens inclusief reasoning. Het schrijfmodel krijgt maximaal 3000 uitvoertokens inclusief reasoning. Onderzoek heeft een timeout van 60 seconden; schrijven 45 seconden. De reservering is geen gemeten factuurbedrag.
 
 Versiecontrole voorkomt overschrijven van gelijktijdige redactionele wijzigingen. Bij een opslagconflict blijft de nieuwe tekst beschikbaar in het formulier om te kopiëren. Modellen, onderzoeksuitvoer en verbruik worden bij een geslaagde generatie in het concept vastgelegd.
 

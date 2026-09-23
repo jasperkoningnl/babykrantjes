@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase'
 import { amsterdamToday, parseCalendarDate } from '@/lib/contentDates'
 import { gatherNewsFacts } from '@/lib/factGathering'
 import { buildPrompt, SYSTEM_PROMPT } from '@/lib/prompts'
-import { callOpenAI } from '@/lib/openai'
+import { callOpenAI, newsWriterModel } from '@/lib/openai'
 import { loadNewsEditor } from '@/lib/newsEditorial'
 import { gatherWaybackResearch } from '@/lib/waybackResearch'
 import { loadNewsStyleExamples } from '@/lib/newsStyleExamples'
@@ -44,10 +44,10 @@ export async function POST(request: NextRequest) {
     const sources = [...researchSources.slice(0, 20 - archive.sources.length), ...archive.sources]
     const combined = [facts.combined, archive.text].filter(Boolean).join('\n\n')
     const prompt = buildPrompt('nieuws', { basisGegevens: { volledigeNaam: '[NAAM]', geboorteDatum: date }, gatheredFacts: { nieuws: combined }, newsStyleExamples: examples })
-    const result = await callOpenAI(prompt, SYSTEM_PROMPT, { maxOutputTokens: 3000 })
+    const result = await callOpenAI(prompt, SYSTEM_PROMPT, { maxOutputTokens: 3000, model: newsWriterModel() })
     const body = result.text
     if (!body || body.length > 20000) throw new Error('Incomplete generation')
-    const metadata = { id: generationId, promptVersion: 'birth-news-v3-openai', styleExampleIds: examples.map(e => e.id), writer: result.model, writerUsage: result.usage,
+    const metadata = { id: generationId, promptVersion: 'birth-news-v4-day-selection', styleExampleIds: examples.map(e => e.id), writer: result.model, writerUsage: result.usage,
       researchers: facts.results, archive: archive.results, reservedCents: 100, createdAt: new Date().toISOString(), humanReviewed: false }
     const notes = `${combined}\n\nWayback: ${archive.results.map(r => `${r.name}: ${r.status}`).join(' ')}`
     const { error: saveError } = await db.rpc('save_news_draft', {

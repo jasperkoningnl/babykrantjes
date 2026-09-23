@@ -3,6 +3,7 @@
 // Eén onderzoeker per sectie; zonder webbronnen telt het onderzoek niet.
 
 import { callOpenAIResearch, researchModel } from './openai'
+import { gatherWaybackResearch } from './waybackResearch'
 
 export interface FactResult {
   model: string
@@ -23,7 +24,21 @@ export interface GatheredFacts {
 // ---------------------------------------------------------------------------
 
 function nieuwsFeitenPrompt(datum: string): string {
-  return `Zoek het nieuws op van ${datum}. Geef een feitelijke opsomming van 6-8 nieuwsitems die op of rond deze dag speelden, met voor elk item: wat er gebeurde, wanneer, en waarom het relevant is. Mix Nederlands en internationaal nieuws. Noem ook grote lopende verhaallijnen die het nieuws in die periode domineerden, met een concreet feit van die dag als aanleiding. Noem ook grote evenementen, festivals of sportevenementen die op deze dag plaatsvonden of van start gingen, als die relevant genoeg zijn. Geef alleen verifieerbare feiten, geen interpretaties. Antwoord in het Nederlands.`
+  return `Zoek het nieuws op van precies ${datum}. Doel: bepalen wat die dag het belangrijkste en meest besproken nieuws was, in Nederland en internationaal.
+
+Zoek gericht:
+- wat die dag bovenaan stond bij NOS en NU.nl (Nederlandse politiek, binnenlands nieuws);
+- het grootste internationale nieuws van die dag;
+- sport (wedstrijden, uitslagen, toernooien die die dag speelden);
+- wetenschap, cultuur of iets opvallends of lichts.
+
+Geef 12-15 kandidaat-items. Per item:
+- wat er gebeurde, met concrete details (namen, plaatsen, getallen);
+- de datum van de gebeurtenis (niet alleen de publicatiedatum);
+- de bron;
+- het belang: TOP (openingsnieuws of voorpagina die dag), GROOT of KLEIN.
+
+Neem alleen nieuws op dat op ${datum} gebeurde of die dag groot in het nieuws was. Een lopende verhaallijn mag alleen met een concreet feit van die dag. Geef alleen verifieerbare feiten, geen interpretaties. Antwoord in het Nederlands.`
 }
 
 function cultuurFeitenPrompt(datum: string): string {
@@ -60,7 +75,7 @@ function combineResults(results: FactResult[]): string {
 }
 
 export async function gatherNewsFacts(datum: string): Promise<GatheredFacts> {
-  const result = await research(nieuwsFeitenPrompt(datum), 2)
+  const result = await research(nieuwsFeitenPrompt(datum), 5)
   if (result.error) console.warn(`[FactGathering] ${result.model} nieuws fout: ${result.error}`)
   else console.log(`[FactGathering] ${result.model} nieuws OK (${result.durationMs}ms)`)
   return { results: [result], combined: combineResults([result]) }
@@ -71,4 +86,16 @@ export async function gatherCultuurFacts(datum: string): Promise<GatheredFacts> 
   if (result.error) console.warn(`[FactGathering] ${result.model} cultuur fout: ${result.error}`)
   else console.log(`[FactGathering] ${result.model} cultuur OK (${result.durationMs}ms)`)
   return { results: [result], combined: combineResults([result]) }
+}
+
+/**
+ * Nieuwsonderzoek plus de voorpaginakoppen van NOS en NU.nl van die dag.
+ * Beide lopen tegelijk; de koppen tonen wat die dag echt bovenaan stond.
+ */
+export async function gatherNewsEvidence(datum: string): Promise<GatheredFacts> {
+  const [facts, archive] = await Promise.all([
+    gatherNewsFacts(datum),
+    gatherWaybackResearch(datum).catch(() => ({ text: '', sources: [], results: [] })),
+  ])
+  return { results: facts.results, combined: [facts.combined, archive.text].filter(Boolean).join('\n\n') }
 }

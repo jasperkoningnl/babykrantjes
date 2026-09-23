@@ -47,6 +47,13 @@ const GEN_TAKEN = [
   'Acht artikelen schrijven',
 ]
 
+// Iedere poging doet alle AI-aanvragen opnieuw; daarom niet eindeloos herhalen.
+const MAX_AUTO_RETRIES = 2
+
+class GenerationError extends Error {
+  constructor(message: string, readonly retryable: boolean) { super(message) }
+}
+
 async function collectAllData(data: BabykrantData, birthDate: string, birthPlace: string, fullName: string) {
   const enrichedData: any = { ...data }
   try {
@@ -81,7 +88,8 @@ async function collectAllData(data: BabykrantData, birthDate: string, birthPlace
   })
   const result = await res.json().catch(() => null)
   if (!res.ok || !result?.success || !result.articles) {
-    throw new Error(result?.error || 'De artikelen konden niet worden gemaakt')
+    // 4xx (budget, invoer, sessie) lost zichzelf niet op door opnieuw te proberen.
+    throw new GenerationError(result?.error || 'De artikelen konden niet worden gemaakt', res.status >= 500 || res.status === 0)
   }
 
   const articleSaveResponse = await fetch('/api/papers', {
@@ -98,6 +106,8 @@ export default function LoadingScreenPage() {
   const [klaar, setKlaar] = useState(false)
   const [generationError, setGenerationError] = useState('')
   const [generationAttempt, setGenerationAttempt] = useState(0)
+  const [generationFailed, setGenerationFailed] = useState(false)
+  const [manualRun, setManualRun] = useState(0)
   const [factIndex, setFactIndex] = useState(() => Math.floor(Math.random() * FUN_FACTS.length))
   const hasStarted = useRef(false)
 
@@ -127,6 +137,12 @@ export default function LoadingScreenPage() {
       })
       .catch((error) => {
         console.error('[LoadingScreen] Generatie mislukt:', error)
+        const retryable = !(error instanceof GenerationError) || error.retryable
+        if (!retryable || generationAttempt >= MAX_AUTO_RETRIES) {
+          setGenerationFailed(true)
+          setGenerationError(`Het maken van je krant is niet gelukt${error instanceof GenerationError ? `: ${error.message}` : ''}. Je gegevens zijn bewaard.`)
+          return
+        }
         setGenerationError('Het maken duurt langer dan verwacht. We proberen het automatisch opnieuw.')
         retryTimer = setTimeout(() => {
           hasStarted.current = false
@@ -137,7 +153,7 @@ export default function LoadingScreenPage() {
     return () => {
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [data, generationAttempt])
+  }, [data, generationAttempt, manualRun])
 
   useEffect(() => {
     if (!data) return
@@ -228,9 +244,25 @@ export default function LoadingScreenPage() {
         )}
 
         {generationError && !klaar && (
-          <p className="font-serif text-[14px] text-subtle mb-6" role="status">
-            {generationError}
-          </p>
+          <div className="mb-6">
+            <p className="font-serif text-[14px] text-subtle" role="status">
+              {generationError}
+            </p>
+            {generationFailed && (
+              <button
+                onClick={() => {
+                  setGenerationFailed(false)
+                  setGenerationError('')
+                  hasStarted.current = false
+                  setGenerationAttempt(0)
+                  setManualRun(run => run + 1)
+                }}
+                className="mt-3 underline"
+              >
+                Opnieuw proberen
+              </button>
+            )}
+          </div>
         )}
 
         {/* Email option / redirect notice */}

@@ -1,5 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { gatherNewsFacts, gatherCultuurFacts } from '@/lib/factGathering'
+import { gatherNewsFacts, gatherCultuurFacts, gatherNewsEvidence } from '@/lib/factGathering'
+import { buildPrompt } from '@/lib/prompts'
+
+vi.mock('@/lib/waybackResearch', () => ({ gatherWaybackResearch: vi.fn(async () => ({ text: 'NOS, archiefopname:\n- Kabinet valt', sources: [], results: [] })) }))
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 
@@ -17,7 +20,7 @@ function mockOpenAI(citations = true) {
   return fetcher
 }
 
-it('researches news with one bounded OpenAI web search call', async () => {
+it('researches the news of the exact day with one bounded OpenAI web search call', async () => {
   const fetcher = mockOpenAI()
   const facts = await gatherNewsFacts('2026-08-31')
   expect(fetcher).toHaveBeenCalledTimes(1)
@@ -26,7 +29,9 @@ it('researches news with one bounded OpenAI web search call', async () => {
   expect(url).toBe('https://api.openai.com/v1/responses')
   expect(body.model).toBe('gpt-5.4-2026-03-05')
   expect(body.tools[0].type).toBe('web_search')
-  expect(body.max_tool_calls).toBe(2)
+  expect(body.max_tool_calls).toBe(5)
+  expect(body.input).toContain('precies 2026-08-31')
+  expect(body.input).toContain('12-15 kandidaat-items')
   expect(body.max_output_tokens).toBe(4000)
   expect(body.store).toBe(false)
   expect(facts.results).toHaveLength(1)
@@ -63,4 +68,18 @@ it('never calls another AI provider', async () => {
   const fetcher = mockOpenAI()
   await Promise.all([gatherNewsFacts('2026-08-31'), gatherCultuurFacts('2026-08-31')])
   expect(fetcher.mock.calls.every(([url]) => url.startsWith('https://api.openai.com/'))).toBe(true)
+})
+
+it('adds the NOS/NU.nl front-page headlines to the news evidence for every paper', async () => {
+  mockOpenAI()
+  const evidence = await gatherNewsEvidence('2026-08-31')
+  expect(evidence.combined).toContain('OpenAI feiten')
+  expect(evidence.combined).toContain('Kabinet valt')
+})
+
+it('tells the writer to prefer the news that led that day', () => {
+  const prompt = buildPrompt('nieuws', { basisGegevens: { volledigeNaam: 'Sam', geboorteDatum: '2026-08-31' }, gatheredFacts: { nieuws: 'Feiten' } })
+  expect(prompt).toContain('bovenaan de voorpagina van NOS of NU.nl')
+  expect(prompt).toContain('Laat nieuws van een andere dag weg')
+  expect(prompt).not.toContain('de grote verhaallijnen die dit jaar definiëren')
 })

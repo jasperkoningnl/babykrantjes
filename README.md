@@ -61,6 +61,7 @@ krant gebruikt een willekeurige HttpOnly gastensessie.
 |---|---|
 | `OPENAI_API_KEY` | Onderzoek (websearch) en artikelgeneratie |
 | `OPENAI_WRITER_MODEL` | Optioneel: schrijfmodel (standaard `gpt-5.4-mini`) |
+| `OPENAI_NEWS_WRITER_MODEL` | Optioneel: apart schrijfmodel voor nieuwsconcepten in `/admin` en het los opnieuw maken van de nieuwssectie (standaard gelijk aan `OPENAI_WRITER_MODEL`) |
 | `OPENAI_RESEARCH_MODEL` | Optioneel: onderzoeksmodel met websearch (standaard `gpt-5.4-2026-03-05`) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable/anon key (client-side reads) |
