@@ -6,7 +6,7 @@
 //
 // Design:
 // - Deterministic keyword/alias matching, no AI calls. The article generator
-//   (Claude) receives the matched dossier context in its prompt and weaves it in.
+//   (the writer model) receives the matched dossier context in its prompt and weaves it in.
 // - A dossier only matches when it was active on the given date (start/eind).
 // - Matching is case-insensitive, diacritic-insensitive and on word boundaries,
 //   so "Oekraïne" matches alias "oekraine" but "coronation" does not match "corona".

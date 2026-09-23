@@ -3,7 +3,7 @@
 // Server-side scraper voor Top40.nl
 // FIXED v2.0.0: NODE_TLS_REJECT_UNAUTHORIZED-hack verwijderd. Die schakelde
 // TLS-verificatie proces-breed uit tijdens de fetch en kon door de async
-// race "aan" blijven staan voor al het andere verkeer (Anthropic, betalen).
+// race "aan" blijven staan voor al het andere verkeer (AI-aanbieder, betalen).
 // Nu: gewone fetch eerst; alleen bij een certificaatfout van top40.nl een
 // undici-dispatcher die uitsluitend voor die ene request soepeler valideert.
 // FIXED v2.0.1: undici wordt lazy geïmporteerd; een top-level import
