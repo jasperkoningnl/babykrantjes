@@ -122,8 +122,3 @@ export const USAGE_LIMITS = {
   timeoutMs: 20000,
   maxTokensPerRequest: 1000
 }
-
-export const CLAUDE_PRICING = {
-  inputCostPer1MTokens: 1.00,
-  outputCostPer1MTokens: 5.00,
-}

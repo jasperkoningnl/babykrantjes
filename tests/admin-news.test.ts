@@ -15,11 +15,13 @@ import { POST } from '@/app/api/admin/news/route'
 import { POST as generate } from '@/app/api/admin/news/generate/route'
 import { buildPrompt, SYSTEM_PROMPT } from '@/lib/prompts'
 
-afterEach(() => { vi.unstubAllGlobals(); delete process.env.OPENAI_API_KEY; delete process.env.ANTHROPIC_API_KEY })
+afterEach(() => { vi.unstubAllGlobals(); delete process.env.OPENAI_API_KEY })
 
 const request = (body: unknown, origin = 'https://example.test') => new NextRequest('https://example.test/api/admin/news', {
   method: 'POST', headers: { origin, cookie: `${ADMIN_COOKIE}=test-token`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 })
+const openaiText = (text: string) => ({ status: 'completed', usage: { input_tokens: 20, output_tokens: 10 },
+  output: [{ type: 'message', content: [{ type: 'output_text', text, annotations: [] }] }] })
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.load.mockResolvedValue({ article: null, draft: null })
@@ -32,44 +34,57 @@ beforeEach(() => {
 })
 
 describe('editor access', () => {
-  it('uses both researchers and the existing newspaper prompt, then saves the result as a draft', async () => {
-    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
+  it('uses the OpenAI researcher and the existing newspaper prompt, then saves the result as a draft', async () => {
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.OPENAI_API_KEY = 'test'
     mocks.rpc.mockResolvedValue({ data: true, error: null })
-    const results = [{ model: 'chatgpt', text: 'Dagfeiten', sources: [{ name: 'Bron', url: 'https://example.test/news' }], durationMs: 1 }, { model: 'claude', text: 'Context', durationMs: 1 }]
+    const results = [{ model: 'gpt-5.4-2026-03-05', text: 'Dagfeiten', sources: [{ name: 'Bron', url: 'https://example.test/news' }], durationMs: 1 }]
     mocks.gather.mockResolvedValue({ results, combined: 'Dagfeiten en context' })
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'Geboortekranttekst' }], stop_reason: 'end_turn', usage: { input_tokens: 20, output_tokens: 10 } }) })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => openaiText('Geboortekranttekst') })
     vi.stubGlobal('fetch', fetchMock)
     const response = await generate(request({ date: '2025-01-01', version: 0 }))
     expect(response.status).toBe(200)
-    expect(mocks.gather).toHaveBeenCalledWith('2025-01-01', true)
+    expect(mocks.gather).toHaveBeenCalledWith('2025-01-01')
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.openai.com/v1/responses')
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body)
-    expect(sent.system).toBe(SYSTEM_PROMPT)
-    expect(sent.messages[0].content).toBe(buildPrompt('nieuws', { basisGegevens: { volledigeNaam: '[NAAM]', geboorteDatum: '2025-01-01' }, gatheredFacts: { nieuws: 'Dagfeiten en context' }, newsStyleExamples: [{ id: 'example', title: 'Example', news_date: '2000-01-01', body: 'Historical style example', style_note: 'Short context' }] }))
-    expect(sent.messages[0].content).toContain('<style_examples>')
-    expect(sent.messages[0].content).toContain('Geen ongelukken, rampen of doden als opening')
-    expect(sent.messages[0].content).toContain('Kies 5-8 nieuwsitems')
+    expect(sent.instructions).toBe(SYSTEM_PROMPT)
+    expect(sent.temperature).toBeUndefined()
+    expect(sent.input).toBe(buildPrompt('nieuws', { basisGegevens: { volledigeNaam: '[NAAM]', geboorteDatum: '2025-01-01' }, gatheredFacts: { nieuws: 'Dagfeiten en context' }, newsStyleExamples: [{ id: 'example', title: 'Example', news_date: '2000-01-01', body: 'Historical style example', style_note: 'Short context' }] }))
+    expect(sent.input).toContain('<style_examples>')
+    expect(sent.input).toContain('Geen ongelukken, rampen of doden als opening')
+    expect(sent.input).toContain('Kies 5-8 nieuwsitems')
     const saved = mocks.rpc.mock.calls.find(c => c[0] === 'save_news_draft')![1]
     expect(saved.p_actor_id).toBe('trusted-id')
     expect(saved.p_facts.generation.researchers).toEqual(results)
+    expect(saved.p_facts.generation.writer).toBe('gpt-5.4-mini')
     expect(saved.p_body).toBe('Geboortekranttekst')
     expect(mocks.rpc.mock.calls.some(c => c[0] === 'publish_news_draft')).toBe(false)
   })
+  it('uses the separately configurable news writer model', async () => {
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.OPENAI_API_KEY = 'test'; process.env.OPENAI_NEWS_WRITER_MODEL = 'gpt-5.4'
+    mocks.rpc.mockResolvedValue({ data: true, error: null })
+    mocks.gather.mockResolvedValue({ results: [{ text: 'Dagfeiten', sources: [{ name: 'Bron', url: 'https://example.test/news' }] }], combined: 'Dagfeiten' })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => openaiText('Tekst') })
+    vi.stubGlobal('fetch', fetchMock)
+    expect((await generate(request({ date: '2025-01-01', version: 0 }))).status).toBe(200)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).model).toBe('gpt-5.4')
+    delete process.env.OPENAI_NEWS_WRITER_MODEL
+  })
   it('does not pay for generation when the displayed version is stale', async () => {
-    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.OPENAI_API_KEY = 'test'
     mocks.load.mockResolvedValueOnce({ article: { editorial_version: 1 }, draft: { body: 'Editor work' } })
     expect((await generate(request({ date: '2025-01-01', version: 0 }))).status).toBe(409)
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
   it('regenerates an existing draft with archive evidence and preserves its version guard', async () => {
-    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.OPENAI_API_KEY = 'test'
     mocks.load.mockResolvedValue({ article: { editorial_version: 3 }, draft: { body: 'Old article' } })
     mocks.rpc.mockResolvedValue({ data: true, error: null })
-    mocks.gather.mockResolvedValue({ results: [{ text: 'Facts', sources: [{ name: 'Source', url: 'https://example.test' }] }, { text: 'Context' }], combined: 'Facts and context' })
+    mocks.gather.mockResolvedValue({ results: [{ text: 'Facts', sources: [{ name: 'Source', url: 'https://example.test' }] }], combined: 'Facts and context' })
     mocks.archive.mockResolvedValue({ text: 'Archive context', sources: [{ name: 'NOS archive', url: 'https://web.archive.org/web/20250101180000/https://nos.nl/' }], results: [{ name: 'NOS', status: 'Available' }] })
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'New article' }], stop_reason: 'end_turn' }) })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => openaiText('New article') })
     vi.stubGlobal('fetch', fetchMock)
     expect((await generate(request({ date: '2025-01-01', version: 3 }))).status).toBe(200)
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).messages[0].content).toContain('Archive context')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).input).toContain('Archive context')
     const saved = mocks.rpc.mock.calls.find(c => c[0] === 'save_news_draft')![1]
     expect(saved.p_expected_version).toBe(3)
     expect(saved.p_body).toBe('New article')
@@ -81,10 +96,10 @@ describe('editor access', () => {
     expect((await POST(request({ action: 'save', date: '2025-01-01', body: 'Edited', facts: 'Research', sources: [{ name: 'Source', url: 'https://example.test' }], version: 1 }))).status).toBe(200)
     expect(mocks.rpc.mock.calls[0][1].p_facts.generation.id).toBe('saved-generation')
   })
-  it('does not write an article when either researcher failed', async () => {
-    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
+  it('does not write an article when the researcher failed', async () => {
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.OPENAI_API_KEY = 'test'
     mocks.rpc.mockResolvedValue({ data: true, error: null })
-    mocks.gather.mockResolvedValue({ results: [{ text: 'Facts' }, { text: '', error: 'timeout' }], combined: 'Facts' })
+    mocks.gather.mockResolvedValue({ results: [{ text: '', error: 'timeout' }], combined: '' })
     vi.stubGlobal('fetch', vi.fn())
     expect((await generate(request({ date: '2025-01-01', version: 0 }))).status).toBe(503)
     expect(fetch).not.toHaveBeenCalled()
@@ -115,11 +130,10 @@ describe('editor access', () => {
   })
   it('keeps generation disabled by default and fails closed when the budget is exhausted', async () => {
     expect((await generate(request({}))).status).toBe(503)
-    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.ANTHROPIC_API_KEY = 'test'; process.env.OPENAI_API_KEY = 'test'
+    process.env.NEWS_PILOT_ENABLED = 'true'; process.env.OPENAI_API_KEY = 'test'
     mocks.rpc.mockResolvedValueOnce({ data: false, error: null })
     const result = await generate(request({ date: '2025-01-01', version: 0 }))
     expect(result.status).toBe(429)
-    delete process.env.ANTHROPIC_API_KEY
     delete process.env.OPENAI_API_KEY
   })
   it('rejects invalid dates and unsafe source links', () => {

@@ -4,7 +4,8 @@ Genereer een gepersonaliseerde babykrant op basis van een geboortedatum.
 De krant combineert persoonlijke gegevens (naam, geboorteverhaal, foto's)
 met historische data van die dag: nieuws, weer, tv-programmering,
 kijkcijfers, muziek, films en meer — herschreven tot krantartikelen door
-Claude (Haiku 4.5).
+OpenAI (standaard `gpt-5.4-mini`). Nieuws en cultuur worden per krant
+onderzocht door OpenAI met websearch (standaard `gpt-5.4`).
 
 Live: [babykrant-claude.vercel.app](https://babykrant-claude.vercel.app)
 
@@ -17,7 +18,7 @@ Live: [babykrant-claude.vercel.app](https://babykrant-claude.vercel.app)
    bronnen (Wikipedia, Wayback Machine/NOS/NU.nl, Open-Meteo, TMDB,
    Top 40, tv-gidsen, naambetekenis, Google News, nieuwsdossiers).
 3. **Generatie** (`/generate-articles`): alle acht krantsecties worden in
-   één gestructureerde Claude-call geschreven; per sectie regenereren kan.
+   één gestructureerde OpenAI-call geschreven; per sectie regenereren kan.
 
 ## Architectuur
 
@@ -32,7 +33,8 @@ pg_cron (Supabase)
 Next.js (Vercel)
   → API routes lezen eerst uit Supabase (cache)
     → miss: on-the-fly scrapen + resultaat terugschrijven (cache-on-read)
-  → /api/generate-paper: één Claude-call met alle data → 8 artikelen
+  → /api/generate-paper: OpenAI-onderzoek (nieuws, cultuur) + één
+    gestructureerde OpenAI-call met alle data → 8 artikelen
 ```
 
 De dagelijkse pipeline bouwt vanaf nu een sluitende cache op: elke krant
@@ -57,7 +59,10 @@ krant gebruikt een willekeurige HttpOnly gastensessie.
 
 | Variabele | Waarvoor |
 |---|---|
-| `ANTHROPIC_API_KEY` | Artikelgeneratie (Claude Haiku 4.5) |
+| `OPENAI_API_KEY` | Onderzoek (websearch) en artikelgeneratie |
+| `OPENAI_WRITER_MODEL` | Optioneel: schrijfmodel (standaard `gpt-5.4-mini`) |
+| `OPENAI_NEWS_WRITER_MODEL` | Optioneel: apart schrijfmodel voor nieuwsconcepten in `/admin` en het los opnieuw maken van de nieuwssectie (standaard gelijk aan `OPENAI_WRITER_MODEL`) |
+| `OPENAI_RESEARCH_MODEL` | Optioneel: onderzoeksmodel met websearch (standaard `gpt-5.4-2026-03-05`) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable/anon key (client-side reads) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key — alleen server-side, nooit `NEXT_PUBLIC_` |
@@ -130,7 +135,7 @@ bijbehorende test en is meteen duidelijk welke parser brak.
 ```
 app/               Next.js app router (wizard, generatie-UI, API routes)
 components/        Wizard-stappen
-lib/               Gedeelde modules (prompts, claude, supabase, cache, ...)
+lib/               Gedeelde modules (prompts, openai, supabase, cache, ...)
 supabase/          Migraties + Edge Functions (dagelijkse pipeline)
 scripts/           Losse tools (tv-bron scan, news discovery, export)
 data/              Statische data (dossiers.json, scanrapporten)

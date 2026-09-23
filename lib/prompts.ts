@@ -1,19 +1,16 @@
 // lib/prompts.ts
 // @version 1.0.0
-// Alle Claude-prompts voor de babykrant op één plek (alleen backend).
+// Alle AI-prompts voor de babykrant op één plek (alleen backend).
 // De frontend stuurt uitsluitend data; prompts leven hier.
 //
 // - SYSTEM_PROMPT + buildPrompt(section, data): per-sectie generatie
 //   (gebruikt door /api/generate-article, o.a. voor de "opnieuw"-knop)
-// - buildFullPaperPrompt(data) + PAPER_TOOL: één gestructureerde call die
+// - buildFullPaperPrompt(data) + PAPER_SCHEMA: één gestructureerde call die
 //   alle acht secties in één keer genereert (/api/generate-paper)
 
 import { getSterrenbeeld, getChineesJaar } from './calculations'
 import { ARTICLE_SECTIONS, type ArticleSection } from './articleTypes'
 import { buildNewsStyleExamples } from './newsStylePrompt'
-
-/** Het model voor alle artikelgeneratie. */
-export const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
 
 // SYSTEM PROMPT - Algemeen voor alle secties
 export const SYSTEM_PROMPT = `Je bent een professionele journalist die babykranten schrijft voor Nederlandse ouders.
@@ -172,8 +169,13 @@ Het artikel heeft drie delen:
 
 3. SELECTIE:
    - Kies 5-8 nieuwsitems. Meer dan de intro, en behandel ze met diepgang.
-   - Mix: Nederlands nieuws, internationale politiek, sport, wetenschap, bijzondere gebeurtenissen.
-   - Kies op tijdsbeeld: de grote verhaallijnen die dit jaar definiëren.
+   - Kies het nieuws van déze dag, in deze volgorde van voorrang:
+     a. wat die dag bovenaan de voorpagina van NOS of NU.nl stond (zie de archiefkoppen) of in het onderzoek als TOP is gemarkeerd;
+     b. het grootste internationale nieuws van die dag;
+     c. het belangrijkste sportnieuws van die dag;
+     d. iets uit wetenschap, cultuur of iets opvallends.
+   - Laat nieuws van een andere dag weg. Een grote verhaallijn van dat jaar alleen als korte achtergrond bij een concreet feit van die dag.
+   - Mix Nederlands en internationaal nieuws.
    - Sluit bij voorkeur af met iets lichts of opvallends (sport, ruimtevaart, een grappig feit).
    - Geen ongelukken, rampen of doden als opening. Specifieke dodentallen vermijden.
 
@@ -181,6 +183,7 @@ REGELS:
 - Gebruik ALLEEN feiten uit de aangeleverde lijst hieronder. Verzin niets.
 - Feiten die in meerdere bronnen voorkomen zijn waarschijnlijk betrouwbaarder.
 - Schrijf als een echte krant: feitelijk, specifiek, met namen en plaatsen. Geen vage samenvattingen.
+- Maak het levendig: geef elk item een concreet detail (een naam, getal, plaats of uitspraak) en wissel korte en langere zinnen af. Geen opsomming van losse feiten.
 - Geen categorie-introducties zoals "In de sportwereld..." of "Op internationaal vlak..."
 - De subkop "STAD - door onze verslaggevers" is het enige kopje. Verder doorlopende tekst.
 - Schrijf zakelijk maar toegankelijk, in het Nederlands.
@@ -385,14 +388,13 @@ const SECTION_ORDER: ArticleSection[] = [
 ]
 
 /**
- * Tool-definitie die Claude dwingt alle acht secties als JSON terug te
- * geven (structured output via forced tool use).
+ * JSON-schema dat het model dwingt alle acht secties als losse tekstvelden
+ * terug te geven (strict structured output).
  */
-export const PAPER_TOOL = {
-  name: 'lever_babykrant',
-  description: 'Lever alle acht artikelen van de babykrant aan als losse tekstvelden.',
-  input_schema: {
-    type: 'object' as const,
+export const PAPER_SCHEMA = {
+  name: 'babykrant',
+  schema: {
+    type: 'object',
     properties: Object.fromEntries(
       SECTION_ORDER.map((section) => [
         section,
@@ -403,6 +405,7 @@ export const PAPER_TOOL = {
       ])
     ),
     required: SECTION_ORDER,
+    additionalProperties: false,
   },
 }
 
@@ -416,7 +419,7 @@ export function buildFullPaperPrompt(data: any): string {
   const sectionBlocks = SECTION_ORDER.map((section) => {
     const sectionPrompt = buildPrompt(section, data)
       // De losse prompts eindigen op een schrijf-instructie; in de
-      // gecombineerde call levert de tool-call de tekst per veld.
+      // gecombineerde call levert het JSON-veld de tekst per sectie.
       .replace(/\n?Schrijf de tekst:$/, '')
     return `=== SECTIE "${section}" ===\n${sectionPrompt}`
   }).join('\n\n')
@@ -425,7 +428,7 @@ export function buildFullPaperPrompt(data: any): string {
 
 Hieronder staan de instructies en brondata per sectie. Schrijf elke sectie volgens zijn eigen instructies (structuur, lengte, toon) en zorg voor een consistente toon over de hele krant, zonder dezelfde formuleringen of openingszinnen te herhalen tussen secties.
 
-Lever het resultaat aan via de tool "lever_babykrant", met per sectie de volledige tekst (platte tekst, geen Markdown).
+Lever het resultaat aan als JSON, met per sectie de volledige tekst (platte tekst, geen Markdown).
 
 ${sectionBlocks}`
 }

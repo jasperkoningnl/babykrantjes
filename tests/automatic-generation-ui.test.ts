@@ -22,6 +22,13 @@ describe('automatische generatie-interface', () => {
     expect(loading).toContain('setKlaar(true)')
   })
 
+  it('probeert een mislukte generatie niet eindeloos opnieuw', () => {
+    const loading = read('app/loading-screen/page.tsx')
+    expect(loading).toContain('const MAX_AUTO_RETRIES = 2')
+    expect(loading).toContain('generationAttempt >= MAX_AUTO_RETRIES')
+    expect(loading).toContain('Opnieuw proberen')
+  })
+
   it('houdt de herstellink beschikbaar nadat de generatie klaar is', () => {
     expect(read('app/loading-screen/page.tsx')).toContain('RecoveryEmailForm')
     expect(read('app/generate-articles/page.tsx')).toContain('RecoveryEmailForm')
