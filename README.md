@@ -3,9 +3,9 @@
 Genereer een gepersonaliseerde babykrant op basis van een geboortedatum.
 De krant combineert persoonlijke gegevens (naam, geboorteverhaal, foto's)
 met historische data van die dag: nieuws, weer, tv-programmering,
-kijkcijfers, muziek, films en meer — herschreven tot krantartikelen door
-OpenAI (standaard `gpt-5.4-mini`). Nieuws en cultuur worden per krant
-onderzocht door OpenAI met websearch (standaard `gpt-5.4`).
+kijkcijfers, muziek, films en meer. De persoonlijke secties schrijft
+OpenAI (standaard `gpt-5.4-mini`). Nieuws (per dag) en cultuur (per week)
+schrijven Claude-taken vooraf; zie [docs/redactie](docs/redactie/README.md).
 
 Live: [babykrant-claude.vercel.app](https://babykrant-claude.vercel.app)
 
@@ -17,8 +17,9 @@ Live: [babykrant-claude.vercel.app](https://babykrant-claude.vercel.app)
 2. **Dataverzameling**: per geboortedatum wordt data opgehaald uit ~10
    bronnen (Wikipedia, Wayback Machine/NOS/NU.nl, Open-Meteo, TMDB,
    Top 40, tv-gidsen, naambetekenis, Google News, nieuwsdossiers).
-3. **Generatie** (`/generate-articles`): alle acht krantsecties worden in
-   één gestructureerde OpenAI-call geschreven; per sectie regenereren kan.
+3. **Generatie** (`/generate-articles`): nieuws en cultuur komen uit de
+   redactiebibliotheek; de zes persoonlijke secties worden in één
+   gestructureerde OpenAI-call geschreven. Per sectie regenereren kan.
 
 ## Architectuur
 
@@ -33,8 +34,10 @@ pg_cron (Supabase)
 Next.js (Vercel)
   → API routes lezen eerst uit Supabase (cache)
     → miss: on-the-fly scrapen + resultaat terugschrijven (cache-on-read)
-  → /api/generate-paper: OpenAI-onderzoek (nieuws, cultuur) + één
-    gestructureerde OpenAI-call met alle data → 8 artikelen
+  → /api/generate-paper: nieuws + cultuur uit de redactiebibliotheek,
+    één gestructureerde OpenAI-call voor de overige 6 artikelen
+  → /api/redactie/[sleutel]: MCP-connector waarmee Claude-taken nieuws
+    en cultuur lezen en publiceren (docs/redactie)
 ```
 
 De dagelijkse pipeline bouwt vanaf nu een sluitende cache op: elke krant
@@ -59,10 +62,9 @@ krant gebruikt een willekeurige HttpOnly gastensessie.
 
 | Variabele | Waarvoor |
 |---|---|
-| `OPENAI_API_KEY` | Onderzoek (websearch) en artikelgeneratie |
+| `OPENAI_API_KEY` | Persoonlijke krantsecties (hoofdartikel, horoscoop, weer, naam, naamgenoten, geboren op) |
 | `OPENAI_WRITER_MODEL` | Optioneel: schrijfmodel (standaard `gpt-5.4-mini`) |
-| `OPENAI_NEWS_WRITER_MODEL` | Optioneel: apart schrijfmodel voor nieuwsconcepten in `/admin` en het los opnieuw maken van de nieuwssectie (standaard gelijk aan `OPENAI_WRITER_MODEL`) |
-| `OPENAI_RESEARCH_MODEL` | Optioneel: onderzoeksmodel met websearch (standaard `gpt-5.4-2026-03-05`) |
+| `REDACTIE_SLEUTEL` | Geheime sleutel (min. 32 tekens) in de URL van de redactie-connector; zonder sleutel staat de connector uit |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable/anon key (client-side reads) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key — alleen server-side, nooit `NEXT_PUBLIC_` |

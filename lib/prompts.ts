@@ -6,11 +6,11 @@
 // - SYSTEM_PROMPT + buildPrompt(section, data): per-sectie generatie
 //   (gebruikt door /api/generate-article, o.a. voor de "opnieuw"-knop)
 // - buildFullPaperPrompt(data) + PAPER_SCHEMA: één gestructureerde call die
-//   alle acht secties in één keer genereert (/api/generate-paper)
+//   alle AI-secties in één keer genereert (/api/generate-paper)
+// Nieuws en cultuur schrijft de redactie vooraf (lib/contentLibrary.ts).
 
 import { getSterrenbeeld, getChineesJaar } from './calculations'
 import { ARTICLE_SECTIONS, type ArticleSection } from './articleTypes'
-import { buildNewsStyleExamples } from './newsStylePrompt'
 
 // SYSTEM PROMPT - Algemeen voor alle secties
 export const SYSTEM_PROMPT = `Je bent een professionele journalist die babykranten schrijft voor Nederlandse ouders.
@@ -142,59 +142,6 @@ TONE: Informatief, beschrijvend, gebruik derde persoon ("De stier is...")
 
 Schrijf de tekst:`
 
-    case 'nieuws':
-      const gatheredNewsFacts = data.gatheredFacts?.nieuws || ''
-      const datumVolledig = new Date(datum).toLocaleDateString('nl-NL', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        timeZone: 'Europe/Amsterdam'
-      })
-
-      return `Hieronder staan feiten over het nieuws op ${datumVolledig}, verzameld uit meerdere bronnen. Schrijf een nieuwsartikel van 200-280 woorden voor een babykrant over de geboorte van ${roepnaam}.
-
-STRUCTUUR:
-Het artikel heeft drie delen:
-
-1. INTRO-ALINEA (2-3 zinnen):
-   - Open exact met: "De geboorte van ${roepnaam} is het belangrijkste nieuws op ${datumVolledig}, maar er gebeurde meer."
-   - Noem direct 1-2 grote nieuwsitems als teaser, zodat de lezer wil doorlezen.
-
-2. SUBKOP + UITGEBREIDE ALINEA'S:
-   - Schrijf na de intro een subkop in de stijl: "HILVERSUM - door onze verslaggevers" (kies een Nederlandse mediastad: Utrecht, Hilversum, Amsterdam).
-   - Schrijf daarna 2-4 alinea's met gedetailleerde berichtgeving.
-   - Elke alinea behandelt 1-2 gerelateerde onderwerpen met echte details: namen, plaatsen, context.
-   - Maak natuurlijke overgangen tussen alinea's.
-
-3. SELECTIE:
-   - Kies 5-8 nieuwsitems. Meer dan de intro, en behandel ze met diepgang.
-   - Kies het nieuws van déze dag, in deze volgorde van voorrang:
-     a. wat die dag bovenaan de voorpagina van NOS of NU.nl stond (zie de archiefkoppen) of in het onderzoek als TOP is gemarkeerd;
-     b. het grootste internationale nieuws van die dag;
-     c. het belangrijkste sportnieuws van die dag;
-     d. iets uit wetenschap, cultuur of iets opvallends.
-   - Laat nieuws van een andere dag weg. Een grote verhaallijn van dat jaar alleen als korte achtergrond bij een concreet feit van die dag.
-   - Mix Nederlands en internationaal nieuws.
-   - Sluit bij voorkeur af met iets lichts of opvallends (sport, ruimtevaart, een grappig feit).
-   - Geen ongelukken, rampen of doden als opening. Specifieke dodentallen vermijden.
-
-REGELS:
-- Gebruik ALLEEN feiten uit de aangeleverde lijst hieronder. Verzin niets.
-- Feiten die in meerdere bronnen voorkomen zijn waarschijnlijk betrouwbaarder.
-- Schrijf als een echte krant: feitelijk, specifiek, met namen en plaatsen. Geen vage samenvattingen.
-- Maak het levendig: geef elk item een concreet detail (een naam, getal, plaats of uitspraak) en wissel korte en langere zinnen af. Geen opsomming van losse feiten.
-- Geen categorie-introducties zoals "In de sportwereld..." of "Op internationaal vlak..."
-- De subkop "STAD - door onze verslaggevers" is het enige kopje. Verder doorlopende tekst.
-- Schrijf zakelijk maar toegankelijk, in het Nederlands.
-
-${buildNewsStyleExamples(data.newsStyleExamples)}
-
-FEITEN:
-${gatheredNewsFacts || 'Geen feiten beschikbaar'}
-
-Schrijf de tekst:`
-
     case 'weer':
       const weather = data.weather
       if (!weather) {
@@ -225,39 +172,6 @@ STRUCTUUR:
 
 LENGTE: 60-100 woorden
 TONE: Beschrijvend, luchtig, toegankelijk
-
-Schrijf de tekst:`
-
-    case 'cultuur':
-      const gatheredCultuurFacts = data.gatheredFacts?.cultuur || ''
-      const geboortejaar = new Date(datum).getFullYear()
-      const heeftStreaming = geboortejaar >= 2015
-
-      return `Hieronder staan feiten over de cultuurwereld rond ${datum}, verzameld uit meerdere bronnen. Schrijf een vlot overzicht van 140-200 woorden voor een babykrant over de geboorte van ${roepnaam}.
-
-STRUCTUUR EN INHOUD:
-Schrijf doorlopende tekst in alinea's. Behandel deze onderwerpen in een natuurlijke volgorde:
-
-1. MUZIEK: Begin met de nummer 1-hit in de Top 40 of Mega Top 50. Noem artiest EN songtitel. Noem daarna 2-3 andere populaire artiesten/nummers uit de hitlijsten.
-2. TV: Welke programma's draaiden er op de Nederlandse televisie? Gebruik zinnen als "Op TV zijn programma's als..." of "De kijker kan kiezen uit...". Noem zowel amusement als actualiteit.${heeftStreaming ? '\n3. STREAMING: Welke series waren trending op Netflix, Disney+, Apple TV+ of andere diensten?' : ''}
-${heeftStreaming ? '4' : '3'}. FILM: Welke films draaiden er in de bioscoop? Kies titels die cultureel impact hadden.
-${heeftStreaming ? '5' : '4'}. RADIO: Sluit af met radioprogramma's als die beschikbaar zijn ("Op radio kun je luisteren naar...").
-
-STIJL:
-- Schrijf toegankelijk en luchtig, als een cultuurpagina in een echte krant.
-- Noem concrete titels, namen en programma's. Geen vage omschrijvingen.
-- Maak het een momentopname: de lezer moet het tijdsbeeld herkennen.
-- Noem bij muziek artiest EN songtitel.
-- Noem bij films eventueel de regisseur als die algemeen bekend is.
-
-REGELS:
-- Gebruik ALLEEN feiten uit de aangeleverde lijst hieronder. Verzin niets.
-- Feiten die in meerdere bronnen voorkomen zijn waarschijnlijk betrouwbaarder.
-- Geen Markdown, geen kopjes, geen kijkcijfers.
-- Schrijf in het Nederlands.
-
-FEITEN:
-${gatheredCultuurFacts || 'Geen feiten beschikbaar'}
 
 Schrijf de tekst:`
 
@@ -376,19 +290,22 @@ Schrijf de tekst:`
 // Eén gestructureerde call voor de complete babykrant
 // =============================================================================
 
-const SECTION_ORDER: ArticleSection[] = [
+/** Secties die de redactie vooraf schrijft; die gaan nooit naar het schrijfmodel. */
+export const LIBRARY_SECTIONS = ['nieuws', 'cultuur'] as const satisfies readonly ArticleSection[]
+
+/** Secties die per krant door het schrijfmodel worden geschreven. */
+export const AI_SECTIONS = [
   'hoofdartikel',
   'sterrenbeeld',
-  'nieuws',
   'weer',
-  'cultuur',
   'naam_betekenis',
   'beroemde_namen',
   'geboren_op_dag',
-]
+] as const satisfies readonly ArticleSection[]
+export type AiSection = typeof AI_SECTIONS[number]
 
 /**
- * JSON-schema dat het model dwingt alle acht secties als losse tekstvelden
+ * JSON-schema dat het model dwingt alle AI-secties als losse tekstvelden
  * terug te geven (strict structured output).
  */
 export const PAPER_SCHEMA = {
@@ -396,7 +313,7 @@ export const PAPER_SCHEMA = {
   schema: {
     type: 'object',
     properties: Object.fromEntries(
-      SECTION_ORDER.map((section) => [
+      AI_SECTIONS.map((section) => [
         section,
         {
           type: 'string',
@@ -404,19 +321,19 @@ export const PAPER_SCHEMA = {
         },
       ])
     ),
-    required: SECTION_ORDER,
+    required: [...AI_SECTIONS],
     additionalProperties: false,
   },
 }
 
 /**
- * Bouwt één user prompt die alle acht secties beschrijft. Hergebruikt de
+ * Bouwt één user prompt die alle AI-secties beschrijft. Hergebruikt de
  * per-sectie prompts zodat beide generatiepaden dezelfde instructies delen.
  */
 export function buildFullPaperPrompt(data: any): string {
   const naam = data?.basisGegevens?.volledigeNaam || 'de baby'
 
-  const sectionBlocks = SECTION_ORDER.map((section) => {
+  const sectionBlocks = AI_SECTIONS.map((section) => {
     const sectionPrompt = buildPrompt(section, data)
       // De losse prompts eindigen op een schrijf-instructie; in de
       // gecombineerde call levert het JSON-veld de tekst per sectie.
@@ -424,7 +341,7 @@ export function buildFullPaperPrompt(data: any): string {
     return `=== SECTIE "${section}" ===\n${sectionPrompt}`
   }).join('\n\n')
 
-  return `Schrijf de complete babykrant voor ${naam}: alle acht secties in één keer.
+  return `Schrijf de volgende secties van de babykrant voor ${naam} in één keer. Het nieuws en de cultuurpagina staan al klaar; die schrijf je niet.
 
 Hieronder staan de instructies en brondata per sectie. Schrijf elke sectie volgens zijn eigen instructies (structuur, lengte, toon) en zorg voor een consistente toon over de hele krant, zonder dezelfde formuleringen of openingszinnen te herhalen tussen secties.
 

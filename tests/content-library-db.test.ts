@@ -43,11 +43,12 @@ beforeAll(async () => {
   `)
   await exec(readFileSync(new URL('../supabase/migrations/20260905101814_content_library_news_foundation.sql', import.meta.url), 'utf8'))
   await exec(readFileSync(new URL('../supabase/migrations/20260905115345_news_editorial_review.sql', import.meta.url), 'utf8'))
+  await exec(readFileSync(new URL('../supabase/migrations/20260926190000_redactie_connector.sql', import.meta.url), 'utf8'))
   await exec("notify pgrst, 'reload schema'")
 }, 60_000)
 
 beforeEach(async () => {
-  await exec('truncate public.article_publications, public.article_revisions, public.news_articles, public.articles, public.content_jobs cascade')
+  await exec('truncate public.article_publications, public.article_drafts, public.article_revisions, public.culture_articles, public.news_articles, public.articles, public.content_jobs cascade')
   await exec('update public.news_pilot_budget set reserved_cents = 0')
 })
 afterAll(async () => { if (pool) await pool.end(); else await embedded!.close() })
@@ -211,5 +212,91 @@ describe('news foundation migration', () => {
       await roleExec('reset role')
       client?.release()
     }
+  })
+
+  describe('redactie-connector', () => {
+    const publishLibrary = (type: string, key: string, body = 'Tekst', sourceJson = sources, note: string | null = null) =>
+      query('select public.publish_library_article($1, $2, $3, $4::jsonb, $5) as result', [type, key, body, sourceJson, note])
+        .then(rows => rows[0].result)
+    const read = (type: string, key: string) => query('select public.library_article($1, $2) as result', [type, key]).then(rows => rows[0].result)
+    const overview = (type: string, from: string, to: string) =>
+      query('select public.library_overview($1, $2, $3) as result', [type, from, to]).then(rows => rows[0].result)
+
+    it('publishes news directly and keeps every version', async () => {
+      const first = await publishLibrary('news', '2025-01-01', 'Eerste versie', sources, 'Eerste publicatie')
+      const second = await publishLibrary('news', '2025-01-01', '  Tweede versie  ')
+      expect([first.version, second.version]).toEqual([1, 2])
+      expect(second.article_id).toBe(first.article_id)
+      const article = await read('news', '2025-01-01')
+      expect(article.published).toMatchObject({ version: 2, body: 'Tweede versie', revision_id: second.revision_id })
+      expect(article.draft).toBeNull()
+      expect(await query('select body from public.article_revisions order by version')).toEqual([{ body: 'Eerste versie' }, { body: 'Tweede versie' }])
+      expect(await query('select actor_id, reason, previous_revision_id from public.article_publications order by created_at')).toEqual([
+        { actor_id: null, reason: 'Eerste publicatie', previous_revision_id: null },
+        { actor_id: null, reason: 'Gepubliceerd via redactie-connector', previous_revision_id: first.revision_id },
+      ])
+      expect((await query('select editorial_status from public.articles'))[0].editorial_status).toBe('approved')
+    })
+
+    it('stores culture per week starting on Monday', async () => {
+      await expect(publishLibrary('culture', '2025-01-01')).rejects.toThrow(/Monday/)
+      await publishLibrary('culture', '2024-12-30', 'Cultuurweek')
+      expect((await read('culture', '2024-12-30')).published.body).toBe('Cultuurweek')
+      expect(await read('news', '2024-12-30')).toBeNull()
+      expect(await overview('culture', '2024-12-01', '2025-01-31')).toEqual([
+        expect.objectContaining({ key: '2024-12-30', version: 1, has_draft: false }),
+      ])
+      await expect(query(`insert into public.culture_articles(article_id, week_start)
+        select id, '2025-01-06' from public.articles where article_type = 'culture'`)).rejects.toThrow()
+    })
+
+    it('rejects invalid input without partial writes', async () => {
+      await expect(publishLibrary('weather', '2025-01-01')).rejects.toThrow(/Unknown article type/)
+      await expect(publishLibrary('news', '9999-01-01')).rejects.toThrow(/future/)
+      await expect(publishLibrary('news', '2025-01-01', '   ')).rejects.toThrow(/Invalid body/)
+      await expect(publishLibrary('news', '2025-01-01', 'Tekst', '[]')).rejects.toThrow(/Sources required/)
+      await expect(publishLibrary('news', '2025-01-01', 'Tekst', '[{"name":"Model"}]')).rejects.toThrow(/Invalid source/)
+      await expect(publishLibrary('news', '2025-01-01', 'Tekst', sources, 'x'.repeat(1001))).rejects.toThrow(/Note too long/)
+      expect(await query('select * from public.articles')).toHaveLength(0)
+    })
+
+    it('shows old drafts, hides rejected articles and republishes them', async () => {
+      const save = () => query("select * from public.save_news_draft('2025-01-02', 'Oud concept', '{}', $1, 0, $2)", [sources, actor])
+      const [draft] = await save()
+      expect(await read('news', '2025-01-02')).toMatchObject({ published: null, draft: { body: 'Oud concept' } })
+      expect(await overview('news', '2025-01-01', '2025-01-31')).toEqual([expect.objectContaining({ key: '2025-01-02', version: null, has_draft: true })])
+      await exec(`update public.articles set editorial_status = 'rejected' where id = '${draft.article_id}'`)
+      expect(await read('news', '2025-01-02')).toMatchObject({ published: null, draft: null })
+      expect(await overview('news', '2025-01-01', '2025-01-31')).toEqual([])
+      await publishLibrary('news', '2025-01-02', 'Nieuwe tekst')
+      expect((await read('news', '2025-01-02')).published.body).toBe('Nieuwe tekst')
+    })
+
+    it('serializes concurrent first publications for one date', async () => {
+      const results = await Promise.all(Array.from({ length: 5 }, (_, i) => publishLibrary('news', '2025-01-03', `Versie ${i}`)))
+      expect(new Set(results.map(result => result.article_id)).size).toBe(1)
+      expect(results.map(result => result.version).sort()).toEqual([1, 2, 3, 4, 5])
+      expect(await query('select * from public.news_articles')).toHaveLength(1)
+    })
+
+    it('denies public roles and allows service workers', async () => {
+      for (const role of ['anon', 'authenticated']) {
+        for (const fn of ['public.publish_library_article(text, date, text, jsonb, text)', 'public.library_article(text, date)', 'public.library_overview(text, date, date)']) {
+          expect((await query("select has_function_privilege($1, $2, 'EXECUTE') as allowed", [role, fn]))[0].allowed).toBe(false)
+        }
+        expect((await query("select has_table_privilege($1, 'public.culture_articles', 'SELECT,INSERT,UPDATE,DELETE') as allowed", [role]))[0].allowed).toBe(false)
+      }
+      expect((await query("select relrowsecurity from pg_class where oid = 'public.culture_articles'::regclass"))[0].relrowsecurity).toBe(true)
+      const client = pool ? await pool.connect() : null
+      const roleExec = (sql: string) => client ? client.query(sql) : embedded!.exec(sql)
+      try {
+        await roleExec('set role service_role')
+        await roleExec(`select public.publish_library_article('culture', '2025-01-06', 'Week', '[{"name":"Top 40","url":"https://www.top40.nl"}]')`)
+        await roleExec(`select public.library_article('culture', '2025-01-06'), public.library_overview('news', '2025-01-01', '2025-01-31')`)
+      } finally {
+        await roleExec('reset role')
+        client?.release()
+      }
+    })
   })
 })
