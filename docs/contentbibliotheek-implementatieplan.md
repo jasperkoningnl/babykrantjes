@@ -1,5 +1,7 @@
 # Implementatieplan: centrale contentbibliotheek
 
+> **Achterhaald voor nieuws en cultuur (26 september 2026):** die worden nu door Claude-taken geschreven en gepubliceerd, zonder beheeromgeving. Zie [docs/redactie](redactie/README.md).
+>
 > **Status:** beperkt nieuws-fundament goedgekeurd door opdrachtgever op 5 september 2026; overige fases blijven voorstel. Zie [review en uitvoeringsstatus](contentbibliotheek-review.md). Productiemigratie niet uitgevoerd.
 > **Doel:** gedeelde artikelen eenmalig genereren, redactioneel beheren en hergebruiken in babykranten.
 

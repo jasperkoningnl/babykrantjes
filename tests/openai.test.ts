@@ -42,18 +42,21 @@ it('refuses oversized input before calling the API', async () => {
   expect(fetcher).not.toHaveBeenCalled()
 })
 
-it('requests a strict JSON schema and returns all paper sections', async () => {
+it('requests a strict JSON schema and returns all AI sections', async () => {
   const sections = PAPER_SCHEMA.schema.required
   const fetcher = mockFetch(reply(JSON.stringify(Object.fromEntries(sections.map(s => [s, `tekst ${s}`])))))
   const result = await callOpenAIStructured<Record<string, string>>('prompt', 'systeem', PAPER_SCHEMA)
   const body = JSON.parse(fetcher.mock.calls[0][1].body)
   expect(body.text.format).toMatchObject({ type: 'json_schema', name: 'babykrant', strict: true })
   expect(body.text.format.schema.additionalProperties).toBe(false)
-  expect(result.data.nieuws).toBe('tekst nieuws')
+  expect(result.data.hoofdartikel).toBe('tekst hoofdartikel')
+  // Nieuws en cultuur schrijft de redactie vooraf; het schrijfmodel krijgt ze niet.
+  expect(sections).not.toContain('nieuws')
+  expect(sections).not.toContain('cultuur')
 })
 
 it('rejects structured output with a missing section or invalid JSON', async () => {
-  mockFetch(reply(JSON.stringify({ nieuws: 'alleen nieuws' })))
+  mockFetch(reply(JSON.stringify({ hoofdartikel: 'alleen het hoofdartikel' })))
   await expect(callOpenAIStructured('prompt', 'systeem', PAPER_SCHEMA)).rejects.toThrow('volledig')
   mockFetch(reply('geen json'))
   await expect(callOpenAIStructured('prompt', 'systeem', PAPER_SCHEMA)).rejects.toThrow('geldig')

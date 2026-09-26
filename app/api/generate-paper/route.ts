@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { ArticleSection } from '@/lib/articleTypes'
-import { SYSTEM_PROMPT, buildFullPaperPrompt, PAPER_SCHEMA } from '@/lib/prompts'
+import { SYSTEM_PROMPT, buildFullPaperPrompt, PAPER_SCHEMA, type AiSection } from '@/lib/prompts'
 import { callOpenAIStructured, OPENAI_PRICING } from '@/lib/openai'
-import { gatherNewsEvidence, gatherCultuurFacts } from '@/lib/factGathering'
-import { loadNewsStyleExamples } from '@/lib/newsStyleExamples'
+import { fillName, getPublishedText } from '@/lib/contentLibrary'
 import { getSupabaseAdmin } from '@/lib/supabase'
 import { checkRateLimit, reserveDailyCost, settleDailyCost } from '@/lib/rateLimit'
 import { findPaperSession } from '@/lib/paperSession'
@@ -41,13 +39,14 @@ export async function POST(request: NextRequest) {
     }
 
     const geboorteDatum = data.basisGegevens.geboorteDatum
-    stage = 'onderzoek'
-    const [nieuwsFacts, cultuurFacts, newsStyleExamples] = await Promise.all([gatherNewsEvidence(geboorteDatum), gatherCultuurFacts(geboorteDatum), loadNewsStyleExamples()])
-    data.newsStyleExamples = newsStyleExamples
-    data.gatheredFacts = { nieuws: nieuwsFacts.combined, cultuur: cultuurFacts.combined }
+    const roepnaam = String(data.basisGegevens.volledigeNaam).trim().split(/\s+/)[0]
+    // Nieuws en cultuur schrijft de redactie vooraf; die kosten hier niets.
+    stage = 'bibliotheek'
+    const [nieuws, cultuur] = await Promise.all([getPublishedText('news', geboorteDatum), getPublishedText('culture', geboorteDatum)])
+    if (!nieuws || !cultuur) console.warn(`[GeneratePaper] Geen gepubliceerd ${[!nieuws && 'nieuws', !cultuur && 'cultuur'].filter(Boolean).join(' en ')} voor ${geboorteDatum}`)
     stage = 'schrijven'
-    const result = await callOpenAIStructured<Record<ArticleSection, string>>(buildFullPaperPrompt(data), SYSTEM_PROMPT, PAPER_SCHEMA)
-    const articles = result.data
+    const result = await callOpenAIStructured<Record<AiSection, string>>(buildFullPaperPrompt(data), SYSTEM_PROMPT, PAPER_SCHEMA)
+    const articles = { ...result.data, nieuws: fillName(nieuws ?? '', roepnaam), cultuur: fillName(cultuur ?? '', roepnaam) }
     const wordCounts = Object.fromEntries(Object.entries(articles).map(([section, text]) => [section, String(text).trim().split(/\s+/).filter(Boolean).length]))
     const cost = calculateCost(result.tokensUsed.input, result.tokensUsed.output)
     await settleDailyCost(RESERVED_COST, cost)

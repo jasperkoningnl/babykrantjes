@@ -1,102 +1,58 @@
 import 'server-only'
 
 import { getSupabaseAdmin } from './supabase'
-import { parseCalendarDate } from './contentDates'
+import { contentWeekStart, parseCalendarDate } from './contentDates'
 
-export interface NewsJob {
-  id: string
-  content_key: string
-  status: 'queued' | 'running' | 'completed' | 'failed'
-  attempts: number
-  max_attempts: number
-  lock_token: string | null
-  lease_expires_at: string | null
-}
+// Gedeelde artikelen: nieuws per dag, cultuur per week (maandag).
+// Geschreven en gepubliceerd door de Claude-redactietaken via de redactie-connector.
+export type LibraryType = 'news' | 'culture'
 
-export interface NewsRevisionInput {
-  body: string
-  facts: Record<string, unknown>
-  sources: { url: string; name: string; date?: string; title?: string; retrieved_at?: string }[]
-  metadata: Record<string, unknown>
-  coverageTier: 'recent_week' | 'recent_month' | 'recent_year' | 'historical_on_demand'
-  researchMethod: string
-}
+export interface LibrarySource { name: string; url: string }
 
-export interface PublishedNews {
-  id: string
+export interface LibraryArticle {
   article_id: string
-  version: number
-  body: string
-  facts_snapshot: Record<string, unknown>
-  sources_snapshot: NewsRevisionInput['sources']
-  published_at: string
+  published: { revision_id: string; version: number; body: string; sources: LibrarySource[]; published_at: string; note: string | null } | null
+  draft: { body: string; sources: LibrarySource[]; updated_at: string } | null
 }
 
-function requireDate(date: string) {
-  if (!parseCalendarDate(date)) throw new Error('Ongeldige nieuwsdatum')
+export interface LibraryOverviewItem { key: string; version: number | null; published_at: string | null; has_draft: boolean }
+
+/** De sleutel waaronder een datum is opgeslagen: de dag zelf, of voor cultuur de maandag van die week. */
+export function libraryKey(type: LibraryType, date: string): string {
+  if (!parseCalendarDate(date)) throw new Error('Ongeldige datum')
+  return type === 'culture' ? contentWeekStart(date) : date
 }
 
-/** No callers in the customer flow yet. All mutations are single database transactions. */
-export async function enqueueNewsJob(date: string): Promise<NewsJob> {
-  requireDate(date)
-  const { data, error } = await getSupabaseAdmin().rpc('enqueue_news_job', { p_date: date })
+export async function getLibraryArticle(type: LibraryType, date: string): Promise<LibraryArticle | null> {
+  const { data, error } = await getSupabaseAdmin().rpc('library_article', { p_type: type, p_key: libraryKey(type, date) })
   if (error) throw error
-  return data as NewsJob
+  return (data as LibraryArticle | null) ?? null
 }
 
-export async function claimNewsJob(leaseSeconds = 300): Promise<NewsJob | null> {
-  const { data, error } = await getSupabaseAdmin().rpc('claim_news_job', { p_lease_seconds: leaseSeconds })
+/** Alleen gepubliceerde tekst; een oud concept of een onbruikbare datum levert niets op. */
+export async function getPublishedText(type: LibraryType, date: string): Promise<string | null> {
+  if (!parseCalendarDate(date)) return null
+  return (await getLibraryArticle(type, date))?.published?.body ?? null
+}
+
+export async function listLibrary(type: LibraryType, from: string, to: string): Promise<LibraryOverviewItem[]> {
+  const { data, error } = await getSupabaseAdmin().rpc('library_overview', { p_type: type, p_from: from, p_to: to })
   if (error) throw error
-  return (data?.[0] as NewsJob) ?? null
+  return (data as LibraryOverviewItem[]) ?? []
 }
 
-export async function failNewsJob(jobId: string, lockToken: string, errorCode: string): Promise<boolean> {
-  const { data, error } = await getSupabaseAdmin().rpc('fail_news_job', {
-    p_job_id: jobId, p_lock_token: lockToken, p_error_code: errorCode,
+export async function publishLibraryArticle(input: {
+  type: LibraryType; date: string; body: string; sources: LibrarySource[]; note?: string
+}): Promise<{ article_id: string; revision_id: string; version: number }> {
+  const { data, error } = await getSupabaseAdmin().rpc('publish_library_article', {
+    p_type: input.type, p_key: libraryKey(input.type, input.date), p_body: input.body,
+    p_sources: input.sources, p_note: input.note ?? null,
   })
   if (error) throw error
-  return data === true
+  return data as { article_id: string; revision_id: string; version: number }
 }
 
-export async function completeNewsJob(jobId: string, lockToken: string, revision: NewsRevisionInput): Promise<string> {
-  const { data, error } = await getSupabaseAdmin().rpc('complete_news_job', {
-    p_job_id: jobId, p_lock_token: lockToken, p_body: revision.body,
-    p_facts: revision.facts, p_sources: revision.sources, p_metadata: revision.metadata,
-    p_coverage_tier: revision.coverageTier, p_research_method: revision.researchMethod,
-  })
-  if (error) throw error
-  return data as string
-}
-
-/** Caller must authorize the editor server-side before using this internal primitive. */
-export async function publishArticleRevision(input: {
-  articleId: string; revisionId: string; expectedCurrentId: string | null; actorId: string; reason: string
-}): Promise<string> {
-  const { data, error } = await getSupabaseAdmin().rpc('publish_article_revision', {
-    p_article_id: input.articleId, p_revision_id: input.revisionId,
-    p_expected_current_id: input.expectedCurrentId, p_actor_id: input.actorId, p_reason: input.reason,
-  })
-  if (error) throw error
-  return data as string
-}
-
-export async function getPublishedNews(date: string): Promise<PublishedNews | null> {
-  requireDate(date)
-  const supabase = getSupabaseAdmin()
-  const { data: news, error: newsError } = await supabase.from('news_articles')
-    .select('article_id').eq('news_date', date).maybeSingle()
-  if (newsError) throw newsError
-  if (!news) return null
-  const { data: article, error: articleError } = await supabase.from('articles')
-    .select('current_revision_id').eq('id', news.article_id).maybeSingle()
-  if (articleError) throw articleError
-  if (!article?.current_revision_id) return null
-  // Fetch the exact immutable revision, never simply the newest draft.
-  // A newer needs_review revision must not hide the last approved publication.
-  const { data, error } = await supabase.from('article_revisions')
-    .select('id, article_id, version, body, facts_snapshot, sources_snapshot, published_at')
-    .eq('article_id', news.article_id).eq('id', article.current_revision_id)
-    .not('published_at', 'is', null).maybeSingle()
-  if (error) throw error
-  return data as PublishedNews | null
+/** Gedeelde teksten gebruiken [NAAM]; de krant vult de roepnaam in. */
+export function fillName(text: string, roepnaam: string): string {
+  return text.replaceAll('[NAAM]', roepnaam)
 }
