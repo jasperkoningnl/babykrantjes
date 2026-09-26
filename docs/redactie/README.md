@@ -21,7 +21,7 @@ OpenAI schrijft alleen nog de persoonlijke secties: hoofdartikel, horoscoop, wee
 2. **Sleutel.** Maak in Vercel de omgevingsvariabele `REDACTIE_SLEUTEL` aan, voor Production. Gebruik een willekeurige reeks van minstens 32 letters en cijfers, bijvoorbeeld uit je wachtwoordmanager. Deploy daarna opnieuw.
 3. **Connector.** Ga in Claude naar [Customize → Connectors](https://claude.ai/customize/connectors), klik op "+" en kies "Add custom connector".
    - Naam: `Babykrantje redactie`
-   - URL: `https://babykrant-claude.vercel.app/api/redactie/<REDACTIE_SLEUTEL>`, of je eigen domein.
+   - URL: `https://www.babykrantje.nl/api/redactie/<REDACTIE_SLEUTEL>`. Gebruik precies dit adres, met `www`. De andere domeinen sturen door, en een doorverwijzing kan de connector breken.
    - Laat de OAuth-velden leeg.
    - Wie deze URL heeft, kan publiceren. Deel hem dus niet. Heb je hem toch gedeeld, maak dan een nieuwe sleutel aan en werk de URL bij.
 4. **Cowork-project.** Maak een project "Babykrantje redactie" aan en plak [projectinstructies.md](projectinstructies.md) in de instructies. Zet de connector aan.
